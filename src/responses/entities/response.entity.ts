@@ -1,3 +1,4 @@
+import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import {
@@ -36,6 +37,16 @@ export class Response {
     referencedColumnName: 'questionId',
   })
   question: Question;
+
+  @ManyToOne(() => OptionQuestion, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({
+    name: 'option_id',
+    referencedColumnName: 'optionId',
+  })
+  option?: OptionQuestion;
 
   @Column({
     name: 'text_value',
