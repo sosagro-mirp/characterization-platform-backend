@@ -1,26 +1,54 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
+import { Department } from './entities/department.entity';
 
 @Injectable()
 export class DepartmentsService {
-  create(createDepartmentDto: CreateDepartmentDto) {
-    return 'This action adds a new department';
+  constructor(
+    @InjectRepository(Department)
+    private readonly departmentsRepository: Repository<Department>,
+  ) {}
+
+  async create(createDepartmentDto: CreateDepartmentDto): Promise<Department> {
+    const department = this.departmentsRepository.create(createDepartmentDto);
+
+    return await this.departmentsRepository.save(department);
   }
 
-  findAll() {
-    return `This action returns all departments`;
+  async findAll(): Promise<Department[]> {
+    return await this.departmentsRepository.find({
+      order: { name: 'ASC' },
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} department`;
+  async findOne(id: string): Promise<Department> {
+    const department = await this.departmentsRepository.findOne({
+      where: { departmentId: id },
+    });
+
+    if (!department) {
+      throw new NotFoundException('Department not found');
+    }
+
+    return department;
   }
 
-  update(id: number, updateDepartmentDto: UpdateDepartmentDto) {
-    return `This action updates a #${id} department`;
+  async update(
+    id: string,
+    updateDepartmentDto: UpdateDepartmentDto,
+  ): Promise<Department> {
+    const department = await this.findOne(id);
+
+    Object.assign(department, updateDepartmentDto);
+
+    return await this.departmentsRepository.save(department);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} department`;
+  async remove(id: string): Promise<void> {
+    const department = await this.findOne(id);
+    await this.departmentsRepository.remove(department);
   }
 }
