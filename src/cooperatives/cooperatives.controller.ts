@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { CooperativesService } from './cooperatives.service';
 import { CreateCooperativeDto } from './dto/create-cooperative.dto';
 import { UpdateCooperativeDto } from './dto/update-cooperative.dto';
@@ -18,17 +27,20 @@ export class CooperativesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.cooperativesService.findOne(+id);
+  findOne(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.cooperativesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCooperativeDto: UpdateCooperativeDto) {
-    return this.cooperativesService.update(+id, updateCooperativeDto);
+  update(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() updateCooperativeDto: UpdateCooperativeDto,
+  ) {
+    return this.cooperativesService.update(id, updateCooperativeDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.cooperativesService.remove(+id);
+  remove(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.cooperativesService.remove(id);
   }
 }
