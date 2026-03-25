@@ -23,24 +23,24 @@ export class Survey {
   surveyId: string;
 
   @ManyToOne(() => Farmer, {
-    nullable: false,
+    nullable: true,
     onDelete: 'RESTRICT',
   })
   @JoinColumn({
     name: 'farmer_id',
     referencedColumnName: 'id',
   })
-  farmer: Farmer;
+  farmer?: Farmer;
 
   @ManyToOne(() => User, {
-    nullable: false,
+    nullable: true,
     onDelete: 'RESTRICT',
   })
   @JoinColumn({
     name: 'user_id',
     referencedColumnName: 'userId',
   })
-  user: User;
+  user?: User;
 
   @ManyToMany(() => Instrument, (instrument) => instrument.surveys)
   @JoinTable({
