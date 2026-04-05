@@ -43,6 +43,13 @@ export class OptionQuestion {
   })
   value?: number;
 
+  @Column({
+    name: 'is_other',
+    type: 'boolean',
+    default: false,
+  })
+  isOther: boolean;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',

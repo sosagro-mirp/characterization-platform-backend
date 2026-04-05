@@ -75,6 +75,7 @@ export class InstrumentsService {
             optionId: option.optionId,
             text: option.text,
             value: option.value,
+            isOther: option.isOther,
           })),
         })),
       })),

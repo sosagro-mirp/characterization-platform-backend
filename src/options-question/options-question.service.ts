@@ -31,8 +31,25 @@ export class OptionsQuestionService {
       throw new NotFoundException('Question not found');
     }
 
+    if (createOptionQuestionDto.isOther) {
+      const existing = await this.optionsQuestionRepository.findOne({
+        where: { question: { questionId }, isOther: true },
+      });
+      if (existing) {
+        throw new BadRequestException(
+          'This question already has an "other" option',
+        );
+      }
+    }
+
+    const text = createOptionQuestionDto.isOther
+      ? createOptionQuestionDto.text
+      : createOptionQuestionDto.text.trim().charAt(0).toUpperCase() +
+        createOptionQuestionDto.text.trim().slice(1).toLowerCase();
+
     const option = this.optionsQuestionRepository.create({
       ...createOptionQuestionDto,
+      text,
       question,
     });
 
@@ -58,6 +75,10 @@ export class OptionsQuestionService {
     const options = this.optionsQuestionRepository.create(
       createOptionQuestionDtos.map((dto) => ({
         ...dto,
+        text: dto.isOther
+          ? dto.text
+          : dto.text.trim().charAt(0).toUpperCase() +
+            dto.text.trim().slice(1).toLowerCase(),
         question,
       })),
     );

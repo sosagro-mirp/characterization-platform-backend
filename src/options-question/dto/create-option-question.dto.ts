@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -15,4 +16,8 @@ export class CreateOptionQuestionDto {
   @IsOptional()
   @IsNumber()
   value?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isOther?: boolean;
 }
