@@ -62,4 +62,17 @@ export class SurveysService {
 
     return await this.surveysRepository.save(survey);
   }
+
+  async markAsSynchronized(surveyId: string): Promise<Survey> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+    });
+
+    if (!survey) {
+      throw new NotFoundException('Survey not found');
+    }
+
+    survey.sincronized = true;
+    return this.surveysRepository.save(survey);
+  }
 }
