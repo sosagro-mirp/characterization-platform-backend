@@ -39,6 +39,28 @@ export class ResponsesService {
       throw new BadRequestException('At least one response must be provided');
     }
 
+    const surveyIds = [
+      ...new Set(createResponseDtos.map((d) => d.surveyId)),
+    ];
+    if (surveyIds.length > 1) {
+      throw new BadRequestException(
+        'All responses must belong to the same survey',
+      );
+    }
+
+    const surveyId = surveyIds[0];
+
+    const existingCount = await this.responsesRepository.count({
+      where: { survey: { surveyId } },
+    });
+
+    if (existingCount > 0) {
+      return this.responsesRepository.find({
+        where: { survey: { surveyId } },
+        relations: { survey: true, question: true, option: true },
+      });
+    }
+
     return await this.responsesRepository.manager.transaction(
       async (manager) => {
         const responses: Response[] = [];
