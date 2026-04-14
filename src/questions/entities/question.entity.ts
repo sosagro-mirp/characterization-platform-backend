@@ -65,6 +65,18 @@ export class Question {
   })
   order: number;
 
+  @ManyToOne(() => Question, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'condition_question_id' })
+  conditionQuestion?: Question;
+
+  @Column({
+    name: 'condition_value',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  conditionValue?: string;
+
   @OneToMany(
     () => Response,
     (response: Response): Question => response.question,
