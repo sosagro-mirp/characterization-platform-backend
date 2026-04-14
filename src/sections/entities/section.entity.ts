@@ -20,7 +20,7 @@ export class Section {
 
   @Column({
     type: 'varchar',
-    length: 50,
+    length: 100,
     nullable: false,
   })
   name: string;

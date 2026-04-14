@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUUID,
   MaxLength,
@@ -23,4 +24,13 @@ export class CreateQuestionDto {
   @IsInt()
   @Min(1)
   order: number;
+
+  @IsOptional()
+  @IsUUID()
+  conditionQuestionId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  conditionValue?: string;
 }

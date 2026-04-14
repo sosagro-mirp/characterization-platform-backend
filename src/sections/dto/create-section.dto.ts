@@ -3,7 +3,7 @@ import { IsInt, IsNotEmpty, IsString, MaxLength, Min } from 'class-validator';
 export class CreateSectionDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(50)
+  @MaxLength(100)
   name: string;
 
   @IsInt()

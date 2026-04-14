@@ -21,7 +21,7 @@ export class QuestionsService {
     sectionId: string,
     createQuestionDto: CreateQuestionDto,
   ): Promise<Question> {
-    const { typeId, ...questionData } = createQuestionDto;
+    const { typeId, conditionQuestionId, ...questionData } = createQuestionDto;
 
     const section = await this.sectionsRepository.findOne({
       where: { sectionId },
@@ -39,10 +39,25 @@ export class QuestionsService {
       throw new NotFoundException('Type of question not found');
     }
 
+    let conditionQuestion: Question | undefined;
+
+    if (conditionQuestionId) {
+      const found = await this.questionsRepository.findOne({
+        where: { questionId: conditionQuestionId },
+      });
+
+      if (!found) {
+        throw new NotFoundException('Condition question not found');
+      }
+
+      conditionQuestion = found;
+    }
+
     const question = this.questionsRepository.create({
       ...questionData,
       section,
       type,
+      conditionQuestion,
     });
 
     return await this.questionsRepository.save(question);

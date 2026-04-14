@@ -22,7 +22,6 @@ export class CreateResponseDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
   textValue?: string;
 
   @IsOptional()

@@ -40,6 +40,7 @@ export class InstrumentsService {
       .leftJoinAndSelect('section.questions', 'question')
       .leftJoinAndSelect('question.type', 'type')
       .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.conditionQuestion', 'conditionQuestion')
       .where('instrument.instrumentId = :id', { id })
       .orderBy('section.order', 'ASC')
       .addOrderBy('question.order', 'ASC')
@@ -77,6 +78,9 @@ export class InstrumentsService {
             value: option.value,
             isOther: option.isOther,
           })),
+          conditionQuestionId:
+            question.conditionQuestion?.questionId ?? null,
+          conditionValue: question.conditionValue ?? null,
         })),
       })),
     };

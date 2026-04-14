@@ -50,8 +50,7 @@ export class Response {
 
   @Column({
     name: 'text_value',
-    type: 'varchar',
-    length: 255,
+    type: 'text',
     nullable: true,
   })
   textValue?: string;
