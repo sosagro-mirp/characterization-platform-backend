@@ -1,9 +1,12 @@
 import {
+  IsArray,
   IsBoolean,
   IsDateString,
   IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -11,7 +14,7 @@ import {
 export class CreateInstrumentDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(50)
+  @MaxLength(255)
   name: string;
 
   @IsInt()
@@ -23,4 +26,9 @@ export class CreateInstrumentDto {
 
   @IsBoolean()
   isActive: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  actorTypeIds?: string[];
 }

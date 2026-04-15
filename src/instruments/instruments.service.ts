@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
 
@@ -9,16 +10,47 @@ export class InstrumentsService {
   constructor(
     @InjectRepository(Instrument)
     private readonly instrumentsRepository: Repository<Instrument>,
+    @InjectRepository(ActorType)
+    private readonly actorTypesRepository: Repository<ActorType>,
   ) {}
 
   async create(createInstrumentDto: CreateInstrumentDto): Promise<Instrument> {
-    const instrument = this.instrumentsRepository.create(createInstrumentDto);
+    const { actorTypeIds, ...rest } = createInstrumentDto;
+
+    let actorTypes: ActorType[] = [];
+    if (actorTypeIds && actorTypeIds.length > 0) {
+      actorTypes = await this.actorTypesRepository.find({
+        where: { actorTypeId: In(actorTypeIds) },
+      });
+
+      if (actorTypes.length !== actorTypeIds.length) {
+        throw new NotFoundException('One or more actor types were not found');
+      }
+    }
+
+    const instrument = this.instrumentsRepository.create({
+      ...rest,
+      actorTypes,
+    });
 
     return await this.instrumentsRepository.save(instrument);
   }
 
   async findAll(): Promise<Instrument[]> {
-    return await this.instrumentsRepository.find();
+    return await this.instrumentsRepository.find({
+      relations: { actorTypes: true },
+    });
+  }
+
+  async findByActorType(actorTypeId: string): Promise<Instrument[]> {
+    return await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .innerJoin('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.actorTypes', 'at')
+      .where('actorType.actorTypeId = :actorTypeId', { actorTypeId })
+      .andWhere('instrument.isActive = true')
+      .orderBy('instrument.name', 'ASC')
+      .getMany();
   }
 
   async findOne(id: string): Promise<Instrument> {
@@ -78,8 +110,7 @@ export class InstrumentsService {
             value: option.value,
             isOther: option.isOther,
           })),
-          conditionQuestionId:
-            question.conditionQuestion?.questionId ?? null,
+          conditionQuestionId: question.conditionQuestion?.questionId ?? null,
           conditionValue: question.conditionValue ?? null,
         })),
       })),
