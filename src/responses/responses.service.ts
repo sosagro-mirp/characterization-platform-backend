@@ -39,9 +39,7 @@ export class ResponsesService {
       throw new BadRequestException('At least one response must be provided');
     }
 
-    const surveyIds = [
-      ...new Set(createResponseDtos.map((d) => d.surveyId)),
-    ];
+    const surveyIds = [...new Set(createResponseDtos.map((d) => d.surveyId))];
     if (surveyIds.length > 1) {
       throw new BadRequestException(
         'All responses must belong to the same survey',

@@ -15,7 +15,9 @@ export class CooperativesService {
     private readonly departmentsRepository: Repository<Department>,
   ) {}
 
-  async create(createCooperativeDto: CreateCooperativeDto): Promise<Cooperative> {
+  async create(
+    createCooperativeDto: CreateCooperativeDto,
+  ): Promise<Cooperative> {
     const { departmentId, ...cooperativeData } = createCooperativeDto;
 
     const department = await this.departmentsRepository.findOne({
