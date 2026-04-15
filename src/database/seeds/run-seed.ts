@@ -31,6 +31,8 @@ import { TypeOfInstitution } from 'src/types-of-institutions/entities/type-of-in
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
 import { User } from 'src/users/entities/user.entity';
 import { seedActorTypes } from './actor-types.seed';
+import { seedGeography } from './geography.seed';
+import { seedTypesOfCrops } from './types-of-crops.seed';
 import { seedTypesOfQuestions } from './types-of-questions.seed';
 import { seedCacaoInstrument } from './cacao-instrument.seed';
 import { seedTecCharacterization } from './tec-characterization.seed';
@@ -82,6 +84,8 @@ async function run(): Promise<void> {
   try {
     await dataSource.transaction(async (manager) => {
       await seedActorTypes(manager);
+      await seedGeography(manager);
+      await seedTypesOfCrops(manager);
       await seedTypesOfQuestions(manager);
       await seedCacaoInstrument(manager);
       await seedTecCharacterization(manager);
