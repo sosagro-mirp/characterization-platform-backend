@@ -28,6 +28,7 @@ import { TypesOfQuestionsModule } from './types-of-questions/types-of-questions.
 import { ObstaclesModule } from './obstacles/obstacles.module';
 import { DigitalFuncionalityModule } from './digital-funcionality/digital-funcionality.module';
 import { OptionsQuestionModule } from './options-question/options-question.module';
+import { ActorTypesModule } from './actor-types/actor-types.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { OptionsQuestionModule } from './options-question/options-question.modul
     ObstaclesModule,
     DigitalFuncionalityModule,
     OptionsQuestionModule,
+    ActorTypesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
