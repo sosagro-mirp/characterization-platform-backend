@@ -1,7 +1,15 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ParseUUIDPipe } from '@nestjs/common';
 import { CreateSurveyDto } from './dto/create-survey.dto';
-import { SurveysService } from './surveys.service';
+import { SurveyFilters, SurveysService } from './surveys.service';
 
 @Controller('surveys')
 export class SurveysController {
@@ -10,6 +18,26 @@ export class SurveysController {
   @Post()
   create(@Body() createSurveyDto: CreateSurveyDto) {
     return this.surveysService.create(createSurveyDto);
+  }
+
+  @Get()
+  findAll(
+    @Query('actorTypeId') actorTypeId?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('townId') townId?: string,
+    @Query('vereda') vereda?: string,
+    @Query('cropId') cropId?: string,
+    @Query('instrumentId') instrumentId?: string,
+  ) {
+    const filters: SurveyFilters = {
+      actorTypeId,
+      departmentId,
+      townId,
+      vereda,
+      cropId,
+      instrumentId,
+    };
+    return this.surveysService.findAll(filters);
   }
 
   @Patch(':id/sync')
