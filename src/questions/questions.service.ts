@@ -10,6 +10,14 @@ import { Question } from './entities/question.entity';
 
 const TYPES_WITHOUT_OPTIONS = ['open_text', 'numeric', 'yes_no'];
 
+const LIKERT_DEFAULT_OPTIONS = [
+  { text: 'Totalmente de acuerdo', value: 5 },
+  { text: 'De acuerdo', value: 4 },
+  { text: 'Ni de acuerdo ni en desacuerdo', value: 3 },
+  { text: 'En desacuerdo', value: 2 },
+  { text: 'Totalmente en desacuerdo', value: 1 },
+];
+
 @Injectable()
 export class QuestionsService {
   constructor(
@@ -22,6 +30,13 @@ export class QuestionsService {
     @InjectRepository(OptionQuestion)
     private readonly optionsRepository: Repository<OptionQuestion>,
   ) {}
+
+  private async seedLikertOptions(question: Question): Promise<void> {
+    const options = this.optionsRepository.create(
+      LIKERT_DEFAULT_OPTIONS.map((opt) => ({ ...opt, question })),
+    );
+    await this.optionsRepository.save(options);
+  }
 
   async create(
     sectionId: string,
@@ -66,7 +81,16 @@ export class QuestionsService {
       conditionQuestion,
     });
 
-    return await this.questionsRepository.save(question);
+    const saved = await this.questionsRepository.save(question);
+
+    if (type.name === 'likert') {
+      await this.seedLikertOptions(saved);
+    }
+
+    return await this.questionsRepository.findOne({
+      where: { questionId: saved.questionId },
+      relations: ['type', 'options'],
+    }) as Question;
   }
 
   async findOne(questionId: string): Promise<Question> {
@@ -108,6 +132,7 @@ export class QuestionsService {
 
       if (TYPES_WITHOUT_OPTIONS.includes(newType.name) && question.options?.length > 0) {
         await this.optionsRepository.delete({ question: { questionId } });
+        question.options = [];
       }
 
       question.type = newType;
@@ -140,7 +165,20 @@ export class QuestionsService {
     }
 
     Object.assign(question, rest);
-    return await this.questionsRepository.save(question);
+    const saved = await this.questionsRepository.save(question);
+
+    if (
+      typeId !== undefined &&
+      question.type?.name === 'likert' &&
+      (question.options?.length ?? 0) === 0
+    ) {
+      await this.seedLikertOptions(saved);
+    }
+
+    return await this.questionsRepository.findOne({
+      where: { questionId: saved.questionId },
+      relations: ['type', 'options'],
+    }) as Question;
   }
 
   async remove(sectionId: string, questionId: string): Promise<void> {

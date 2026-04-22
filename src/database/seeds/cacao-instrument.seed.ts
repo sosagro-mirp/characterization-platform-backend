@@ -1437,7 +1437,7 @@ export async function seedCacaoInstrument(
     'open_text',
     'numeric',
     'yes_no',
-    'single-choice',
+    'single_choice',
     'multiple_choice',
     'likert',
   ];
