@@ -57,6 +57,7 @@ export class InstrumentsService {
   async findOne(id: string): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
+      relations: { actorTypes: true },
     });
 
     if (!instrument) {
