@@ -1,13 +1,18 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateSectionDto } from './dto/create-section.dto';
+import { UpdateSectionDto } from './dto/update-section.dto';
 import { SectionsService } from './sections.service';
 
 @ApiTags('Sections')
@@ -48,5 +53,33 @@ export class SectionsController {
     @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
   ) {
     return this.sectionsService.findOne(instrumentId, sectionId);
+  }
+
+  @Patch(':sectionId')
+  @ApiOperation({ summary: 'Actualizar sección' })
+  @ApiParam({ name: 'instrumentId', format: 'uuid' })
+  @ApiParam({ name: 'sectionId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Sección actualizada.' })
+  @ApiResponse({ status: 404, description: 'Sección no encontrada.' })
+  update(
+    @Param('instrumentId', new ParseUUIDPipe()) instrumentId: string,
+    @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
+    @Body() updateSectionDto: UpdateSectionDto,
+  ) {
+    return this.sectionsService.update(instrumentId, sectionId, updateSectionDto);
+  }
+
+  @Delete(':sectionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Eliminar sección' })
+  @ApiParam({ name: 'instrumentId', format: 'uuid' })
+  @ApiParam({ name: 'sectionId', format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Sección eliminada.' })
+  @ApiResponse({ status: 404, description: 'Sección no encontrada.' })
+  remove(
+    @Param('instrumentId', new ParseUUIDPipe()) instrumentId: string,
+    @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
+  ) {
+    return this.sectionsService.remove(instrumentId, sectionId);
   }
 }

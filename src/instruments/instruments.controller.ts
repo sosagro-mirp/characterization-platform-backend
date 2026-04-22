@@ -1,15 +1,20 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
+import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { InstrumentsService } from './instruments.service';
 
 class FindAllInstrumentsQuery {
@@ -71,5 +76,28 @@ export class InstrumentsController {
   @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.instrumentsService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Actualizar instrumento' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Instrumento actualizado.' })
+  @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
+  update(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() updateInstrumentDto: UpdateInstrumentDto,
+  ) {
+    return this.instrumentsService.update(id, updateInstrumentDto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Eliminar instrumento' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Instrumento eliminado.' })
+  @ApiResponse({ status: 400, description: 'Instrumento con encuestas asociadas.' })
+  @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
+  remove(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.instrumentsService.remove(id);
   }
 }

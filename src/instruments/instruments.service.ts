@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
+import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
 
 @Injectable()
@@ -63,6 +64,56 @@ export class InstrumentsService {
     }
 
     return instrument;
+  }
+
+  async update(id: string, updateInstrumentDto: UpdateInstrumentDto): Promise<Instrument> {
+    const instrument = await this.instrumentsRepository.findOne({
+      where: { instrumentId: id },
+      relations: { actorTypes: true },
+    });
+
+    if (!instrument) {
+      throw new NotFoundException('Instrument not found');
+    }
+
+    const { actorTypeIds, ...rest } = updateInstrumentDto;
+
+    Object.assign(instrument, rest);
+
+    if (actorTypeIds !== undefined) {
+      if (actorTypeIds.length > 0) {
+        const actorTypes = await this.actorTypesRepository.find({
+          where: { actorTypeId: In(actorTypeIds) },
+        });
+        if (actorTypes.length !== actorTypeIds.length) {
+          throw new NotFoundException('One or more actor types were not found');
+        }
+        instrument.actorTypes = actorTypes;
+      } else {
+        instrument.actorTypes = [];
+      }
+    }
+
+    return await this.instrumentsRepository.save(instrument);
+  }
+
+  async remove(id: string): Promise<void> {
+    const instrument = await this.instrumentsRepository.findOne({
+      where: { instrumentId: id },
+      relations: { surveys: true },
+    });
+
+    if (!instrument) {
+      throw new NotFoundException('Instrument not found');
+    }
+
+    if (instrument.surveys && instrument.surveys.length > 0) {
+      throw new BadRequestException(
+        'Cannot delete an instrument that has associated surveys. Deactivate it instead.',
+      );
+    }
+
+    await this.instrumentsRepository.remove(instrument);
   }
 
   async findOneForRender(id: string) {

@@ -1,13 +1,18 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateQuestionDto } from './dto/create-question.dto';
+import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
 import { QuestionsService } from './questions.service';
 
@@ -39,5 +44,33 @@ export class QuestionsController {
     @Param('questionId', new ParseUUIDPipe()) questionId: string,
   ): Promise<Question> {
     return this.questionsService.findOne(questionId);
+  }
+
+  @Patch(':questionId')
+  @ApiOperation({ summary: 'Actualizar pregunta' })
+  @ApiParam({ name: 'sectionId', format: 'uuid' })
+  @ApiParam({ name: 'questionId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Pregunta actualizada.' })
+  @ApiResponse({ status: 404, description: 'Pregunta no encontrada.' })
+  update(
+    @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
+    @Param('questionId', new ParseUUIDPipe()) questionId: string,
+    @Body() updateQuestionDto: UpdateQuestionDto,
+  ) {
+    return this.questionsService.update(sectionId, questionId, updateQuestionDto);
+  }
+
+  @Delete(':questionId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Eliminar pregunta' })
+  @ApiParam({ name: 'sectionId', format: 'uuid' })
+  @ApiParam({ name: 'questionId', format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Pregunta eliminada.' })
+  @ApiResponse({ status: 404, description: 'Pregunta no encontrada.' })
+  remove(
+    @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
+    @Param('questionId', new ParseUUIDPipe()) questionId: string,
+  ) {
+    return this.questionsService.remove(sectionId, questionId);
   }
 }
