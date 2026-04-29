@@ -36,6 +36,8 @@ import { seedTypesOfCrops } from './types-of-crops.seed';
 import { seedTypesOfQuestions } from './types-of-questions.seed';
 import { seedCacaoInstrument } from './cacao-instrument.seed';
 import { seedTecCharacterization } from './tec-characterization.seed';
+import { seedRoles } from './roles.seed';
+import { seedAdminUser } from './admin-user.seed';
 
 const ALL_ENTITIES = [
   ActorType,
@@ -83,6 +85,8 @@ async function run(): Promise<void> {
 
   try {
     await dataSource.transaction(async (manager) => {
+      await seedRoles(manager);
+      await seedAdminUser(manager);
       await seedActorTypes(manager);
       await seedGeography(manager);
       await seedTypesOfCrops(manager);
