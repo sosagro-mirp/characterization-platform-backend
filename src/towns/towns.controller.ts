@@ -8,12 +8,16 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
 import { TownsService } from './towns.service';
 import { CreateTownDto } from './dto/create-town.dto';
 import { UpdateTownDto } from './dto/update-town.dto';
 
 @ApiTags('Towns')
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN)
 @Controller('towns')
 export class TownsController {
   constructor(private readonly townsService: TownsService) {}

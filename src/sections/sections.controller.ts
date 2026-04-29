@@ -10,12 +10,16 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { SectionsService } from './sections.service';
 
 @ApiTags('Sections')
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN)
 @Controller('instruments/:instrumentId/sections')
 export class SectionsController {
   constructor(private readonly sectionsService: SectionsService) {}

@@ -9,20 +9,30 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateOptionQuestionDto } from './dto/create-option-question.dto';
 import { UpdateOptionQuestionDto } from './dto/update-option-question.dto';
 import { OptionsQuestionService } from './options-question.service';
 
 @ApiTags('Options')
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN)
 @Controller('questions/:questionId/options')
 export class OptionsQuestionController {
   constructor(
     private readonly optionsQuestionService: OptionsQuestionService,
   ) {}
 
+  @Public()
   @Post()
-  @ApiOperation({ summary: 'Crear opción de pregunta' })
+  @ApiOperation({
+    summary: 'Crear opción de pregunta',
+    description:
+      'Público: usado por el flujo de encuesta en campo para registrar la opción "Otro" con texto libre.',
+  })
   @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
   @ApiResponse({ status: 201, description: 'Opción creada.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })

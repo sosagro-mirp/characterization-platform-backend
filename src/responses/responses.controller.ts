@@ -1,9 +1,11 @@
 import { Body, Controller, ParseArrayPipe, Post } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateResponseDto } from './dto/create-response.dto';
 import { ResponsesService } from './responses.service';
 
 @ApiTags('Responses')
+@Public()
 @Controller('responses')
 export class ResponsesController {
   constructor(private readonly responsesService: ResponsesService) {}

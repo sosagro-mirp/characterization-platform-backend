@@ -8,12 +8,16 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
 import { ActorTypesService } from './actor-types.service';
 import { CreateActorTypeDto } from './dto/create-actor-type.dto';
 import { UpdateActorTypeDto } from './dto/update-actor-type.dto';
 
 @ApiTags('Actor Types')
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN)
 @Controller('actor-types')
 export class ActorTypesController {
   constructor(private readonly actorTypesService: ActorTypesService) {}

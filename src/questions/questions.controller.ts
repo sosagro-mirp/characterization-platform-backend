@@ -10,13 +10,17 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
 import { QuestionsService } from './questions.service';
 
 @ApiTags('Questions')
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN)
 @Controller('sections/:sectionId/questions')
 export class QuestionsController {
   constructor(private readonly questionsService: QuestionsService) {}

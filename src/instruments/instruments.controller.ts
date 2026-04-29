@@ -11,8 +11,11 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { InstrumentsService } from './instruments.service';
@@ -29,6 +32,8 @@ export class InstrumentsController {
   constructor(private readonly instrumentsService: InstrumentsService) {}
 
   @Post()
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Crear instrumento de encuesta' })
   @ApiResponse({ status: 201, description: 'Instrumento creado.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
@@ -36,6 +41,7 @@ export class InstrumentsController {
     return this.instrumentsService.create(createInstrumentDto);
   }
 
+  @Public()
   @Get()
   @ApiOperation({
     summary: 'Listar instrumentos',
@@ -55,6 +61,7 @@ export class InstrumentsController {
     return this.instrumentsService.findAll();
   }
 
+  @Public()
   @Get(':id/render')
   @ApiOperation({
     summary: 'Renderizar instrumento',
@@ -70,6 +77,8 @@ export class InstrumentsController {
   }
 
   @Get(':id')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Obtener instrumento por ID' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Instrumento encontrado.' })
@@ -79,6 +88,8 @@ export class InstrumentsController {
   }
 
   @Patch(':id')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Actualizar instrumento' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Instrumento actualizado.' })
@@ -91,6 +102,8 @@ export class InstrumentsController {
   }
 
   @Delete(':id')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar instrumento' })
   @ApiParam({ name: 'id', format: 'uuid' })

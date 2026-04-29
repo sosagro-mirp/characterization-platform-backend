@@ -7,12 +7,16 @@ import {
   Param,
   Delete,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
 import { FarmsService } from './farms.service';
 import { CreateFarmDto } from './dto/create-farm.dto';
 import { UpdateFarmDto } from './dto/update-farm.dto';
 
 @ApiTags('Farms')
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN)
 @Controller('farms')
 export class FarmsController {
   constructor(private readonly farmsService: FarmsService) {}
