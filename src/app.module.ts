@@ -29,6 +29,7 @@ import { ObstaclesModule } from './obstacles/obstacles.module';
 import { DigitalFuncionalityModule } from './digital-funcionality/digital-funcionality.module';
 import { OptionsQuestionModule } from './options-question/options-question.module';
 import { ActorTypesModule } from './actor-types/actor-types.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { ActorTypesModule } from './actor-types/actor-types.module';
     DigitalFuncionalityModule,
     OptionsQuestionModule,
     ActorTypesModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
