@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
+import { RolesGuard } from './auth/guards/roles.guard';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FarmersModule } from './farmers/farmers.module';
@@ -28,6 +31,8 @@ import { TypesOfQuestionsModule } from './types-of-questions/types-of-questions.
 import { ObstaclesModule } from './obstacles/obstacles.module';
 import { DigitalFuncionalityModule } from './digital-funcionality/digital-funcionality.module';
 import { OptionsQuestionModule } from './options-question/options-question.module';
+import { ActorTypesModule } from './actor-types/actor-types.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -67,8 +72,14 @@ import { OptionsQuestionModule } from './options-question/options-question.modul
     ObstaclesModule,
     DigitalFuncionalityModule,
     OptionsQuestionModule,
+    ActorTypesModule,
+    AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
+  ],
 })
 export class AppModule {}

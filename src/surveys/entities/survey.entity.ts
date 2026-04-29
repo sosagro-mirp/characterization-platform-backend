@@ -1,6 +1,10 @@
+import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { Department } from 'src/departments/entities/department.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Response } from 'src/responses/entities/response.entity';
+import { Town } from 'src/towns/entities/town.entity';
+import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
   Column,
@@ -41,6 +45,25 @@ export class Survey {
     referencedColumnName: 'userId',
   })
   user?: User;
+
+  @ManyToOne(() => ActorType, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'actor_type_id' })
+  actorType?: ActorType;
+
+  @ManyToOne(() => Department, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'department_id' })
+  department?: Department;
+
+  @ManyToOne(() => Town, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'town_id' })
+  town?: Town;
+
+  @Column({ name: 'vereda', type: 'varchar', length: 100, nullable: true })
+  vereda?: string;
+
+  @ManyToOne(() => TypeOfCrop, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'crop_id' })
+  crop?: TypeOfCrop;
 
   @ManyToMany(() => Instrument, (instrument) => instrument.surveys)
   @JoinTable({

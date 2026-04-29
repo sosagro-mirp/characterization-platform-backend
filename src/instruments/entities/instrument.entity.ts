@@ -1,9 +1,11 @@
+import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinTable,
   ManyToMany,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -19,7 +21,7 @@ export class Instrument {
 
   @Column({
     type: 'varchar',
-    length: 50,
+    length: 255,
     nullable: false,
   })
   name: string;
@@ -49,6 +51,17 @@ export class Instrument {
 
   @ManyToMany(() => Survey, (survey) => survey.instruments)
   surveys: Survey[];
+
+  @ManyToMany(() => ActorType, { eager: false })
+  @JoinTable({
+    name: 'instruments_actor_types',
+    joinColumn: { name: 'instrument_id', referencedColumnName: 'instrumentId' },
+    inverseJoinColumn: {
+      name: 'actor_type_id',
+      referencedColumnName: 'actorTypeId',
+    },
+  })
+  actorTypes: ActorType[];
 
   @CreateDateColumn({
     name: 'created_at',
