@@ -23,6 +23,15 @@ async function bootstrap() {
     )
     .setVersion('1.0')
     .addServer('http://localhost:3000', 'Desarrollo local')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Pega aquí el accessToken devuelto por POST /api/auth/login',
+      },
+      'bearer',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -42,6 +51,7 @@ async function bootstrap() {
     { name: 'Surveys' },
     { name: 'Responses' },
     { name: 'Users' },
+    { name: 'Auth' },
     { name: 'Health' },
   ];
 

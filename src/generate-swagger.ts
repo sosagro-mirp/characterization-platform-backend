@@ -16,6 +16,14 @@ async function generate() {
     .setTitle('SOSAgro Characterization Platform API')
     .setDescription('API REST para la plataforma de caracterización agrícola.')
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'bearer',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
