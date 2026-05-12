@@ -31,6 +31,15 @@ export class CreateQuestionDto {
   @IsBoolean()
   isRequired: boolean;
 
+  /**
+   * Indica si la pregunta forma parte de los criterios de selección de
+   * unidades productivas. Por defecto `false`.
+   */
+  @ApiPropertyOptional({ example: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  isSelectionCriteria?: boolean;
+
   /** Posición de la pregunta dentro de la sección (empieza en 1) */
   @ApiProperty({ example: 1, minimum: 1 })
   @IsInt()

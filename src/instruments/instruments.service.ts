@@ -149,6 +149,7 @@ export class InstrumentsService {
           questionId: question.questionId,
           text: question.text,
           isRequired: question.isRequired,
+          isSelectionCriteria: question.isSelectionCriteria,
           order: question.order,
           type: question.type
             ? {

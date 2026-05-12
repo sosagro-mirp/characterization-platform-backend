@@ -76,6 +76,7 @@ export class QuestionsService {
 
     const question = this.questionsRepository.create({
       ...questionData,
+      isSelectionCriteria: questionData.isSelectionCriteria ?? false,
       section,
       type,
       conditionQuestion,

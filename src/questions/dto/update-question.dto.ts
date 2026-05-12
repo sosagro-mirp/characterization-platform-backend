@@ -26,6 +26,11 @@ export class UpdateQuestionDto {
   @IsBoolean()
   isRequired?: boolean;
 
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isSelectionCriteria?: boolean;
+
   @ApiPropertyOptional({ example: 2, minimum: 1 })
   @IsOptional()
   @IsInt()

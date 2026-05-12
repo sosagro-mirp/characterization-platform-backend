@@ -59,6 +59,14 @@ export class Question {
   isRequired: boolean;
 
   @Column({
+    name: 'is_selection_criteria',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  isSelectionCriteria: boolean;
+
+  @Column({
     name: 'order',
     type: 'integer',
     nullable: false,
