@@ -5,6 +5,9 @@ dotenv.config();
 
 import { DataSource } from 'typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
+import { Campaign } from 'src/campaigns/entities/campaign.entity';
+import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
 import { Cooperative } from 'src/cooperatives/entities/cooperative.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Device } from 'src/devices/entities/device.entity';
@@ -39,6 +42,9 @@ import { seedAdminUser } from './admin-user.seed';
 
 const ALL_ENTITIES = [
   ActorType,
+  Campaign,
+  CampaignSession,
+  CampaignStep,
   Cooperative,
   Department,
   Device,
