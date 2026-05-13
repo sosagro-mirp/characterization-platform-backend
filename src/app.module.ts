@@ -81,7 +81,7 @@ import { HealthModule } from './health/health.module';
           ...(databaseUrl ? { url: databaseUrl } : { host: dbHost, port: dbPort, database: dbName, username: dbUser, password: dbPassword }),
           ssl: dbSsl ? { rejectUnauthorized: false } : false,
           autoLoadEntities: true,
-          synchronize: false,
+          synchronize: configService.get<string>('DB_SYNC') === 'true',
           migrationsRun: nodeEnv === 'production',
           migrations: ['dist/migrations/*.js'],
           logging: nodeEnv !== 'production',
