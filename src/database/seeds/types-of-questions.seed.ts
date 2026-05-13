@@ -8,6 +8,7 @@ const TYPES_OF_QUESTIONS: string[] = [
   'single_choice',
   'multiple_choice',
   'likert',
+  'compliance',
 ];
 
 export async function seedTypesOfQuestions(

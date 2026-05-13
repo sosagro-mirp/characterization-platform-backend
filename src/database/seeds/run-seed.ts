@@ -34,8 +34,6 @@ import { seedActorTypes } from './actor-types.seed';
 import { seedGeography } from './geography.seed';
 import { seedTypesOfCrops } from './types-of-crops.seed';
 import { seedTypesOfQuestions } from './types-of-questions.seed';
-import { seedCacaoInstrument } from './cacao-instrument.seed';
-import { seedTecCharacterization } from './tec-characterization.seed';
 import { seedRoles } from './roles.seed';
 import { seedAdminUser } from './admin-user.seed';
 
@@ -91,8 +89,6 @@ async function run(): Promise<void> {
       await seedGeography(manager);
       await seedTypesOfCrops(manager);
       await seedTypesOfQuestions(manager);
-      await seedCacaoInstrument(manager);
-      await seedTecCharacterization(manager);
     });
     console.log('[seed] Completado exitosamente');
   } catch (error) {

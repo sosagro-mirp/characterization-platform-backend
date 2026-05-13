@@ -6,7 +6,6 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  MaxLength,
 } from 'class-validator';
 
 export class CreateResponseDto {
@@ -26,7 +25,7 @@ export class CreateResponseDto {
   @IsUUID()
   questionId: string;
 
-  /** UUID de la opción seleccionada — usar para preguntas de tipo single_choice, likert, yes_no y multiple_choice */
+  /** UUID de la opción seleccionada — usar para preguntas de tipo single_choice, likert, yes_no, multiple_choice y compliance */
   @ApiPropertyOptional({
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440002',
@@ -40,7 +39,6 @@ export class CreateResponseDto {
   @IsOptional()
   @IsString()
   @IsNotEmpty()
-  @MaxLength(255)
   textValue?: string;
 
   /** Valor numérico — usar cuando la pregunta es de tipo numeric */

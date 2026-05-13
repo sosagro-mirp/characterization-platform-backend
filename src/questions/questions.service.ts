@@ -8,7 +8,7 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
 
-const TYPES_WITHOUT_OPTIONS = ['open_text', 'numeric', 'yes_no'];
+const TYPES_WITHOUT_OPTIONS = ['open_text', 'numeric', 'yes_no', 'compliance'];
 
 const LIKERT_DEFAULT_OPTIONS = [
   { text: 'Totalmente de acuerdo', value: 5 },
@@ -16,6 +16,14 @@ const LIKERT_DEFAULT_OPTIONS = [
   { text: 'Ni de acuerdo ni en desacuerdo', value: 3 },
   { text: 'En desacuerdo', value: 2 },
   { text: 'Totalmente en desacuerdo', value: 1 },
+];
+
+const COMPLIANCE_DEFAULT_OPTIONS: { text: string; value?: number }[] = [
+  { text: 'Cumple', value: 2 },
+  { text: 'Cumple parcialmente', value: 1 },
+  { text: 'No cumple', value: 0 },
+  { text: 'No aplica' },
+  { text: 'No evidenciado' },
 ];
 
 @Injectable()
@@ -34,6 +42,13 @@ export class QuestionsService {
   private async seedLikertOptions(question: Question): Promise<void> {
     const options = this.optionsRepository.create(
       LIKERT_DEFAULT_OPTIONS.map((opt) => ({ ...opt, question })),
+    );
+    await this.optionsRepository.save(options);
+  }
+
+  private async seedComplianceOptions(question: Question): Promise<void> {
+    const options = this.optionsRepository.create(
+      COMPLIANCE_DEFAULT_OPTIONS.map((opt) => ({ ...opt, question })),
     );
     await this.optionsRepository.save(options);
   }
@@ -86,6 +101,10 @@ export class QuestionsService {
 
     if (type.name === 'likert') {
       await this.seedLikertOptions(saved);
+    }
+
+    if (type.name === 'compliance') {
+      await this.seedComplianceOptions(saved);
     }
 
     return await this.questionsRepository.findOne({
@@ -174,6 +193,14 @@ export class QuestionsService {
       (question.options?.length ?? 0) === 0
     ) {
       await this.seedLikertOptions(saved);
+    }
+
+    if (
+      typeId !== undefined &&
+      question.type?.name === 'compliance' &&
+      (question.options?.length ?? 0) === 0
+    ) {
+      await this.seedComplianceOptions(saved);
     }
 
     return await this.questionsRepository.findOne({
