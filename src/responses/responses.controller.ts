@@ -1,11 +1,13 @@
 import { Body, Controller, ParseArrayPipe, Post } from '@nestjs/common';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Public } from '../auth/decorators/public.decorator';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
 import { CreateResponseDto } from './dto/create-response.dto';
 import { ResponsesService } from './responses.service';
 
 @ApiTags('Responses')
-@Public()
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
 @Controller('responses')
 export class ResponsesController {
   constructor(private readonly responsesService: ResponsesService) {}
