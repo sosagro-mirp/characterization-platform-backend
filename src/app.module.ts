@@ -35,6 +35,7 @@ import { ActorTypesModule } from './actor-types/actor-types.module';
 import { AuthModule } from './auth/auth.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.mo
     AuthModule,
     CampaignsModule,
     CampaignSessionsModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
