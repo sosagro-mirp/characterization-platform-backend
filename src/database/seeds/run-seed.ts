@@ -67,13 +67,19 @@ const ALL_ENTITIES = [
 ];
 
 async function run(): Promise<void> {
+  const databaseUrl = process.env.DATABASE_URL;
   const dataSource = new DataSource({
     type: 'postgres',
-    host: process.env.DB_HOST ?? 'localhost',
-    port: parseInt(process.env.DB_PORT ?? '5432', 10),
-    database: process.env.DB_NAME,
-    username: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
+    ...(databaseUrl
+      ? { url: databaseUrl }
+      : {
+          host: process.env.DB_HOST ?? 'localhost',
+          port: parseInt(process.env.DB_PORT ?? '5432', 10),
+          database: process.env.DB_NAME,
+          username: process.env.DB_USER,
+          password: process.env.DB_PASSWORD,
+        }),
+    ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
     entities: ALL_ENTITIES,
     synchronize: false,
   });
