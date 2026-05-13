@@ -4,10 +4,12 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
   MaxLength,
+  Min,
 } from 'class-validator';
 
 export class CreateSurveyDto {
@@ -90,4 +92,17 @@ export class CreateSurveyDto {
   @IsOptional()
   @IsUUID()
   cropId?: string;
+
+  /** UUID de la sesión de campaña a la que pertenece este survey (opcional) */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  campaignSessionId?: string;
+
+  /** Orden del paso dentro de la campaña al que corresponde este survey (opcional) */
+  @ApiPropertyOptional({ example: 1, minimum: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  stepOrder?: number;
 }

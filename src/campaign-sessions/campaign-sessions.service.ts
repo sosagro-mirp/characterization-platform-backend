@@ -1,0 +1,154 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { Campaign } from 'src/campaigns/entities/campaign.entity';
+import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
+import { CampaignSession } from './entities/campaign-session.entity';
+import { Response } from 'src/responses/entities/response.entity';
+import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
+
+interface NextStepInstrument {
+  instrumentId: string;
+  name: string;
+  isActive: boolean;
+}
+
+export interface NextStepResult {
+  stepId: string;
+  order: number;
+  instrument: NextStepInstrument;
+  totalSteps: number;
+  completedCount: number;
+}
+
+@Injectable()
+export class CampaignSessionsService {
+  constructor(
+    @InjectRepository(CampaignSession)
+    private readonly sessionsRepository: Repository<CampaignSession>,
+    @InjectRepository(Campaign)
+    private readonly campaignsRepository: Repository<Campaign>,
+  ) {}
+
+  async create(dto: CreateCampaignSessionDto): Promise<CampaignSession> {
+    const campaign = await this.campaignsRepository.findOne({
+      where: { campaignId: dto.campaignId },
+    });
+    if (!campaign) throw new NotFoundException('Campaign not found');
+
+    const session = this.sessionsRepository.create({
+      campaign,
+      farmer: dto.farmerId ? ({ id: dto.farmerId } as any) : undefined,
+      user: dto.userId ? ({ userId: dto.userId } as any) : undefined,
+      actorType: dto.actorTypeId
+        ? ({ actorTypeId: dto.actorTypeId } as any)
+        : undefined,
+      department: dto.departmentId
+        ? ({ departmentId: dto.departmentId } as any)
+        : undefined,
+      town: dto.townId ? ({ townId: dto.townId } as any) : undefined,
+      vereda: dto.vereda,
+      crop: dto.cropId ? ({ cropId: dto.cropId } as any) : undefined,
+    });
+    const saved = await this.sessionsRepository.save(session);
+    return this.findOne(saved.sessionId);
+  }
+
+  async findOne(sessionId: string): Promise<CampaignSession> {
+    const session = await this.sessionsRepository.findOne({
+      where: { sessionId },
+      relations: [
+        'campaign',
+        'campaign.steps',
+        'campaign.steps.instrument',
+        'campaign.steps.conditionQuestion',
+        'farmer',
+        'user',
+        'actorType',
+        'department',
+        'town',
+        'crop',
+        'surveys',
+        'surveys.responses',
+        'surveys.responses.question',
+        'surveys.responses.option',
+      ],
+    });
+    if (!session) throw new NotFoundException('Campaign session not found');
+    session.campaign.steps = (session.campaign.steps ?? []).sort(
+      (a, b) => a.order - b.order,
+    );
+    return session;
+  }
+
+  async markAsSynchronized(sessionId: string): Promise<CampaignSession> {
+    const session = await this.findOne(sessionId);
+    session.sincronized = true;
+    await this.sessionsRepository.save(session);
+    return this.findOne(sessionId);
+  }
+
+  async getNextStep(sessionId: string): Promise<NextStepResult | null> {
+    const session = await this.findOne(sessionId);
+    const steps = session.campaign.steps ?? [];
+    const totalSteps = steps.length;
+
+    const completedOrders = new Set(
+      (session.surveys ?? [])
+        .filter((s) => typeof s.stepOrder === 'number')
+        .map((s) => s.stepOrder as number),
+    );
+    const completedCount = completedOrders.size;
+
+    const allResponses: Response[] = (session.surveys ?? []).flatMap(
+      (s) => s.responses ?? [],
+    );
+
+    for (const step of steps) {
+      if (completedOrders.has(step.order)) continue;
+
+      if (step.conditionQuestion && step.conditionValue !== undefined && step.conditionValue !== null) {
+        const matching = allResponses.filter(
+          (r) => r.question?.questionId === step.conditionQuestion!.questionId,
+        );
+        if (matching.length === 0) continue;
+
+        const expected = step.conditionValue;
+        const satisfied = matching.some((r) => {
+          if (r.option?.optionId && r.option.optionId === expected) return true;
+          if (r.textValue !== undefined && r.textValue !== null && r.textValue === expected) return true;
+          if (
+            r.numericValue !== undefined &&
+            r.numericValue !== null &&
+            String(r.numericValue) === expected
+          )
+            return true;
+          if (r.booleanValue !== undefined && r.booleanValue !== null) {
+            if (
+              (expected === 'true' && r.booleanValue === true) ||
+              (expected === 'false' && r.booleanValue === false)
+            )
+              return true;
+          }
+          return false;
+        });
+
+        if (!satisfied) continue;
+      }
+
+      return {
+        stepId: step.stepId,
+        order: step.order,
+        instrument: {
+          instrumentId: step.instrument.instrumentId,
+          name: step.instrument.name,
+          isActive: step.instrument.isActive,
+        },
+        totalSteps,
+        completedCount,
+      };
+    }
+
+    return null;
+  }
+}

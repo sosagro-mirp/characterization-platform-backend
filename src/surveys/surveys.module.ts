@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
@@ -22,6 +23,7 @@ import { SurveysService } from './surveys.service';
       Department,
       Town,
       TypeOfCrop,
+      CampaignSession,
     ]),
   ],
   controllers: [SurveysController],

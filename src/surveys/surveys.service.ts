@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
@@ -39,6 +40,8 @@ export class SurveysService {
     private readonly townsRepository: Repository<Town>,
     @InjectRepository(TypeOfCrop)
     private readonly typesOfCropsRepository: Repository<TypeOfCrop>,
+    @InjectRepository(CampaignSession)
+    private readonly campaignSessionsRepository: Repository<CampaignSession>,
   ) {}
 
   async create(createSurveyDto: CreateSurveyDto): Promise<Survey> {
@@ -118,6 +121,16 @@ export class SurveysService {
       }
     }
 
+    let campaignSession: CampaignSession | null = null;
+    if (createSurveyDto.campaignSessionId) {
+      campaignSession = await this.campaignSessionsRepository.findOne({
+        where: { sessionId: createSurveyDto.campaignSessionId },
+      });
+      if (!campaignSession) {
+        throw new NotFoundException('CampaignSession not found');
+      }
+    }
+
     const survey = this.surveysRepository.create({
       farmer: farmer ?? undefined,
       user: user ?? undefined,
@@ -128,6 +141,8 @@ export class SurveysService {
       town: town ?? undefined,
       vereda: createSurveyDto.vereda,
       crop: crop ?? undefined,
+      campaignSession: campaignSession ?? undefined,
+      stepOrder: createSurveyDto.stepOrder,
     });
 
     return await this.surveysRepository.save(survey);
