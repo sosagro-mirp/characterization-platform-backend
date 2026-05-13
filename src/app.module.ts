@@ -6,6 +6,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { FarmersModule } from './farmers/farmers.module';
 import { FarmsModule } from './farms/farms.module';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
@@ -40,6 +41,12 @@ import { HealthModule } from './health/health.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,  // 1 minute
+        limit: 60,    // 60 requests per minute per IP
+      },
+    ]),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
@@ -98,6 +105,7 @@ import { HealthModule } from './health/health.module';
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
