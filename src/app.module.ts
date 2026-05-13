@@ -4,7 +4,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { FarmersModule } from './farmers/farmers.module';
 import { FarmsModule } from './farms/farms.module';
@@ -39,15 +39,29 @@ import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.mo
 @Module({
   imports: [
     ConfigModule.forRoot(),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      database: process.env.DB_NAME,
-      username: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      autoLoadEntities: true, // Carga automática de entidades
-      synchronize: true, // Sincroniza el esquema de la base de datos (no recomendado para producción)
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+        const dbHost = configService.get<string>('DB_HOST');
+        const dbPort = parseInt(configService.get<string>('DB_PORT') || '5432', 10);
+        const dbName = configService.get<string>('DB_NAME');
+        const dbUser = configService.get<string>('DB_USER');
+        const dbPassword = configService.get<string>('DB_PASSWORD');
+        const dbSsl = configService.get<string>('DB_SSL') === 'true';
+        const nodeEnv = configService.get<string>('NODE_ENV');
+
+        return {
+          type: 'postgres',
+          ...(databaseUrl ? { url: databaseUrl } : { host: dbHost, port: dbPort, database: dbName, username: dbUser, password: dbPassword }),
+          ssl: dbSsl ? { rejectUnauthorized: false } : false,
+          autoLoadEntities: true,
+          synchronize: false,
+          migrationsRun: nodeEnv === 'production',
+          migrations: ['dist/migrations/*.js'],
+          logging: nodeEnv !== 'production',
+        };
+      },
     }),
     FarmersModule,
     FarmsModule,
