@@ -11,7 +11,6 @@ import { ParseUUIDPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
-import { Public } from '../auth/decorators/public.decorator';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { SurveyFilters, SurveysService } from './surveys.service';
 
@@ -20,8 +19,9 @@ import { SurveyFilters, SurveysService } from './surveys.service';
 export class SurveysController {
   constructor(private readonly surveysService: SurveysService) {}
 
-  @Public()
   @Post()
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({
     summary: 'Crear sesión de encuesta',
     description: 'Crea una nueva sesión de encuesta y retorna el surveyId. Acepta contexto geográfico y de actor de forma opcional.',
@@ -66,8 +66,9 @@ export class SurveysController {
     return this.surveysService.findAll(filters);
   }
 
-  @Public()
   @Patch(':id/sync')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({ summary: 'Marcar encuesta como sincronizada' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la sesión de encuesta' })
   @ApiResponse({ status: 200, description: 'Encuesta marcada como sincronizada.' })

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -16,6 +17,8 @@ import { IsOptional, IsUUID } from 'class-validator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { InstrumentsService } from './instruments.service';
@@ -78,7 +81,7 @@ export class InstrumentsController {
 
   @Get(':id')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Obtener instrumento por ID' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Instrumento encontrado.' })
@@ -89,7 +92,7 @@ export class InstrumentsController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Actualizar instrumento' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Instrumento actualizado.' })
@@ -97,7 +100,16 @@ export class InstrumentsController {
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updateInstrumentDto: UpdateInstrumentDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
+    if (
+      updateInstrumentDto.isActive !== undefined &&
+      user.role !== ROLES.ADMIN
+    ) {
+      throw new ForbiddenException(
+        'Only admin can activate or deactivate instruments',
+      );
+    }
     return this.instrumentsService.update(id, updateInstrumentDto);
   }
 
