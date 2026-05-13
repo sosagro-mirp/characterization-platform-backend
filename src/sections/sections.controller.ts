@@ -19,7 +19,7 @@ import { SectionsService } from './sections.service';
 
 @ApiTags('Sections')
 @ApiBearerAuth()
-@Roles(ROLES.ADMIN)
+@Roles(ROLES.ADMIN, ROLES.RESEARCHER)
 @Controller('instruments/:instrumentId/sections')
 export class SectionsController {
   constructor(private readonly sectionsService: SectionsService) {}

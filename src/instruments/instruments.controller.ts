@@ -33,7 +33,7 @@ export class InstrumentsController {
 
   @Post()
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Crear instrumento de encuesta' })
   @ApiResponse({ status: 201, description: 'Instrumento creado.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
@@ -78,7 +78,7 @@ export class InstrumentsController {
 
   @Get(':id')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Obtener instrumento por ID' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Instrumento encontrado.' })
@@ -89,7 +89,7 @@ export class InstrumentsController {
 
   @Patch(':id')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Actualizar instrumento' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Instrumento actualizado.' })
@@ -103,7 +103,7 @@ export class InstrumentsController {
 
   @Delete(':id')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar instrumento' })
   @ApiParam({ name: 'id', format: 'uuid' })

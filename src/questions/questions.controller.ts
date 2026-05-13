@@ -20,7 +20,7 @@ import { QuestionsService } from './questions.service';
 
 @ApiTags('Questions')
 @ApiBearerAuth()
-@Roles(ROLES.ADMIN)
+@Roles(ROLES.ADMIN, ROLES.RESEARCHER)
 @Controller('sections/:sectionId/questions')
 export class QuestionsController {
   constructor(private readonly questionsService: QuestionsService) {}
