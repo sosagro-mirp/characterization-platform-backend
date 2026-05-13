@@ -7,6 +7,7 @@ import { RolesGuard } from './auth/guards/roles.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 import { FarmersModule } from './farmers/farmers.module';
 import { FarmsModule } from './farms/farms.module';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
@@ -41,6 +42,22 @@ import { HealthModule } from './health/health.module';
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL ?? 'info',
+        transport: process.env.NODE_ENV === 'production'
+          ? { target: 'pino/file', options: { destination: 1 } }
+          : {
+              target: 'pino-pretty',
+              options: {
+                colorize: true,
+                singleLine: false,
+                translateTime: 'SYS:standard',
+                ignore: 'pid,hostname',
+              },
+            },
+      },
+    }),
     ThrottlerModule.forRoot([
       {
         ttl: 60_000,  // 1 minute
