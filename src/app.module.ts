@@ -33,6 +33,8 @@ import { DigitalFuncionalityModule } from './digital-funcionality/digital-funcio
 import { OptionsQuestionModule } from './options-question/options-question.module';
 import { ActorTypesModule } from './actor-types/actor-types.module';
 import { AuthModule } from './auth/auth.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.module';
 
 @Module({
   imports: [
@@ -74,6 +76,8 @@ import { AuthModule } from './auth/auth.module';
     OptionsQuestionModule,
     ActorTypesModule,
     AuthModule,
+    CampaignsModule,
+    CampaignSessionsModule,
   ],
   controllers: [AppController],
   providers: [

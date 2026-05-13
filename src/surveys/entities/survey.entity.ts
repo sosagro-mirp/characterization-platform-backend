@@ -1,4 +1,5 @@
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
@@ -81,6 +82,16 @@ export class Survey {
 
   @OneToMany(() => Response, (response) => response.survey)
   responses: Response[];
+
+  @ManyToOne(() => CampaignSession, (session) => session.surveys, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'campaign_session_id', referencedColumnName: 'sessionId' })
+  campaignSession?: CampaignSession;
+
+  @Column({ name: 'step_order', type: 'integer', nullable: true })
+  stepOrder?: number;
 
   @Column({
     name: 'sincronized',
