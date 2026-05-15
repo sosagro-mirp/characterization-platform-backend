@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, UseGuards, HttpStatus } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -7,6 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { AuthResponseDto, AuthUserDto } from './dto/auth-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from './decorators/public.decorator';
@@ -30,6 +31,25 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Credenciales inválidas.' })
   login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Cambiar la contraseña del usuario autenticado' })
+  @ApiResponse({ status: 200, description: 'Contraseña actualizada.' })
+  @ApiResponse({ status: 401, description: 'Contraseña actual incorrecta.' })
+  async changePassword(
+    @CurrentUser() current: AuthenticatedUser,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    await this.usersService.changeOwnPassword(
+      current.userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+    return { message: 'Contraseña actualizada correctamente.' };
   }
 
   @UseGuards(JwtAuthGuard)
