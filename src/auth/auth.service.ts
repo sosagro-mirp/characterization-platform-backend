@@ -33,10 +33,12 @@ export class AuthService {
 
   buildAuthResponse(user: User): AuthResponseDto {
     const role = user.role?.name ?? null;
+    const mustChangePassword = user.mustChangePassword ?? false;
     const payload: JwtPayload = {
       sub: user.userId,
       email: user.email,
       role,
+      mustChangePassword,
     };
     return {
       accessToken: this.jwtService.sign(payload),
@@ -46,6 +48,7 @@ export class AuthService {
         lastName: user.lastName,
         email: user.email,
         role,
+        mustChangePassword,
       },
     };
   }

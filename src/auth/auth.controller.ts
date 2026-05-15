@@ -46,6 +46,7 @@ export class AuthController {
       lastName: user.lastName,
       email: user.email,
       role: user.role?.name ?? null,
+      mustChangePassword: user.mustChangePassword,
     };
   }
 }
