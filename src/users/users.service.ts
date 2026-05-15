@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -88,6 +89,7 @@ export class UsersService {
     Object.assign(user, rest);
     if (password) {
       user.password = await bcrypt.hash(password, BCRYPT_ROUNDS);
+      user.mustChangePassword = true;
     }
     if (institutionId !== undefined) {
       user.institution = institutionId
@@ -108,5 +110,30 @@ export class UsersService {
   async remove(userId: string): Promise<void> {
     const user = await this.findOne(userId);
     await this.usersRepository.remove(user);
+  }
+
+  async changeOwnPassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.user_id = :userId', { userId })
+      .getOne();
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const matches = await bcrypt.compare(currentPassword, user.password);
+    if (!matches) {
+      throw new UnauthorizedException('Contraseña actual incorrecta');
+    }
+
+    user.password = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+    user.mustChangePassword = false;
+    await this.usersRepository.save(user);
   }
 }
