@@ -49,6 +49,14 @@ export class User {
   })
   password: string;
 
+  @Column({
+    name: 'must_change_password',
+    type: 'boolean',
+    nullable: false,
+    default: true,
+  })
+  mustChangePassword: boolean;
+
   @ManyToOne(() => Institution, {
     nullable: true,
     onDelete: 'SET NULL',
