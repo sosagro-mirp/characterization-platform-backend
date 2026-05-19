@@ -4,6 +4,7 @@ export interface AuthenticatedUser {
   userId: string;
   email: string;
   role: string | null;
+  mustChangePassword: boolean;
 }
 
 export const CurrentUser = createParamDecorator(

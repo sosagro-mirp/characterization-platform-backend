@@ -15,6 +15,9 @@ export class AuthUserDto {
 
   @ApiProperty({ nullable: true, example: 'admin' })
   role: string | null;
+
+  @ApiProperty()
+  mustChangePassword: boolean;
 }
 
 export class AuthResponseDto {
