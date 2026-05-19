@@ -44,7 +44,7 @@ export class SurveysService {
     private readonly campaignSessionsRepository: Repository<CampaignSession>,
   ) {}
 
-  async create(createSurveyDto: CreateSurveyDto): Promise<Survey> {
+  async create(createSurveyDto: CreateSurveyDto, userId?: string): Promise<Survey> {
     const instruments = await this.instrumentsRepository.find({
       where: {
         instrumentId: In(createSurveyDto.instrumentIds),
@@ -67,9 +67,9 @@ export class SurveysService {
     }
 
     let user: User | null = null;
-    if (createSurveyDto.userId) {
+    if (userId) {
       user = await this.usersRepository.findOne({
-        where: { userId: createSurveyDto.userId },
+        where: { userId },
       });
 
       if (!user) {
