@@ -5,6 +5,9 @@ dotenv.config();
 
 import { DataSource } from 'typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
+import { Campaign } from 'src/campaigns/entities/campaign.entity';
+import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
 import { Cooperative } from 'src/cooperatives/entities/cooperative.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Device } from 'src/devices/entities/device.entity';
@@ -36,9 +39,26 @@ import { seedTypesOfCrops } from './types-of-crops.seed';
 import { seedTypesOfQuestions } from './types-of-questions.seed';
 import { seedRoles } from './roles.seed';
 import { seedAdminUser } from './admin-user.seed';
+import { seedInstrumentoResiduos } from './instrumento-residuos.seed';
+import { seedInstrumentosAgua } from './instrumento-agua.seed';
+import { seedInstrumentoIdentificacion } from './instrumento-identificacion.seed';
+import { seedInstrumentosCultivos } from './instrumento-cultivos.seed';
+import { seedInstrumentosSuelo } from './instrumento-suelo.seed';
+import { seedInstrumentoCacaoMorfologia } from './instrumento-cacao-morfologia.seed';
+import { seedInstrumentosPoscosecha } from './instrumento-poscosecha.seed';
+import { seedInstrumentoDificultades } from './instrumento-dificultades.seed';
+import { seedInstrumentosInfraestructura } from './instrumento-infraestructura.seed';
+import { seedInstrumentoAsociatividad } from './instrumento-asociatividad.seed';
+import { seedInstrumentoParticipacion } from './instrumento-participacion.seed';
+import { seedInstrumentoAdopcionProductores } from './instrumento-adopcion-productores.seed';
+import { seedInstrumentoAdopcionExtensionistas } from './instrumento-adopcion-extensionistas.seed';
+import { seedInstrumentoAdopcionPropietarios } from './instrumento-adopcion-propietarios.seed';
 
 const ALL_ENTITIES = [
   ActorType,
+  Campaign,
+  CampaignSession,
+  CampaignStep,
   Cooperative,
   Department,
   Device,
@@ -89,6 +109,20 @@ async function run(): Promise<void> {
       await seedGeography(manager);
       await seedTypesOfCrops(manager);
       await seedTypesOfQuestions(manager);
+      await seedInstrumentoResiduos(manager);
+      await seedInstrumentosAgua(manager);
+      await seedInstrumentoIdentificacion(manager);
+      await seedInstrumentosCultivos(manager);
+      await seedInstrumentosSuelo(manager);
+      await seedInstrumentoCacaoMorfologia(manager);
+      await seedInstrumentosPoscosecha(manager);
+      await seedInstrumentoDificultades(manager);
+      await seedInstrumentosInfraestructura(manager);
+      await seedInstrumentoAsociatividad(manager);
+      await seedInstrumentoParticipacion(manager);
+      await seedInstrumentoAdopcionProductores(manager);
+      await seedInstrumentoAdopcionExtensionistas(manager);
+      await seedInstrumentoAdopcionPropietarios(manager);
     });
     console.log('[seed] Completado exitosamente');
   } catch (error) {
@@ -99,4 +133,4 @@ async function run(): Promise<void> {
   }
 }
 
-run();
+void run();
