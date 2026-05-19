@@ -13,7 +13,10 @@ async function bootstrap() {
   app.use(helmet());
 
   // CORS configuration from CORS_ORIGINS env var (comma-separated list)
-  const corsOrigins = (process.env.CORS_ORIGINS ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  const corsOrigins = (process.env.CORS_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   app.enableCors({
     origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
@@ -41,7 +44,8 @@ async function bootstrap() {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        description: 'Pega aquí el accessToken devuelto por POST /api/auth/login',
+        description:
+          'Pega aquí el accessToken devuelto por POST /api/auth/login',
       },
       'bearer',
     )
