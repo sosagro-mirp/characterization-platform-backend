@@ -28,12 +28,19 @@ export class UsersService {
       throw new ConflictException('Email already registered');
     }
 
-    const { institutionId, laboratoryId, roleId, password, ...rest } =
-      createUserDto;
+    const {
+      institutionId,
+      laboratoryId,
+      roleId,
+      password,
+      mustChangePassword,
+      ...rest
+    } = createUserDto;
 
     const user = this.usersRepository.create({
       ...rest,
       password: await bcrypt.hash(password, BCRYPT_ROUNDS),
+      ...(mustChangePassword !== undefined && { mustChangePassword }),
       institution: institutionId ? ({ institutionId } as any) : undefined,
       laboratory: laboratoryId ? ({ laboratoryId } as any) : undefined,
       role: roleId ? ({ roleId } as any) : undefined,
