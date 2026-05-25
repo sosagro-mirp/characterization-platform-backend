@@ -4,8 +4,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 import { FarmersModule } from './farmers/farmers.module';
 import { FarmsModule } from './farms/farms.module';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
@@ -35,19 +37,56 @@ import { ActorTypesModule } from './actor-types/actor-types.module';
 import { AuthModule } from './auth/auth.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST,
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      database: process.env.DB_NAME,
-      username: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      autoLoadEntities: true, // Carga automática de entidades
-      synchronize: true, // Sincroniza el esquema de la base de datos (no recomendado para producción)
+    ConfigModule.forRoot({ isGlobal: true }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL ?? 'info',
+        transport: process.env.NODE_ENV === 'production'
+          ? { target: 'pino/file', options: { destination: 1 } }
+          : {
+              target: 'pino-pretty',
+              options: {
+                colorize: true,
+                singleLine: false,
+                translateTime: 'SYS:standard',
+                ignore: 'pid,hostname',
+              },
+            },
+      },
+    }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,  // 1 minute
+        limit: 60,    // 60 requests per minute per IP
+      },
+    ]),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+        const dbHost = configService.get<string>('DB_HOST');
+        const dbPort = parseInt(configService.get<string>('DB_PORT') || '5432', 10);
+        const dbName = configService.get<string>('DB_NAME');
+        const dbUser = configService.get<string>('DB_USER');
+        const dbPassword = configService.get<string>('DB_PASSWORD');
+        const dbSsl = configService.get<string>('DB_SSL') === 'true';
+        const nodeEnv = configService.get<string>('NODE_ENV');
+
+        return {
+          type: 'postgres',
+          ...(databaseUrl ? { url: databaseUrl } : { host: dbHost, port: dbPort, database: dbName, username: dbUser, password: dbPassword }),
+          ssl: dbSsl ? { rejectUnauthorized: false } : false,
+          autoLoadEntities: true,
+          synchronize: configService.get<string>('DB_SYNC') === 'true',
+          migrationsRun: nodeEnv === 'production',
+          migrations: ['dist/migrations/*.js'],
+          logging: nodeEnv !== 'production',
+        };
+      },
     }),
     FarmersModule,
     FarmsModule,
@@ -78,10 +117,12 @@ import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.mo
     AuthModule,
     CampaignsModule,
     CampaignSessionsModule,
+    HealthModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
