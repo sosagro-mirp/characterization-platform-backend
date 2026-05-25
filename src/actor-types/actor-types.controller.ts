@@ -31,6 +31,7 @@ export class ActorTypesController {
   }
 
   @Get()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Listar tipos de actor' })
   @ApiResponse({ status: 200, description: 'Lista de tipos de actor.' })
   findAll() {
@@ -38,6 +39,7 @@ export class ActorTypesController {
   }
 
   @Get(':id')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Obtener tipo de actor por ID' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Tipo de actor encontrado.' })
