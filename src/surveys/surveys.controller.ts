@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { ParseUUIDPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { CreateSurveyDto } from './dto/create-survey.dto';
@@ -29,8 +31,11 @@ export class SurveysController {
   @ApiResponse({ status: 201, description: 'Sesión de encuesta creada. Retorna surveyId.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
   @ApiResponse({ status: 404, description: 'Instrumento, agricultor o usuario no encontrado.' })
-  create(@Body() createSurveyDto: CreateSurveyDto) {
-    return this.surveysService.create(createSurveyDto);
+  create(
+    @Body() createSurveyDto: CreateSurveyDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.create(createSurveyDto, user.userId);
   }
 
   @Get()

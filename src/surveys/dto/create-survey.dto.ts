@@ -22,15 +22,6 @@ export class CreateSurveyDto {
   @IsUUID()
   farmerId?: string;
 
-  /** UUID del usuario del sistema que aplica la encuesta */
-  @ApiPropertyOptional({
-    format: 'uuid',
-    example: '550e8400-e29b-41d4-a716-446655440001',
-  })
-  @IsOptional()
-  @IsUUID()
-  userId?: string;
-
   /** UUIDs de los instrumentos incluidos en esta sesión de encuesta */
   @ApiProperty({
     type: [String],
