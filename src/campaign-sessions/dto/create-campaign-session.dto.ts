@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
   IsOptional,
   IsString,
   IsUUID,
@@ -46,4 +47,10 @@ export class CreateCampaignSessionDto {
   @IsOptional()
   @IsUUID()
   cropId?: string;
+
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  cropIds?: string[];
 }

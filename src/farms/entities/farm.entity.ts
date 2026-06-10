@@ -37,37 +37,55 @@ export class Farm {
 
   @Column({
     type: 'float',
-    nullable: false,
+    nullable: true,
   })
-  area: number;
+  area: number | null;
 
   @Column({
     name: 'water_access',
     type: 'boolean',
-    nullable: false,
+    nullable: true,
   })
-  waterAccess: boolean;
+  waterAccess: boolean | null;
 
   @Column({
     name: 'internet_access',
     type: 'boolean',
-    nullable: false,
+    nullable: true,
   })
-  internetAccess: boolean;
+  internetAccess: boolean | null;
 
   @Column({
     name: 'has_stability_electricity',
     type: 'boolean',
-    nullable: false,
+    nullable: true,
   })
-  hasStabilityElectricity: boolean;
+  hasStabilityElectricity: boolean | null;
 
   @Column({
     name: 'technical_assistance_access',
     type: 'boolean',
-    nullable: false,
+    nullable: true,
   })
-  technicalAssistanceAccess: boolean;
+  technicalAssistanceAccess: boolean | null;
+
+  @Column({
+    type: 'float',
+    nullable: true,
+  })
+  latitude: number | null;
+
+  @Column({
+    type: 'float',
+    nullable: true,
+  })
+  longitude: number | null;
+
+  @Column({
+    type: 'float',
+    nullable: true,
+  })
+  altitude: number | null;
 
   @OneToMany(() => Farmer, (farmer) => farmer.farm)
   farmers: Farmer[];

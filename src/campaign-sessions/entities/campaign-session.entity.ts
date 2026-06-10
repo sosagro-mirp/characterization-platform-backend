@@ -3,6 +3,8 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
@@ -52,6 +54,10 @@ export class CampaignSession {
   @ManyToOne(() => TypeOfCrop, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'crop_id' })
   crop?: TypeOfCrop;
+
+  @ManyToMany(() => TypeOfCrop)
+  @JoinTable({ name: 'campaign_sessions_crops' })
+  crops: TypeOfCrop[];
 
   @OneToMany(() => Survey, (survey) => survey.campaignSession)
   surveys: Survey[];
