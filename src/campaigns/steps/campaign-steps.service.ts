@@ -111,7 +111,7 @@ export class CampaignStepsService {
 
     if (dto.conditionQuestionId !== undefined) {
       if (dto.conditionQuestionId === null) {
-        step.conditionQuestion = undefined;
+        step.conditionQuestion = null;
       } else {
         const q = await this.questionsRepository.findOne({
           where: { questionId: dto.conditionQuestionId },
@@ -122,16 +122,19 @@ export class CampaignStepsService {
     }
 
     if (dto.conditionValue !== undefined) {
-      step.conditionValue =
-        dto.conditionValue === null ? undefined : dto.conditionValue;
+      step.conditionValue = dto.conditionValue ?? null;
     }
 
     if (dto.order !== undefined && dto.order !== step.order) {
+      const oldOrder = step.order;
       const sibling = await this.stepsRepository.findOne({
         where: { campaign: { campaignId }, order: dto.order, stepId: Not(stepId) },
       });
       if (sibling) {
-        sibling.order = step.order;
+        // Move step to a temporary order to free the unique slot before swapping
+        step.order = 0;
+        await this.stepsRepository.save(step);
+        sibling.order = oldOrder;
         await this.stepsRepository.save(sibling);
       }
       step.order = dto.order;
