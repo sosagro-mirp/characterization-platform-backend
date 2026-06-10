@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
 import { CampaignSession } from './entities/campaign-session.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
+import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 
 interface NextStepInstrument {
   instrumentId: string;
@@ -28,6 +29,8 @@ export class CampaignSessionsService {
     private readonly sessionsRepository: Repository<CampaignSession>,
     @InjectRepository(Campaign)
     private readonly campaignsRepository: Repository<Campaign>,
+    @InjectRepository(TypeOfCrop)
+    private readonly cropsRepository: Repository<TypeOfCrop>,
   ) {}
 
   async create(dto: CreateCampaignSessionDto): Promise<CampaignSession> {
@@ -50,6 +53,13 @@ export class CampaignSessionsService {
       vereda: dto.vereda,
       crop: dto.cropId ? ({ cropId: dto.cropId } as any) : undefined,
     });
+
+    if (dto.cropIds?.length) {
+      session.crops = await this.cropsRepository.findBy({
+        cropId: In(dto.cropIds),
+      });
+    }
+
     const saved = await this.sessionsRepository.save(session);
     return this.findOne(saved.sessionId);
   }
