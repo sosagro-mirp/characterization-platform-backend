@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
+import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
 import { CampaignSession } from './entities/campaign-session.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
@@ -93,13 +94,16 @@ export class CampaignSessionsService {
         'campaign',
         'campaign.steps',
         'campaign.steps.instrument',
-        'campaign.steps.conditionQuestion',
+        'campaign.steps.conditions',
+        'campaign.steps.conditions.conditionQuestion',
+        'campaign.steps.conditions.conditionCrop',
         'farmer',
         'user',
         'actorType',
         'department',
         'town',
         'crop',
+        'crops',
         'surveys',
         'surveys.responses',
         'surveys.responses.question',
@@ -120,6 +124,63 @@ export class CampaignSessionsService {
     return this.findOne(sessionId);
   }
 
+  private evalCondition(
+    condition: StepCondition,
+    allResponses: Response[],
+    sessionCrops: TypeOfCrop[],
+  ): boolean {
+    if (condition.conditionType === 'crop') {
+      const cropId = condition.conditionCrop?.cropId;
+      return cropId ? sessionCrops.some((c) => c.cropId === cropId) : false;
+    }
+
+    // conditionType === 'question'
+    const questionId = condition.conditionQuestion?.questionId;
+    if (!questionId) return false;
+
+    const matches = allResponses.filter(
+      (r) => r.question?.questionId === questionId,
+    );
+    if (matches.length === 0) return false;
+
+    const expected = condition.conditionValue;
+    if (expected === undefined || expected === null) return false;
+
+    return matches.some((r) => {
+      if (r.option?.optionId === expected) return true;
+      if (r.textValue !== null && r.textValue !== undefined && r.textValue === expected) return true;
+      if (r.numericValue !== null && r.numericValue !== undefined && String(r.numericValue) === expected) return true;
+      if (r.booleanValue !== null && r.booleanValue !== undefined) {
+        if (expected === 'true' && r.booleanValue === true) return true;
+        if (expected === 'false' && r.booleanValue === false) return true;
+      }
+      return false;
+    });
+  }
+
+  private stepPassesConditions(
+    step: CampaignStep,
+    allResponses: Response[],
+    sessionCrops: TypeOfCrop[],
+  ): boolean {
+    const conditions = (step.conditions ?? []).sort((a, b) => a.order - b.order);
+    if (conditions.length === 0) return true;
+
+    let result = this.evalCondition(conditions[0], allResponses, sessionCrops);
+
+    for (let i = 1; i < conditions.length; i++) {
+      const cond = conditions[i];
+      const val = this.evalCondition(cond, allResponses, sessionCrops);
+      if (cond.logicalOperator === 'OR') {
+        result = result || val;
+      } else {
+        result = result && val;
+      }
+    }
+
+    return result;
+  }
+
   async getNextStep(sessionId: string): Promise<NextStepResult | null> {
     const session = await this.findOne(sessionId);
     const steps = session.campaign.steps ?? [];
@@ -135,11 +196,11 @@ export class CampaignSessionsService {
     const allResponses: Response[] = (session.surveys ?? []).flatMap(
       (s) => s.responses ?? [],
     );
+    const sessionCrops: TypeOfCrop[] = session.crops ?? [];
 
     for (const step of steps) {
       if (completedOrders.has(step.order)) continue;
-
-      // TODO(spec24-phase3): evaluate step.conditions[] with AND/OR logic
+      if (!this.stepPassesConditions(step, allResponses, sessionCrops)) continue;
 
       return {
         stepId: step.stepId,
