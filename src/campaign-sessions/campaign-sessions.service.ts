@@ -33,6 +33,31 @@ export class CampaignSessionsService {
     private readonly cropsRepository: Repository<TypeOfCrop>,
   ) {}
 
+  async getLastFarmer(userId: string): Promise<{
+    farmerId: string;
+    name: string;
+    lastName: string | null;
+    farm?: { name: string };
+  } | null> {
+    const session = await this.sessionsRepository
+      .createQueryBuilder('session')
+      .innerJoin('session.user', 'user', 'user.userId = :userId', { userId })
+      .innerJoinAndSelect('session.farmer', 'farmer')
+      .leftJoinAndSelect('farmer.farm', 'farm')
+      .where('session.farmer IS NOT NULL')
+      .orderBy('session.createdAt', 'DESC')
+      .getOne();
+
+    if (!session?.farmer) return null;
+
+    return {
+      farmerId: session.farmer.id,
+      name: session.farmer.name,
+      lastName: session.farmer.lastName,
+      farm: session.farmer.farm ? { name: session.farmer.farm.name } : undefined,
+    };
+  }
+
   async create(dto: CreateCampaignSessionDto): Promise<CampaignSession> {
     const campaign = await this.campaignsRepository.findOne({
       where: { campaignId: dto.campaignId },
