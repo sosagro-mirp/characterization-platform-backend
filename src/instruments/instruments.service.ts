@@ -54,6 +54,15 @@ export class InstrumentsService {
       .getMany();
   }
 
+  async findByCode(code: string): Promise<{ instrumentId: string; name: string }> {
+    const instrument = await this.instrumentsRepository.findOne({
+      where: { code },
+      select: ['instrumentId', 'name'],
+    });
+    if (!instrument) throw new NotFoundException(`Instrument with code '${code}' not found`);
+    return { instrumentId: instrument.instrumentId, name: instrument.name };
+  }
+
   async findOne(id: string): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
