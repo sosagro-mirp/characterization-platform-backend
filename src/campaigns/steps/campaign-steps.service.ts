@@ -7,7 +7,6 @@ import { Not, Repository } from 'typeorm';
 import { Campaign } from '../entities/campaign.entity';
 import { CampaignStep } from '../entities/campaign-step.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
-import { Question } from 'src/questions/entities/question.entity';
 import { CreateCampaignStepDto } from './dto/create-campaign-step.dto';
 import { UpdateCampaignStepDto } from './dto/update-campaign-step.dto';
 
@@ -20,8 +19,6 @@ export class CampaignStepsService {
     private readonly stepsRepository: Repository<CampaignStep>,
     @InjectRepository(Instrument)
     private readonly instrumentsRepository: Repository<Instrument>,
-    @InjectRepository(Question)
-    private readonly questionsRepository: Repository<Question>,
   ) {}
 
   private async loadCampaign(campaignId: string): Promise<Campaign> {
@@ -36,7 +33,7 @@ export class CampaignStepsService {
     await this.loadCampaign(campaignId);
     return this.stepsRepository.find({
       where: { campaign: { campaignId } },
-      relations: ['instrument', 'conditionQuestion'],
+      relations: ['instrument'],
       order: { order: 'ASC' },
     });
   }
@@ -50,15 +47,6 @@ export class CampaignStepsService {
       where: { instrumentId: dto.instrumentId },
     });
     if (!instrument) throw new NotFoundException('Instrument not found');
-
-    let conditionQuestion: Question | undefined;
-    if (dto.conditionQuestionId) {
-      const found = await this.questionsRepository.findOne({
-        where: { questionId: dto.conditionQuestionId },
-      });
-      if (!found) throw new NotFoundException('Condition question not found');
-      conditionQuestion = found;
-    }
 
     // Si el `order` ya está ocupado, desplazo el existente al final.
     const clash = await this.stepsRepository.findOne({
@@ -78,8 +66,6 @@ export class CampaignStepsService {
       campaign,
       instrument,
       order: dto.order,
-      conditionQuestion,
-      conditionValue: dto.conditionValue,
     });
     const saved = await this.stepsRepository.save(step);
     return this.findOne(campaignId, saved.stepId);
@@ -88,7 +74,12 @@ export class CampaignStepsService {
   async findOne(campaignId: string, stepId: string): Promise<CampaignStep> {
     const step = await this.stepsRepository.findOne({
       where: { stepId, campaign: { campaignId } },
-      relations: ['instrument', 'conditionQuestion'],
+      relations: [
+        'instrument',
+        'conditions',
+        'conditions.conditionQuestion',
+        'conditions.conditionCrop',
+      ],
     });
     if (!step) throw new NotFoundException('Step not found');
     return step;
@@ -107,23 +98,6 @@ export class CampaignStepsService {
       });
       if (!instrument) throw new NotFoundException('Instrument not found');
       step.instrument = instrument;
-    }
-
-    if (dto.conditionQuestionId !== undefined) {
-      if (dto.conditionQuestionId === null) {
-        step.conditionQuestion = undefined;
-      } else {
-        const q = await this.questionsRepository.findOne({
-          where: { questionId: dto.conditionQuestionId },
-        });
-        if (!q) throw new NotFoundException('Condition question not found');
-        step.conditionQuestion = q;
-      }
-    }
-
-    if (dto.conditionValue !== undefined) {
-      step.conditionValue =
-        dto.conditionValue === null ? undefined : dto.conditionValue;
     }
 
     if (dto.order !== undefined && dto.order !== step.order) {

@@ -139,34 +139,7 @@ export class CampaignSessionsService {
     for (const step of steps) {
       if (completedOrders.has(step.order)) continue;
 
-      if (step.conditionQuestion && step.conditionValue !== undefined && step.conditionValue !== null) {
-        const matching = allResponses.filter(
-          (r) => r.question?.questionId === step.conditionQuestion!.questionId,
-        );
-        if (matching.length === 0) continue;
-
-        const expected = step.conditionValue;
-        const satisfied = matching.some((r) => {
-          if (r.option?.optionId && r.option.optionId === expected) return true;
-          if (r.textValue !== undefined && r.textValue !== null && r.textValue === expected) return true;
-          if (
-            r.numericValue !== undefined &&
-            r.numericValue !== null &&
-            String(r.numericValue) === expected
-          )
-            return true;
-          if (r.booleanValue !== undefined && r.booleanValue !== null) {
-            if (
-              (expected === 'true' && r.booleanValue === true) ||
-              (expected === 'false' && r.booleanValue === false)
-            )
-              return true;
-          }
-          return false;
-        });
-
-        if (!satisfied) continue;
-      }
+      // TODO(spec24-phase3): evaluate step.conditions[] with AND/OR logic
 
       return {
         stepId: step.stepId,

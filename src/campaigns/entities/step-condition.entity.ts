@@ -19,7 +19,7 @@ export class StepCondition {
   @PrimaryGeneratedColumn('uuid', { name: 'condition_id' })
   conditionId: string;
 
-  @ManyToOne(() => CampaignStep, {
+  @ManyToOne(() => CampaignStep, (step) => step.conditions, {
     nullable: false,
     onDelete: 'CASCADE',
   })
