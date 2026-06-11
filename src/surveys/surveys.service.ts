@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
@@ -20,6 +20,7 @@ export interface SurveyFilters {
   vereda?: string;
   cropId?: string;
   instrumentId?: string;
+  farmerId?: string;
 }
 
 @Injectable()
@@ -76,7 +77,7 @@ export class SurveysService {
       });
 
       if (!user) {
-        throw new NotFoundException('User not found');
+        throw new UnauthorizedException('User account not found — please log in again');
       }
     }
 
@@ -154,7 +155,8 @@ export class SurveysService {
   async findAll(filters: SurveyFilters): Promise<Survey[]> {
     const qb = this.surveysRepository
       .createQueryBuilder('survey')
-      .leftJoinAndSelect('survey.instruments', 'instrument');
+      .leftJoinAndSelect('survey.instruments', 'instrument')
+      .leftJoin('survey.campaignSession', 'campaignSession');
 
     if (filters.actorTypeId) {
       qb.leftJoin('survey.actorType', 'actorType').andWhere(
@@ -192,6 +194,13 @@ export class SurveysService {
       qb.andWhere('instrument.instrumentId = :instrumentId', {
         instrumentId: filters.instrumentId,
       });
+    }
+
+    if (filters.farmerId) {
+      qb.andWhere(
+        '(survey.farmer = :farmerId OR campaignSession.farmer = :farmerId)',
+        { farmerId: filters.farmerId },
+      );
     }
 
     return qb.getMany();
@@ -275,8 +284,10 @@ export class SurveysService {
 
     // Link farmer to the CampaignSession if the survey belongs to one
     if (survey.campaignSession) {
-      survey.campaignSession.farmer = farmer;
-      await this.campaignSessionsRepository.save(survey.campaignSession);
+      await this.campaignSessionsRepository.update(
+        { sessionId: survey.campaignSession.sessionId },
+        { farmer },
+      );
     }
 
     return { farmer, existed };
@@ -285,7 +296,7 @@ export class SurveysService {
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: ['responses', 'responses.question', 'campaignSession', 'campaignSession.crops'],
+      relations: ['responses', 'responses.question', 'campaignSession'],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
@@ -306,10 +317,16 @@ export class SurveysService {
         ? await this.typesOfCropsRepository.find({ where: { name: In(cropNames) } })
         : [];
 
-    // Assign to CampaignSession if survey belongs to one
+    // Assign crops to CampaignSession via direct relation update to avoid cascading nulls
     if (survey.campaignSession) {
-      survey.campaignSession.crops = crops;
-      await this.campaignSessionsRepository.save(survey.campaignSession);
+      const session = await this.campaignSessionsRepository.findOne({
+        where: { sessionId: survey.campaignSession.sessionId },
+        relations: ['crops'],
+      });
+      if (session) {
+        session.crops = crops;
+        await this.campaignSessionsRepository.save(session);
+      }
     }
 
     return { crops };

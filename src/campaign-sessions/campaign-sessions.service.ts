@@ -39,14 +39,11 @@ export class CampaignSessionsService {
     lastName: string | null;
     farm?: { name: string };
   } | null> {
-    const session = await this.sessionsRepository
-      .createQueryBuilder('session')
-      .innerJoin('session.user', 'user', 'user.userId = :userId', { userId })
-      .innerJoinAndSelect('session.farmer', 'farmer')
-      .leftJoinAndSelect('farmer.farm', 'farm')
-      .where('session.farmer IS NOT NULL')
-      .orderBy('session.createdAt', 'DESC')
-      .getOne();
+    const session = await this.sessionsRepository.findOne({
+      where: { user: { userId } },
+      relations: ['farmer', 'farmer.farm'],
+      order: { createdAt: 'DESC' },
+    });
 
     if (!session?.farmer) return null;
 

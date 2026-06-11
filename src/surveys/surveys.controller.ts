@@ -51,6 +51,7 @@ export class SurveysController {
   @ApiQuery({ name: 'vereda',       required: false, description: 'Búsqueda parcial por nombre de vereda (case-insensitive)' })
   @ApiQuery({ name: 'cropId',       required: false, description: 'Filtrar por cultivo', schema: { type: 'string', format: 'uuid' } })
   @ApiQuery({ name: 'instrumentId', required: false, description: 'Filtrar por instrumento', schema: { type: 'string', format: 'uuid' } })
+  @ApiQuery({ name: 'farmerId',     required: false, description: 'Filtrar por agricultor (incluye surveys vinculados a través de campaign_sessions)', schema: { type: 'string', format: 'uuid' } })
   @ApiResponse({ status: 200, description: 'Lista de encuestas con sus instrumentos asociados.' })
   findAll(
     @Query('actorTypeId') actorTypeId?: string,
@@ -59,6 +60,7 @@ export class SurveysController {
     @Query('vereda') vereda?: string,
     @Query('cropId') cropId?: string,
     @Query('instrumentId') instrumentId?: string,
+    @Query('farmerId') farmerId?: string,
   ) {
     const filters: SurveyFilters = {
       actorTypeId,
@@ -67,6 +69,7 @@ export class SurveysController {
       vereda,
       cropId,
       instrumentId,
+      farmerId,
     };
     return this.surveysService.findAll(filters);
   }
