@@ -32,8 +32,16 @@ export class Farm {
   @Column({
     type: 'varchar',
     length: 255,
+    nullable: true,
   })
-  location: string; // Coordenadas geográficas o dirección
+  location: string | null;
+
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  vereda: string | null;
 
   @Column({
     type: 'float',

@@ -33,17 +33,17 @@ export class Farmer {
     type: 'varchar',
     name: 'last_name',
     length: 255,
-    nullable: false,
+    nullable: true,
   })
-  lastName: string;
+  lastName: string | null;
 
   @Column({
     type: 'varchar',
     name: 'document_id',
     length: 50,
-    nullable: false,
+    nullable: true,
   })
-  documentId: string;
+  documentId: string | null;
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   email: string | null;
