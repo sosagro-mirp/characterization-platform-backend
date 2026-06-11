@@ -36,6 +36,13 @@ export class CreateInstrumentDto {
   @IsBoolean()
   isActive: boolean;
 
+  /** Código corto único del instrumento (ej. 'S1', 'S2'). Usado por el frontend para identificar instrumentos del sistema sin hardcodear UUIDs. */
+  @ApiPropertyOptional({ example: 'S1', maxLength: 10 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  code?: string;
+
   /** UUIDs de los tipos de actor que pueden responder este instrumento */
   @ApiPropertyOptional({
     type: [String],
