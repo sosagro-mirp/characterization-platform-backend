@@ -35,7 +35,13 @@ export class CampaignsService {
   async findOne(campaignId: string): Promise<Campaign> {
     const campaign = await this.campaignsRepository.findOne({
       where: { campaignId },
-      relations: ['steps', 'steps.instrument', 'steps.conditionQuestion'],
+      relations: [
+        'steps',
+        'steps.instrument',
+        'steps.conditions',
+        'steps.conditions.conditionQuestion',
+        'steps.conditions.conditionCrop',
+      ],
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
     campaign.steps = (campaign.steps ?? []).sort((a, b) => a.order - b.order);
