@@ -81,4 +81,37 @@ export class SurveysController {
   markAsSynchronized(@Param('id', ParseUUIDPipe) id: string) {
     return this.surveysService.markAsSynchronized(id);
   }
+
+  @Post(':id/extract-crops')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Extraer cultivos desde respuestas S2',
+    description:
+      'Lee las respuestas con systemField crop.* y valor true, identifica los TypeOfCrop ' +
+      'correspondientes y los asigna a la CampaignSession.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta (survey)' })
+  @ApiResponse({ status: 201, description: '{ crops: TypeOfCrop[] }' })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  extractCrops(@Param('id', ParseUUIDPipe) id: string) {
+    return this.surveysService.extractCrops(id);
+  }
+
+  @Post(':id/extract-farmer')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Extraer agricultor desde respuestas S1',
+    description:
+      'Lee las respuestas de la encuesta que tienen systemField asignado (prefijo farmer.* / farm.*), ' +
+      'crea o reutiliza un Farmer y lo vincula a la CampaignSession.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta (survey)' })
+  @ApiResponse({ status: 201, description: '{ farmer, existed: boolean }' })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  @ApiResponse({ status: 422, description: 'Falta farmer.name en las respuestas.' })
+  extractFarmer(@Param('id', ParseUUIDPipe) id: string) {
+    return this.surveysService.extractFarmer(id);
+  }
 }

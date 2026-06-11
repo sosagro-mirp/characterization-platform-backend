@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Department } from 'src/departments/entities/department.entity';
+import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Town } from 'src/towns/entities/town.entity';
@@ -30,6 +31,8 @@ export class SurveysService {
     private readonly instrumentsRepository: Repository<Instrument>,
     @InjectRepository(Farmer)
     private readonly farmersRepository: Repository<Farmer>,
+    @InjectRepository(Farm)
+    private readonly farmsRepository: Repository<Farm>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     @InjectRepository(ActorType)
@@ -205,5 +208,110 @@ export class SurveysService {
 
     survey.sincronized = true;
     return this.surveysRepository.save(survey);
+  }
+
+  async extractFarmer(surveyId: string): Promise<{ farmer: Farmer; existed: boolean }> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+      relations: ['responses', 'responses.question', 'campaignSession'],
+    });
+
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    // Build systemField → value map from all responses that have systemField set
+    const fieldMap: Record<string, string | number | boolean> = {};
+    for (const response of survey.responses ?? []) {
+      const sf = response.question?.systemField;
+      if (!sf) continue;
+      const value = response.textValue ?? response.numericValue ?? response.booleanValue;
+      if (value !== undefined && value !== null) {
+        fieldMap[sf] = value;
+      }
+    }
+
+    const name = fieldMap['farmer.name'] as string | undefined;
+    if (!name) {
+      throw new UnprocessableEntityException('farmer.name is required to extract farmer');
+    }
+
+    const documentId = fieldMap['farmer.documentId'] as string | undefined;
+
+    // Dedup: if documentId is present and a farmer with that document already exists, reuse it
+    let farmer: Farmer | null = null;
+    let existed = false;
+    if (documentId) {
+      farmer = await this.farmersRepository.findOne({ where: { documentId } });
+      if (farmer) existed = true;
+    }
+
+    if (!farmer) {
+      // Create Farm if at least a farm name is available
+      let farm: Farm | null = null;
+      const farmName = fieldMap['farm.name'] as string | undefined;
+      if (farmName) {
+        farm = await this.farmsRepository.save(
+          this.farmsRepository.create({
+            name: farmName,
+            location: null,
+            vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
+            latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
+            longitude: (fieldMap['farm.longitude'] as number | undefined) ?? null,
+            altitude: (fieldMap['farm.altitude'] as number | undefined) ?? null,
+          }),
+        );
+      }
+
+      farmer = await this.farmersRepository.save(
+        this.farmersRepository.create({
+          name,
+          lastName: null,
+          documentId: documentId ?? null,
+          phone: (fieldMap['farmer.phone'] as string | undefined) ?? null,
+          email: (fieldMap['farmer.email'] as string | undefined) ?? null,
+          farm: farm ?? undefined,
+        }),
+      );
+    }
+
+    // Link farmer to the CampaignSession if the survey belongs to one
+    if (survey.campaignSession) {
+      survey.campaignSession.farmer = farmer;
+      await this.campaignSessionsRepository.save(survey.campaignSession);
+    }
+
+    return { farmer, existed };
+  }
+
+  async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+      relations: ['responses', 'responses.question', 'campaignSession', 'campaignSession.crops'],
+    });
+
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
+    const cropNames: string[] = [];
+    for (const response of survey.responses ?? []) {
+      const sf = response.question?.systemField;
+      if (!sf?.startsWith('crop.')) continue;
+      if (response.booleanValue === true) {
+        cropNames.push(sf.split('.')[1]);
+      }
+    }
+
+    // Load matching TypeOfCrop entities by name
+    const crops =
+      cropNames.length > 0
+        ? await this.typesOfCropsRepository.find({ where: { name: In(cropNames) } })
+        : [];
+
+    // Assign to CampaignSession if survey belongs to one
+    if (survey.campaignSession) {
+      survey.campaignSession.crops = crops;
+      await this.campaignSessionsRepository.save(survey.campaignSession);
+    }
+
+    return { crops };
   }
 }

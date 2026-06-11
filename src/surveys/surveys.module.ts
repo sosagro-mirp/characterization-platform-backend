@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Department } from 'src/departments/entities/department.entity';
+import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Town } from 'src/towns/entities/town.entity';
@@ -18,6 +19,7 @@ import { SurveysService } from './surveys.service';
       Survey,
       Instrument,
       Farmer,
+      Farm,
       User,
       ActorType,
       Department,
