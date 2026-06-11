@@ -141,6 +141,7 @@ export class InstrumentsService {
       version: instrument.version,
       publishDate: instrument.publishDate,
       isActive: instrument.isActive,
+      code: instrument.code ?? null,
       sections: (instrument.sections ?? []).map((section) => ({
         sectionId: section.sectionId,
         name: section.name,
@@ -151,6 +152,7 @@ export class InstrumentsService {
           isRequired: question.isRequired,
           isSelectionCriteria: question.isSelectionCriteria,
           order: question.order,
+          systemField: question.systemField ?? null,
           type: question.type
             ? {
                 typeId: question.type.typeId,
