@@ -1,16 +1,17 @@
 import {
-  Column,
   CreateDateColumn,
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   Unique,
   UpdateDateColumn,
+  Column,
 } from 'typeorm';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
-import { Question } from 'src/questions/entities/question.entity';
 import { Campaign } from './campaign.entity';
+import { StepCondition } from './step-condition.entity';
 
 @Entity({ name: 'campaign_steps' })
 @Unique('uq_campaign_step_order', ['campaign', 'order'])
@@ -35,17 +36,10 @@ export class CampaignStep {
   @Column({ name: 'order', type: 'integer', nullable: false })
   order: number;
 
-  @ManyToOne(() => Question, { nullable: true, onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'condition_question_id' })
-  conditionQuestion?: Question | null;
-
-  @Column({
-    name: 'condition_value',
-    type: 'varchar',
-    length: 50,
-    nullable: true,
+  @OneToMany(() => StepCondition, (condition) => condition.step, {
+    eager: false,
   })
-  conditionValue?: string | null;
+  conditions: StepCondition[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;

@@ -34,6 +34,12 @@ export class UpdateInstrumentDto {
   @IsBoolean()
   isActive?: boolean;
 
+  @ApiPropertyOptional({ example: 'S1', maxLength: 10 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  code?: string | null;
+
   @ApiPropertyOptional({
     type: [String],
     format: 'uuid',

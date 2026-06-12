@@ -47,4 +47,10 @@ export class UpdateQuestionDto {
   @IsString()
   @MaxLength(50)
   conditionValue?: string | null;
+
+  @ApiPropertyOptional({ example: 'farmer.name', maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  systemField?: string | null;
 }

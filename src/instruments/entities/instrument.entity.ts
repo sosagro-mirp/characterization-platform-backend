@@ -46,6 +46,14 @@ export class Instrument {
   })
   isActive: boolean;
 
+  @Column({
+    type: 'varchar',
+    length: 10,
+    nullable: true,
+    unique: true,
+  })
+  code?: string;
+
   @OneToMany(() => Section, (section) => section.instrument)
   sections: Section[];
 

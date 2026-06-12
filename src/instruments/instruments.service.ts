@@ -54,6 +54,15 @@ export class InstrumentsService {
       .getMany();
   }
 
+  async findByCode(code: string): Promise<{ instrumentId: string; name: string }> {
+    const instrument = await this.instrumentsRepository.findOne({
+      where: { code },
+      select: ['instrumentId', 'name'],
+    });
+    if (!instrument) throw new NotFoundException(`Instrument with code '${code}' not found`);
+    return { instrumentId: instrument.instrumentId, name: instrument.name };
+  }
+
   async findOne(id: string): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
@@ -141,6 +150,7 @@ export class InstrumentsService {
       version: instrument.version,
       publishDate: instrument.publishDate,
       isActive: instrument.isActive,
+      code: instrument.code ?? null,
       sections: (instrument.sections ?? []).map((section) => ({
         sectionId: section.sectionId,
         name: section.name,
@@ -151,6 +161,7 @@ export class InstrumentsService {
           isRequired: question.isRequired,
           isSelectionCriteria: question.isSelectionCriteria,
           order: question.order,
+          systemField: question.systemField ?? null,
           type: question.type
             ? {
                 typeId: question.type.typeId,

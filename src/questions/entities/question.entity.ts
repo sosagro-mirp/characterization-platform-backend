@@ -73,6 +73,14 @@ export class Question {
   })
   order: number;
 
+  @Column({
+    name: 'system_field',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  systemField?: string;
+
   @ManyToOne(() => Question, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'condition_question_id' })
   conditionQuestion?: Question;

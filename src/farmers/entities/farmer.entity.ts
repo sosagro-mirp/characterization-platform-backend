@@ -33,70 +33,44 @@ export class Farmer {
     type: 'varchar',
     name: 'last_name',
     length: 255,
-    nullable: false,
+    nullable: true,
   })
-  lastName: string;
+  lastName: string | null;
 
   @Column({
     type: 'varchar',
     name: 'document_id',
     length: 50,
-    nullable: false,
+    nullable: true,
   })
-  documentId: string;
+  documentId: string | null;
 
-  @Column({
-    type: 'varchar',
-    length: 255,
-  })
-  email: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  email: string | null;
 
-  @Column({
-    type: 'varchar',
-    length: 255,
-  })
-  phone: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  phone: string | null;
 
-  @Column({
-    type: 'int',
-    nullable: false,
-  })
-  age: number;
+  @Column({ type: 'int', nullable: true })
+  age: number | null;
 
-  @Column({
-    type: 'varchar',
-    length: 50,
-  })
-  gender: string;
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  gender: string | null;
 
-  @Column({
-    type: 'varchar',
-    name: 'education_level',
-    length: 100,
-    nullable: false,
-  })
-  educationLevel: string;
+  @Column({ name: 'education_level', type: 'varchar', length: 100, nullable: true })
+  educationLevel: string | null;
 
-  @Column({
-    type: 'int',
-    name: 'experience_years',
-  })
-  experienceYears: number;
+  @Column({ name: 'experience_years', type: 'int', nullable: true })
+  experienceYears: number | null;
 
-  @Column({
-    type: 'int',
-    name: 'family_size',
-  })
-  familySize: number;
+  @Column({ name: 'family_size', type: 'int', nullable: true })
+  familySize: number | null;
 
-  @Column({
-    type: 'boolean',
-    name: 'is_main_income',
-  })
-  isMainIncome: boolean;
+  @Column({ name: 'is_main_income', type: 'boolean', nullable: true })
+  isMainIncome: boolean | null;
 
-  @Column('boolean', { name: 'participation_in_training' })
-  participationInTraining: boolean;
+  @Column('boolean', { name: 'participation_in_training', nullable: true })
+  participationInTraining: boolean | null;
 
   @ManyToOne(() => Farm, (farm) => farm.farmers, {
     nullable: true,
