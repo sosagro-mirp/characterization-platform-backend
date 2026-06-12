@@ -64,20 +64,20 @@ export class FarmersService {
     return this.findOne(farmer.id);
   }
 
-  async search(query: string): Promise<Farmer[]> {
+  async search(query: string): Promise<{ id: string; name: string; lastName: string | null }[]> {
     return this.farmersRepository.find({
+      select: { id: true, name: true, lastName: true },
       where: [
         { name: ILike(`%${query}%`) },
         { lastName: ILike(`%${query}%`) },
         { documentId: ILike(`%${query}%`) },
       ],
-      relations: FARMER_RELATIONS,
       take: 10,
     });
   }
 
   async findAll(): Promise<Farmer[]> {
-    return this.farmersRepository.find({ relations: FARMER_RELATIONS });
+    return this.farmersRepository.find({ relations: FARMER_RELATIONS, take: 500 });
   }
 
   async findOne(id: string): Promise<Farmer> {

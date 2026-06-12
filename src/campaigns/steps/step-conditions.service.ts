@@ -44,13 +44,8 @@ export class StepConditionsService {
         throw new BadRequestException('La primera condición no puede tener logicalOperator');
       }
     }
-    if (effectiveOrder !== undefined && effectiveOrder > 1 && !(dto as CreateStepConditionDto).logicalOperator) {
-      if ((dto as CreateStepConditionDto).logicalOperator === undefined) {
-        // En update puede omitirse si ya existe; solo forzamos en create
-        if ('conditionType' in dto && (dto as CreateStepConditionDto).order !== undefined) {
-          throw new BadRequestException('Las condiciones con order > 1 requieren logicalOperator');
-        }
-      }
+    if (effectiveOrder !== undefined && effectiveOrder > 1 && !dto.logicalOperator) {
+      throw new BadRequestException('Las condiciones con order > 1 requieren logicalOperator');
     }
 
     const type = (dto as CreateStepConditionDto).conditionType;
