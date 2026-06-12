@@ -1,12 +1,5 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import {
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUUID,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsInt, IsUUID, Min } from 'class-validator';
 
 export class CreateCampaignStepDto {
   @ApiProperty({ format: 'uuid' })
@@ -17,15 +10,4 @@ export class CreateCampaignStepDto {
   @IsInt()
   @Min(1)
   order: number;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID()
-  conditionQuestionId?: string;
-
-  @ApiPropertyOptional({ example: 'cafe', maxLength: 50 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  conditionValue?: string;
 }
