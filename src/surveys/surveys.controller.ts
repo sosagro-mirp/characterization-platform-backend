@@ -14,6 +14,9 @@ import type { AuthenticatedUser } from '../auth/decorators/current-user.decorato
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { CreateSurveyDto } from './dto/create-survey.dto';
+import { CheckDuplicateQueryDto } from './dto/check-duplicate-query.dto';
+import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
+import { SkipStepDto } from './dto/skip-step.dto';
 import { SurveyFilters, SurveysService } from './surveys.service';
 
 @ApiTags('Surveys')
@@ -72,6 +75,58 @@ export class SurveysController {
       farmerId,
     };
     return this.surveysService.findAll(filters);
+  }
+
+  @Get('check-duplicate')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Verificar si el farmer ya respondió este instrumento en la campaña',
+    description:
+      'Retorna hasDuplicate=true y el surveyId del survey existente si el farmer ya tiene ' +
+      'respuestas registradas para el instrumento dentro de la campaña indicada.',
+  })
+  @ApiQuery({ name: 'farmerId', required: true, schema: { type: 'string', format: 'uuid' } })
+  @ApiQuery({ name: 'instrumentId', required: true, schema: { type: 'string', format: 'uuid' } })
+  @ApiQuery({ name: 'campaignId', required: true, schema: { type: 'string', format: 'uuid' } })
+  @ApiResponse({ status: 200, description: '{ hasDuplicate: boolean, surveyId?: string }' })
+  checkDuplicate(@Query() query: CheckDuplicateQueryDto) {
+    return this.surveysService.checkDuplicate(
+      query.farmerId,
+      query.instrumentId,
+      query.campaignId,
+    );
+  }
+
+  @Post('overwrite')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Sobrescribir survey anterior y crear uno nuevo vacío',
+    description:
+      'Elimina el survey duplicado (y sus respuestas en cascada), crea un survey nuevo vacío ' +
+      'con el mismo instrumento y stepOrder en la sesión activa. Retorna { surveyId } del nuevo survey.',
+  })
+  @ApiResponse({ status: 201, description: '{ surveyId: string }' })
+  @ApiResponse({ status: 400, description: 'El survey no pertenece a la misma campaña que la sesión.' })
+  @ApiResponse({ status: 404, description: 'Survey, sesión o instrumento no encontrado.' })
+  overwriteSurvey(@Body() dto: OverwriteSurveyDto) {
+    return this.surveysService.overwriteSurvey(dto);
+  }
+
+  @Post('skip-step')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Marcar un paso como completado sin registrar respuestas',
+    description:
+      'Crea un survey vacío con el stepOrder indicado, actuando como marcador para que ' +
+      'getNextStep no vuelva a sugerir ese paso.',
+  })
+  @ApiResponse({ status: 201, description: '{ surveyId: string }' })
+  @ApiResponse({ status: 404, description: 'Sesión o instrumento no encontrado.' })
+  skipStep(@Body() dto: SkipStepDto) {
+    return this.surveysService.skipStep(dto);
   }
 
   @Patch(':id/sync')

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
@@ -11,6 +11,8 @@ import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
 import { In, Repository } from 'typeorm';
 import { CreateSurveyDto } from './dto/create-survey.dto';
+import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
+import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
 
 export interface SurveyFilters {
@@ -291,6 +293,93 @@ export class SurveysService {
     }
 
     return { farmer, existed };
+  }
+
+  async checkDuplicate(
+    farmerId: string,
+    instrumentId: string,
+    campaignId: string,
+  ): Promise<{ hasDuplicate: boolean; surveyId?: string }> {
+    const row = await this.surveysRepository
+      .createQueryBuilder('survey')
+      .innerJoin('survey.campaignSession', 'session')
+      .innerJoin('session.campaign', 'campaign')
+      .innerJoin('survey.instruments', 'instrument')
+      .leftJoin('survey.farmer', 'surveyFarmer')
+      .leftJoin('session.farmer', 'sessionFarmer')
+      .leftJoin('survey.responses', 'response')
+      .where('campaign.campaignId = :campaignId', { campaignId })
+      .andWhere('instrument.instrumentId = :instrumentId', { instrumentId })
+      .andWhere(
+        '(surveyFarmer.id = :farmerId OR sessionFarmer.id = :farmerId)',
+        { farmerId },
+      )
+      .andWhere('response.responseId IS NOT NULL')
+      .orderBy('survey.createdAt', 'DESC')
+      .select('survey.surveyId', 'surveyId')
+      .limit(1)
+      .getRawOne<{ surveyId: string } | undefined>();
+
+    if (!row) return { hasDuplicate: false };
+    return { hasDuplicate: true, surveyId: row.surveyId };
+  }
+
+  async overwriteSurvey(dto: OverwriteSurveyDto): Promise<{ surveyId: string }> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId: dto.surveyId },
+      relations: ['instruments', 'campaignSession', 'campaignSession.campaign'],
+    });
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    const targetSession = await this.campaignSessionsRepository.findOne({
+      where: { sessionId: dto.sessionId },
+      relations: ['campaign'],
+    });
+    if (!targetSession) throw new NotFoundException('CampaignSession not found');
+
+    if (survey.campaignSession?.campaign?.campaignId !== targetSession.campaign?.campaignId) {
+      throw new BadRequestException('Survey does not belong to the same campaign as the session');
+    }
+
+    const instrument = await this.instrumentsRepository.findOne({
+      where: { instrumentId: dto.instrumentId },
+    });
+    if (!instrument) throw new NotFoundException('Instrument not found');
+
+    // Clear pivot table rows before removing to avoid FK constraint violations
+    survey.instruments = [];
+    await this.surveysRepository.save(survey);
+    await this.surveysRepository.remove(survey);
+
+    const newSurvey = this.surveysRepository.create({
+      campaignSession: targetSession,
+      instruments: [instrument],
+      stepOrder: dto.stepOrder,
+    });
+    const saved = await this.surveysRepository.save(newSurvey);
+    return { surveyId: saved.surveyId };
+  }
+
+  async skipStep(dto: SkipStepDto): Promise<{ surveyId: string }> {
+    const session = await this.campaignSessionsRepository.findOne({
+      where: { sessionId: dto.sessionId },
+    });
+    if (!session) throw new NotFoundException('CampaignSession not found');
+
+    const instrument = await this.instrumentsRepository.findOne({
+      where: { instrumentId: dto.instrumentId },
+    });
+    if (!instrument) throw new NotFoundException('Instrument not found');
+
+    // Create an empty survey as a skip marker — getNextStep treats any survey
+    // with a stepOrder as "completed" regardless of whether it has responses.
+    const survey = this.surveysRepository.create({
+      campaignSession: session,
+      instruments: [instrument],
+      stepOrder: dto.stepOrder,
+    });
+    const saved = await this.surveysRepository.save(survey);
+    return { surveyId: saved.surveyId };
   }
 
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
