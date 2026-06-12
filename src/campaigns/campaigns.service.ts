@@ -50,7 +50,9 @@ export class CampaignsService {
 
   async update(campaignId: string, dto: UpdateCampaignDto): Promise<Campaign> {
     const campaign = await this.findOne(campaignId);
-    Object.assign(campaign, dto);
+    if (dto.name !== undefined) campaign.name = dto.name;
+    if (dto.description !== undefined) campaign.description = dto.description;
+    if (dto.isActive !== undefined) campaign.isActive = dto.isActive;
     await this.campaignsRepository.save(campaign);
     return this.findOne(campaignId);
   }

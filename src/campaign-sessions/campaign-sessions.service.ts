@@ -202,6 +202,10 @@ export class CampaignSessionsService {
       if (completedOrders.has(step.order)) continue;
       if (!this.stepPassesConditions(step, allResponses, sessionCrops)) continue;
 
+      if (!step.instrument) {
+        throw new NotFoundException(`Instrument for step ${step.stepId} not found`);
+      }
+
       return {
         stepId: step.stepId,
         order: step.order,
