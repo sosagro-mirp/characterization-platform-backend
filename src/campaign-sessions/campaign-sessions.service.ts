@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
+import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
 import { CampaignSession } from './entities/campaign-session.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
+import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 
 interface NextStepInstrument {
   instrumentId: string;
@@ -28,7 +30,31 @@ export class CampaignSessionsService {
     private readonly sessionsRepository: Repository<CampaignSession>,
     @InjectRepository(Campaign)
     private readonly campaignsRepository: Repository<Campaign>,
+    @InjectRepository(TypeOfCrop)
+    private readonly cropsRepository: Repository<TypeOfCrop>,
   ) {}
+
+  async getLastFarmer(userId: string): Promise<{
+    farmerId: string;
+    name: string;
+    lastName: string | null;
+    farm?: { name: string };
+  } | null> {
+    const session = await this.sessionsRepository.findOne({
+      where: { user: { userId } },
+      relations: ['farmer', 'farmer.farm'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!session?.farmer) return null;
+
+    return {
+      farmerId: session.farmer.id,
+      name: session.farmer.name,
+      lastName: session.farmer.lastName,
+      farm: session.farmer.farm ? { name: session.farmer.farm.name } : undefined,
+    };
+  }
 
   async create(dto: CreateCampaignSessionDto): Promise<CampaignSession> {
     const campaign = await this.campaignsRepository.findOne({
@@ -50,6 +76,13 @@ export class CampaignSessionsService {
       vereda: dto.vereda,
       crop: dto.cropId ? ({ cropId: dto.cropId } as any) : undefined,
     });
+
+    if (dto.cropIds?.length) {
+      session.crops = await this.cropsRepository.findBy({
+        cropId: In(dto.cropIds),
+      });
+    }
+
     const saved = await this.sessionsRepository.save(session);
     return this.findOne(saved.sessionId);
   }
@@ -61,13 +94,16 @@ export class CampaignSessionsService {
         'campaign',
         'campaign.steps',
         'campaign.steps.instrument',
-        'campaign.steps.conditionQuestion',
+        'campaign.steps.conditions',
+        'campaign.steps.conditions.conditionQuestion',
+        'campaign.steps.conditions.conditionCrop',
         'farmer',
         'user',
         'actorType',
         'department',
         'town',
         'crop',
+        'crops',
         'surveys',
         'surveys.responses',
         'surveys.responses.question',
@@ -88,6 +124,63 @@ export class CampaignSessionsService {
     return this.findOne(sessionId);
   }
 
+  private evalCondition(
+    condition: StepCondition,
+    allResponses: Response[],
+    sessionCrops: TypeOfCrop[],
+  ): boolean {
+    if (condition.conditionType === 'crop') {
+      const cropId = condition.conditionCrop?.cropId;
+      return cropId ? sessionCrops.some((c) => c.cropId === cropId) : false;
+    }
+
+    // conditionType === 'question'
+    const questionId = condition.conditionQuestion?.questionId;
+    if (!questionId) return false;
+
+    const matches = allResponses.filter(
+      (r) => r.question?.questionId === questionId,
+    );
+    if (matches.length === 0) return false;
+
+    const expected = condition.conditionValue;
+    if (expected === undefined || expected === null) return false;
+
+    return matches.some((r) => {
+      if (r.option?.optionId === expected) return true;
+      if (r.textValue !== null && r.textValue !== undefined && r.textValue === expected) return true;
+      if (r.numericValue !== null && r.numericValue !== undefined && String(r.numericValue) === expected) return true;
+      if (r.booleanValue !== null && r.booleanValue !== undefined) {
+        if (expected === 'true' && r.booleanValue === true) return true;
+        if (expected === 'false' && r.booleanValue === false) return true;
+      }
+      return false;
+    });
+  }
+
+  private stepPassesConditions(
+    step: CampaignStep,
+    allResponses: Response[],
+    sessionCrops: TypeOfCrop[],
+  ): boolean {
+    const conditions = (step.conditions ?? []).sort((a, b) => a.order - b.order);
+    if (conditions.length === 0) return true;
+
+    let result = this.evalCondition(conditions[0], allResponses, sessionCrops);
+
+    for (let i = 1; i < conditions.length; i++) {
+      const cond = conditions[i];
+      const val = this.evalCondition(cond, allResponses, sessionCrops);
+      if (cond.logicalOperator === 'OR') {
+        result = result || val;
+      } else {
+        result = result && val;
+      }
+    }
+
+    return result;
+  }
+
   async getNextStep(sessionId: string): Promise<NextStepResult | null> {
     const session = await this.findOne(sessionId);
     const steps = session.campaign.steps ?? [];
@@ -103,38 +196,11 @@ export class CampaignSessionsService {
     const allResponses: Response[] = (session.surveys ?? []).flatMap(
       (s) => s.responses ?? [],
     );
+    const sessionCrops: TypeOfCrop[] = session.crops ?? [];
 
     for (const step of steps) {
       if (completedOrders.has(step.order)) continue;
-
-      if (step.conditionQuestion && step.conditionValue !== undefined && step.conditionValue !== null) {
-        const matching = allResponses.filter(
-          (r) => r.question?.questionId === step.conditionQuestion!.questionId,
-        );
-        if (matching.length === 0) continue;
-
-        const expected = step.conditionValue;
-        const satisfied = matching.some((r) => {
-          if (r.option?.optionId && r.option.optionId === expected) return true;
-          if (r.textValue !== undefined && r.textValue !== null && r.textValue === expected) return true;
-          if (
-            r.numericValue !== undefined &&
-            r.numericValue !== null &&
-            String(r.numericValue) === expected
-          )
-            return true;
-          if (r.booleanValue !== undefined && r.booleanValue !== null) {
-            if (
-              (expected === 'true' && r.booleanValue === true) ||
-              (expected === 'false' && r.booleanValue === false)
-            )
-              return true;
-          }
-          return false;
-        });
-
-        if (!satisfied) continue;
-      }
+      if (!this.stepPassesConditions(step, allResponses, sessionCrops)) continue;
 
       return {
         stepId: step.stepId,

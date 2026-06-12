@@ -65,6 +65,16 @@ export class InstrumentsController {
   }
 
   @Public()
+  @Get('by-code/:code')
+  @ApiOperation({ summary: 'Obtener instrumento por código (S1, S2, etc.)' })
+  @ApiParam({ name: 'code', description: 'Código del instrumento (máx 10 chars)', example: 'S1' })
+  @ApiResponse({ status: 200, description: '{ instrumentId, name }' })
+  @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
+  findByCode(@Param('code') code: string) {
+    return this.instrumentsService.findByCode(code);
+  }
+
+  @Public()
   @Get(':id/render')
   @ApiOperation({
     summary: 'Renderizar instrumento',

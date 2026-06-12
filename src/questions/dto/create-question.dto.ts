@@ -65,4 +65,11 @@ export class CreateQuestionDto {
   @IsString()
   @MaxLength(50)
   conditionValue?: string;
+
+  /** Campo del dominio al que mapea esta pregunta. Formato: 'entidad.campo' (ej. 'farmer.name', 'farm.latitude', 'crop.Café') */
+  @ApiPropertyOptional({ example: 'farmer.name', maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  systemField?: string;
 }
