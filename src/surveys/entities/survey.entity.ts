@@ -85,7 +85,7 @@ export class Survey {
 
   @ManyToOne(() => CampaignSession, (session) => session.surveys, {
     nullable: true,
-    onDelete: 'SET NULL',
+    onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'campaign_session_id', referencedColumnName: 'sessionId' })
   campaignSession?: CampaignSession;

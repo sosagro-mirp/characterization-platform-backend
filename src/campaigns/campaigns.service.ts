@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Campaign } from './entities/campaign.entity';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
@@ -10,6 +11,8 @@ export class CampaignsService {
   constructor(
     @InjectRepository(Campaign)
     private readonly campaignsRepository: Repository<Campaign>,
+    @InjectRepository(CampaignSession)
+    private readonly sessionsRepository: Repository<CampaignSession>,
   ) {}
 
   async create(dto: CreateCampaignDto): Promise<Campaign> {
@@ -55,6 +58,14 @@ export class CampaignsService {
     if (dto.isActive !== undefined) campaign.isActive = dto.isActive;
     await this.campaignsRepository.save(campaign);
     return this.findOne(campaignId);
+  }
+
+  async getSessionsSummary(campaignId: string): Promise<{ sessionCount: number }> {
+    await this.findOne(campaignId);
+    const sessionCount = await this.sessionsRepository.count({
+      where: { campaign: { campaignId } },
+    });
+    return { sessionCount };
   }
 
   async remove(campaignId: string): Promise<void> {
