@@ -69,6 +69,18 @@ export class CampaignsController {
     return this.campaignsService.findOne(id);
   }
 
+  @Get(':id/sessions-summary')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Resumen de sesiones de una campaña',
+    description: 'Retorna el número de sesiones asociadas. Usar antes de eliminar para mostrar advertencia al usuario.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  getSessionsSummary(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.campaignsService.getSessionsSummary(id);
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)

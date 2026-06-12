@@ -8,6 +8,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { AuthResponseDto, AuthUserDto } from './dto/auth-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -34,6 +35,17 @@ export class AuthController {
   @ApiResponse({ status: 429, description: 'Demasiados intentos de login. Intenta más tarde.' })
   login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Registro temporal de investigadores' })
+  @ApiResponse({ status: 201, description: 'Usuario registrado correctamente.' })
+  @ApiResponse({ status: 403, description: 'Código de validación incorrecto.' })
+  @ApiResponse({ status: 409, description: 'El correo ya está registrado.' })
+  register(@Body() dto: RegisterDto): Promise<{ message: string }> {
+    return this.authService.register(dto);
   }
 
   @UseGuards(JwtAuthGuard)

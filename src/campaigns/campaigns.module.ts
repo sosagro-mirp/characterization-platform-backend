@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Campaign } from './entities/campaign.entity';
 import { CampaignStep } from './entities/campaign-step.entity';
 import { StepCondition } from './entities/step-condition.entity';
@@ -19,6 +20,7 @@ import { StepConditionsService } from './steps/step-conditions.service';
       Campaign,
       CampaignStep,
       StepCondition,
+      CampaignSession,
       Instrument,
       Question,
       TypeOfCrop,

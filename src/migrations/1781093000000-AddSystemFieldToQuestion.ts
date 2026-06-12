@@ -6,14 +6,14 @@ export class AddSystemFieldToQuestion1781093000000 implements MigrationInterface
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "questions"
-        ADD COLUMN "system_field" varchar(100) NULL
+        ADD COLUMN IF NOT EXISTS "system_field" character varying(100) NULL
     `);
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "questions"
-        DROP COLUMN "system_field"
+        DROP COLUMN IF EXISTS "system_field"
     `);
   }
 }

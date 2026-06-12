@@ -33,6 +33,7 @@ export class TypesOfQuestionsController {
   }
 
   @Get()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Listar tipos de pregunta' })
   @ApiResponse({ status: 200, description: 'Lista de tipos de pregunta.' })
   findAll() {
@@ -40,6 +41,7 @@ export class TypesOfQuestionsController {
   }
 
   @Get(':id')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Obtener tipo de pregunta por ID' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Tipo de pregunta encontrado.' })

@@ -48,6 +48,7 @@ export class OptionsQuestionController {
   }
 
   @Post('batch')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({
     summary: 'Crear opciones en lote',
     description: 'Crea múltiples opciones para una pregunta en una sola transacción.',
@@ -67,6 +68,7 @@ export class OptionsQuestionController {
   }
 
   @Get()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Listar opciones de una pregunta' })
   @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
   @ApiResponse({ status: 200, description: 'Lista de opciones.' })
@@ -75,6 +77,7 @@ export class OptionsQuestionController {
   }
 
   @Get(':id')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Obtener opción por ID' })
   @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
@@ -88,6 +91,7 @@ export class OptionsQuestionController {
   }
 
   @Patch(':id')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Actualizar opción' })
   @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
@@ -106,6 +110,7 @@ export class OptionsQuestionController {
   }
 
   @Delete(':id')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Eliminar opción' })
   @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
