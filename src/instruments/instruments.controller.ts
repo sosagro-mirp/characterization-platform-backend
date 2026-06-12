@@ -13,7 +13,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { IsOptional, IsUUID } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { Public } from '../auth/decorators/public.decorator';
@@ -27,6 +28,11 @@ class FindAllInstrumentsQuery {
   @IsOptional()
   @IsUUID()
   actorTypeId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  excludeSystem?: boolean;
 }
 
 @ApiTags('Instruments')
@@ -48,7 +54,9 @@ export class InstrumentsController {
   @Get()
   @ApiOperation({
     summary: 'Listar instrumentos',
-    description: 'Retorna todos los instrumentos. Si se provee actorTypeId, filtra por tipo de actor.',
+    description:
+      'Retorna todos los instrumentos. Si se provee actorTypeId, filtra por tipo de actor. ' +
+      'Si excludeSystem=true, omite los instrumentos del sistema (code IS NOT NULL, ej. S1, S2).',
   })
   @ApiQuery({
     name: 'actorTypeId',
@@ -56,12 +64,18 @@ export class InstrumentsController {
     description: 'Filtrar instrumentos por tipo de actor',
     schema: { type: 'string', format: 'uuid' },
   })
+  @ApiQuery({
+    name: 'excludeSystem',
+    required: false,
+    description: 'Si true, excluye instrumentos con código de sistema (S1, S2, etc.)',
+    schema: { type: 'boolean' },
+  })
   @ApiResponse({ status: 200, description: 'Lista de instrumentos.' })
   findAll(@Query() query: FindAllInstrumentsQuery) {
     if (query.actorTypeId) {
       return this.instrumentsService.findByActorType(query.actorTypeId);
     }
-    return this.instrumentsService.findAll();
+    return this.instrumentsService.findAll(query.excludeSystem);
   }
 
   @Public()

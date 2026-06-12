@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -47,6 +48,11 @@ export class CampaignStepsService {
       where: { instrumentId: dto.instrumentId },
     });
     if (!instrument) throw new NotFoundException('Instrument not found');
+    if (instrument.code != null) {
+      throw new BadRequestException(
+        'System instruments (S1, S2, etc.) cannot be added as campaign steps',
+      );
+    }
 
     // Si el `order` ya está ocupado, desplazo el existente al final.
     const clash = await this.stepsRepository.findOne({
@@ -97,6 +103,11 @@ export class CampaignStepsService {
         where: { instrumentId: dto.instrumentId },
       });
       if (!instrument) throw new NotFoundException('Instrument not found');
+      if (instrument.code != null) {
+        throw new BadRequestException(
+          'System instruments (S1, S2, etc.) cannot be added as campaign steps',
+        );
+      }
       step.instrument = instrument;
     }
 

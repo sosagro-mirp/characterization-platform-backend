@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
@@ -37,8 +37,9 @@ export class InstrumentsService {
     return await this.instrumentsRepository.save(instrument);
   }
 
-  async findAll(): Promise<Instrument[]> {
+  async findAll(excludeSystem = false): Promise<Instrument[]> {
     return await this.instrumentsRepository.find({
+      where: excludeSystem ? { code: IsNull() } : undefined,
       relations: { actorTypes: true },
     });
   }
