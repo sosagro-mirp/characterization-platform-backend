@@ -64,14 +64,7 @@ export class FarmersService {
     return this.findOne(farmer.id);
   }
 
-  async search(query: string): Promise<{
-    id: string;
-    name: string;
-    lastName: string | null;
-    documentId: string | null;
-    phone: string | null;
-    farm: { farmId: string; name: string; town: { townId: string; name: string } | null } | null;
-  }[]> {
+  async search(query: string) {
     return this.farmersRepository.find({
       select: {
         id: true,
