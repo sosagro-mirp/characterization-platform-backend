@@ -410,7 +410,7 @@ VALUES (
 -- Y excluir este step_id del INSERT masivo del PASO 6
 ```
 
-Consultar al equipo de desarrollo antes de ejecutar la migración.
+**Decisión tomada (2026-06-12): Opción A.** La fila se migra como `condition_type = 'question'` con el UUID como `condition_value`. El INSERT masivo del PASO 6 cubre esta fila sin modificaciones adicionales.
 
 ---
 
