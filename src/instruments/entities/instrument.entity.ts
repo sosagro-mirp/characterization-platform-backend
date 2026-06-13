@@ -1,12 +1,15 @@
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
+import { User } from 'src/users/entities/user.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   JoinTable,
   ManyToMany,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -70,6 +73,14 @@ export class Instrument {
     },
   })
   actorTypes: ActorType[];
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'created_by_id', referencedColumnName: 'userId' })
+  createdBy?: User;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'updated_by_id', referencedColumnName: 'userId' })
+  updatedBy?: User;
 
   @CreateDateColumn({
     name: 'created_at',

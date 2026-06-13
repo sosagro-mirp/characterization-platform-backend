@@ -46,8 +46,11 @@ export class InstrumentsController {
   @ApiOperation({ summary: 'Crear instrumento de encuesta' })
   @ApiResponse({ status: 201, description: 'Instrumento creado.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
-  create(@Body() createInstrumentDto: CreateInstrumentDto) {
-    return this.instrumentsService.create(createInstrumentDto);
+  create(
+    @Body() createInstrumentDto: CreateInstrumentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.instrumentsService.create(createInstrumentDto, user?.userId);
   }
 
   @Public()
@@ -134,7 +137,7 @@ export class InstrumentsController {
         'Only admin can activate or deactivate instruments',
       );
     }
-    return this.instrumentsService.update(id, updateInstrumentDto);
+    return this.instrumentsService.update(id, updateInstrumentDto, user?.userId);
   }
 
   @Delete(':id')

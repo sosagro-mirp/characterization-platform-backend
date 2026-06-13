@@ -20,6 +20,8 @@ import {
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { CampaignsService } from './campaigns.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
@@ -34,8 +36,11 @@ export class CampaignsController {
   @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Crear campaña' })
   @ApiResponse({ status: 201, description: 'Campaña creada.' })
-  create(@Body() dto: CreateCampaignDto) {
-    return this.campaignsService.create(dto);
+  create(
+    @Body() dto: CreateCampaignDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.campaignsService.create(dto, user?.userId);
   }
 
   @Get()
@@ -98,8 +103,9 @@ export class CampaignsController {
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: UpdateCampaignDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.campaignsService.update(id, dto);
+    return this.campaignsService.update(id, dto, user?.userId);
   }
 
   @Delete(':id')
