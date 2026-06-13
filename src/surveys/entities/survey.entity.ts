@@ -93,6 +93,18 @@ export class Survey {
   @Column({ name: 'step_order', type: 'integer', nullable: true })
   stepOrder?: number;
 
+  @Column({ name: 'respondent_name', type: 'text', nullable: true })
+  respondentName?: string;
+
+  @Column({ name: 'respondent_phone', type: 'text', nullable: true })
+  respondentPhone?: string;
+
+  @Column({ name: 'respondent_document_id', type: 'text', nullable: true })
+  respondentDocumentId?: string;
+
+  @Column({ name: 'respondent_email', type: 'text', nullable: true })
+  respondentEmail?: string;
+
   @Column({
     name: 'sincronized',
     type: 'boolean',
