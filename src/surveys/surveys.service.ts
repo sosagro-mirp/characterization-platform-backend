@@ -240,18 +240,55 @@ export class SurveysService {
       }
     }
 
-    const name = fieldMap['farmer.name'] as string | undefined;
-    if (!name) {
+    // Determine whether the respondent is the producer.
+    // undefined means Q9 was not in the instrument (other instruments) → treat as true.
+    const isRespondent = fieldMap['farmer.isRespondent'] as boolean | undefined;
+    const respondentIsProducer = isRespondent !== false;
+
+    let farmerName: string | undefined;
+    let farmerPhone: string | undefined;
+    let farmerEmail: string | undefined;
+    let farmerDocumentId: string | undefined;
+
+    if (respondentIsProducer) {
+      farmerName = fieldMap['farmer.name'] as string | undefined;
+      farmerPhone = fieldMap['farmer.phone'] as string | undefined;
+      farmerEmail = fieldMap['farmer.email'] as string | undefined;
+      farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
+    } else {
+      // Q9 = false: use producer fields; persist respondent data on the Survey
+      farmerName = fieldMap['farmer.producerName'] as string | undefined;
+      farmerPhone = fieldMap['farmer.producerPhone'] as string | undefined;
+      farmerEmail = fieldMap['farmer.producerEmail'] as string | undefined;
+      farmerDocumentId = fieldMap['farmer.producerDocumentId'] as string | undefined;
+
+      await this.surveysRepository.update(surveyId, {
+        respondentName: (fieldMap['farmer.name'] as string | undefined) || undefined,
+        respondentPhone: (fieldMap['farmer.phone'] as string | undefined) || undefined,
+        respondentDocumentId: (fieldMap['farmer.documentId'] as string | undefined) || undefined,
+        respondentEmail: (fieldMap['farmer.email'] as string | undefined) || undefined,
+      });
+    }
+
+    if (!farmerName) {
       throw new UnprocessableEntityException('farmer.name is required to extract farmer');
     }
 
-    const documentId = fieldMap['farmer.documentId'] as string | undefined;
-
-    // Dedup: if documentId is present and a farmer with that document already exists, reuse it
+    // Dedup by two levels when Q9=false and producerDocumentId absent
     let farmer: Farmer | null = null;
     let existed = false;
-    if (documentId) {
-      farmer = await this.farmersRepository.findOne({ where: { documentId } });
+
+    // Level 1: dedup by documentId (solid)
+    if (farmerDocumentId) {
+      farmer = await this.farmersRepository.findOne({ where: { documentId: farmerDocumentId } });
+      if (farmer) existed = true;
+    }
+
+    // Level 2: dedup by name + phone (heuristic fallback when no documentId)
+    if (!farmer && farmerPhone) {
+      farmer = await this.farmersRepository.findOne({
+        where: { name: farmerName, phone: farmerPhone },
+      });
       if (farmer) existed = true;
     }
 
@@ -274,11 +311,11 @@ export class SurveysService {
 
       farmer = await this.farmersRepository.save(
         this.farmersRepository.create({
-          name,
+          name: farmerName,
           lastName: null,
-          documentId: documentId ?? null,
-          phone: (fieldMap['farmer.phone'] as string | undefined) ?? null,
-          email: (fieldMap['farmer.email'] as string | undefined) ?? null,
+          documentId: farmerDocumentId ?? null,
+          phone: farmerPhone ?? null,
+          email: farmerEmail ?? null,
           farm: farm ?? undefined,
         }),
       );
