@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { User } from 'src/users/entities/user.entity';
+import { In, IsNull, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
@@ -13,9 +14,11 @@ export class InstrumentsService {
     private readonly instrumentsRepository: Repository<Instrument>,
     @InjectRepository(ActorType)
     private readonly actorTypesRepository: Repository<ActorType>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
   ) {}
 
-  async create(createInstrumentDto: CreateInstrumentDto): Promise<Instrument> {
+  async create(createInstrumentDto: CreateInstrumentDto, userId?: string): Promise<Instrument> {
     const { actorTypeIds, ...rest } = createInstrumentDto;
 
     let actorTypes: ActorType[] = [];
@@ -29,9 +32,16 @@ export class InstrumentsService {
       }
     }
 
+    let user: User | undefined;
+    if (userId) {
+      user = await this.usersRepository.findOne({ where: { userId } }) ?? undefined;
+    }
+
     const instrument = this.instrumentsRepository.create({
       ...rest,
       actorTypes,
+      createdBy: user,
+      updatedBy: user,
     });
 
     return await this.instrumentsRepository.save(instrument);
@@ -77,7 +87,7 @@ export class InstrumentsService {
     return instrument;
   }
 
-  async update(id: string, updateInstrumentDto: UpdateInstrumentDto): Promise<Instrument> {
+  async update(id: string, updateInstrumentDto: UpdateInstrumentDto, userId?: string): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
       relations: { actorTypes: true },
@@ -103,6 +113,11 @@ export class InstrumentsService {
       } else {
         instrument.actorTypes = [];
       }
+    }
+
+    if (userId) {
+      const user = await this.usersRepository.findOne({ where: { userId } });
+      if (user) instrument.updatedBy = user;
     }
 
     return await this.instrumentsRepository.save(instrument);
