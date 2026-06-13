@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
+import { User } from 'src/users/entities/user.entity';
 import { Campaign } from './entities/campaign.entity';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { UpdateCampaignDto } from './dto/update-campaign.dto';
@@ -13,13 +14,22 @@ export class CampaignsService {
     private readonly campaignsRepository: Repository<Campaign>,
     @InjectRepository(CampaignSession)
     private readonly sessionsRepository: Repository<CampaignSession>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
   ) {}
 
-  async create(dto: CreateCampaignDto): Promise<Campaign> {
+  async create(dto: CreateCampaignDto, userId?: string): Promise<Campaign> {
+    let user: User | undefined;
+    if (userId) {
+      user = await this.usersRepository.findOne({ where: { userId } }) ?? undefined;
+    }
+
     const campaign = this.campaignsRepository.create({
       name: dto.name,
       description: dto.description,
       isActive: dto.isActive ?? true,
+      createdBy: user,
+      updatedBy: user,
     });
     return this.campaignsRepository.save(campaign);
   }
@@ -51,11 +61,17 @@ export class CampaignsService {
     return campaign;
   }
 
-  async update(campaignId: string, dto: UpdateCampaignDto): Promise<Campaign> {
+  async update(campaignId: string, dto: UpdateCampaignDto, userId?: string): Promise<Campaign> {
     const campaign = await this.findOne(campaignId);
     if (dto.name !== undefined) campaign.name = dto.name;
     if (dto.description !== undefined) campaign.description = dto.description;
     if (dto.isActive !== undefined) campaign.isActive = dto.isActive;
+
+    if (userId) {
+      const user = await this.usersRepository.findOne({ where: { userId } });
+      if (user) campaign.updatedBy = user;
+    }
+
     await this.campaignsRepository.save(campaign);
     return this.findOne(campaignId);
   }
