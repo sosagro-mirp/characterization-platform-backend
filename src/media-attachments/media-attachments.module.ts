@@ -4,12 +4,16 @@ import { Question } from 'src/questions/entities/question.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { User } from 'src/users/entities/user.entity';
+import { StorageModule } from 'src/storage/storage.module';
 import { MediaAttachment } from './entities/media-attachment.entity';
 import { MediaAttachmentsController } from './media-attachments.controller';
 import { MediaAttachmentsService } from './media-attachments.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MediaAttachment, Survey, Question, Response, User])],
+  imports: [
+    TypeOrmModule.forFeature([MediaAttachment, Survey, Question, Response, User]),
+    StorageModule,
+  ],
   controllers: [MediaAttachmentsController],
   providers: [MediaAttachmentsService],
   exports: [MediaAttachmentsService],
