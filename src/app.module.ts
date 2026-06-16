@@ -39,6 +39,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.module';
 import { HealthModule } from './health/health.module';
 import { MediaAttachmentsModule } from './media-attachments/media-attachments.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -120,6 +121,7 @@ import { MediaAttachmentsModule } from './media-attachments/media-attachments.mo
     CampaignSessionsModule,
     HealthModule,
     MediaAttachmentsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [
