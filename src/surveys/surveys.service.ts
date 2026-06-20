@@ -262,6 +262,14 @@ export class SurveysService {
       farmerEmail = fieldMap['farmer.producerEmail'] as string | undefined;
       farmerDocumentId = fieldMap['farmer.producerDocumentId'] as string | undefined;
 
+      // Fallback: if producer name/documentId unknown, use respondent's as provisional
+      if (!farmerName) {
+        farmerName = fieldMap['farmer.name'] as string | undefined;
+      }
+      if (!farmerDocumentId) {
+        farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
+      }
+
       await this.surveysRepository.update(surveyId, {
         respondentName: (fieldMap['farmer.name'] as string | undefined) || undefined,
         respondentPhone: (fieldMap['farmer.phone'] as string | undefined) || undefined,
