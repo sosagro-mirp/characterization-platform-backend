@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -16,12 +17,12 @@ import { UpdateFarmDto } from './dto/update-farm.dto';
 
 @ApiTags('Farms')
 @ApiBearerAuth()
-@Roles(ROLES.ADMIN)
 @Controller('farms')
 export class FarmsController {
   constructor(private readonly farmsService: FarmsService) {}
 
   @Post()
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Crear finca' })
   @ApiResponse({ status: 201, description: 'Finca creada.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
@@ -30,6 +31,7 @@ export class FarmsController {
   }
 
   @Get()
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Listar fincas' })
   @ApiResponse({ status: 200, description: 'Lista de fincas.' })
   findAll() {
@@ -37,29 +39,32 @@ export class FarmsController {
   }
 
   @Get(':id')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Obtener finca por ID' })
-  @ApiParam({ name: 'id', description: 'ID numérico de la finca' })
+  @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Finca encontrada.' })
   @ApiResponse({ status: 404, description: 'Finca no encontrada.' })
-  findOne(@Param('id') id: string) {
-    return this.farmsService.findOne(+id);
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.farmsService.findOne(id);
   }
 
   @Patch(':id')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Actualizar finca' })
-  @ApiParam({ name: 'id', description: 'ID numérico de la finca' })
+  @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Finca actualizada.' })
   @ApiResponse({ status: 404, description: 'Finca no encontrada.' })
-  update(@Param('id') id: string, @Body() updateFarmDto: UpdateFarmDto) {
-    return this.farmsService.update(+id, updateFarmDto);
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateFarmDto: UpdateFarmDto) {
+    return this.farmsService.update(id, updateFarmDto);
   }
 
   @Delete(':id')
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Eliminar finca' })
-  @ApiParam({ name: 'id', description: 'ID numérico de la finca' })
+  @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Finca eliminada.' })
   @ApiResponse({ status: 404, description: 'Finca no encontrada.' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.farmsService.remove(+id);
   }
 }
