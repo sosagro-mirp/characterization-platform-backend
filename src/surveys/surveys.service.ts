@@ -447,11 +447,23 @@ export class SurveysService {
     if (survey.campaignSession) {
       const session = await this.campaignSessionsRepository.findOne({
         where: { sessionId: survey.campaignSession.sessionId },
-        relations: ['crops'],
+        relations: ['crops', 'farmer', 'farmer.farm'],
       });
       if (session) {
         session.crops = crops;
         await this.campaignSessionsRepository.save(session);
+
+        // Propagate crops to the farmer's Farm so the admin edit UI reflects real data
+        if (session.farmer?.farm?.farmId) {
+          const farm = await this.farmsRepository.findOne({
+            where: { farmId: session.farmer.farm.farmId },
+            relations: ['crops'],
+          });
+          if (farm) {
+            farm.crops = crops;
+            await this.farmsRepository.save(farm);
+          }
+        }
       }
     }
 
