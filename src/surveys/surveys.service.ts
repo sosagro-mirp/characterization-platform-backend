@@ -6,6 +6,7 @@ import { Department } from 'src/departments/entities/department.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
+import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -48,6 +49,8 @@ export class SurveysService {
     private readonly typesOfCropsRepository: Repository<TypeOfCrop>,
     @InjectRepository(CampaignSession)
     private readonly campaignSessionsRepository: Repository<CampaignSession>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
   ) {}
 
   async create(createSurveyDto: CreateSurveyDto, userId?: string): Promise<Survey> {
@@ -425,6 +428,45 @@ export class SurveysService {
     });
     const saved = await this.surveysRepository.save(survey);
     return { surveyId: saved.surveyId };
+  }
+
+  async findSurveyResponses(surveyId: string) {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+      relations: { instruments: true },
+    });
+
+    if (!survey) {
+      throw new NotFoundException('Survey not found');
+    }
+
+    const responses = await this.responsesRepository
+      .createQueryBuilder('response')
+      .innerJoinAndSelect('response.question', 'question')
+      .innerJoinAndSelect('question.type', 'type')
+      .innerJoinAndSelect('question.section', 'section')
+      .leftJoinAndSelect('response.option', 'option')
+      .where('response.survey = :surveyId', { surveyId })
+      .orderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC')
+      .getMany();
+
+    return {
+      surveyId: survey.surveyId,
+      instrumentName: survey.instruments?.[0]?.name ?? null,
+      syncedAt: survey.updatedAt.toISOString(),
+      responses: responses.map((r) => ({
+        responseId: r.responseId,
+        questionId: r.question.questionId,
+        questionText: r.question.text,
+        questionType: r.question.type.name,
+        sectionTitle: r.question.section.name,
+        textValue: r.textValue ?? null,
+        numericValue: r.numericValue ?? null,
+        booleanValue: r.booleanValue ?? null,
+        optionText: r.option?.text ?? null,
+      })),
+    };
   }
 
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {

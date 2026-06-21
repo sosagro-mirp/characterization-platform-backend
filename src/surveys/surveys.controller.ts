@@ -129,6 +129,20 @@ export class SurveysController {
     return this.surveysService.skipStep(dto);
   }
 
+  @Get(':id/responses')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Obtener respuestas de una encuesta',
+    description: 'Devuelve todas las respuestas de la encuesta indicada, con el texto de cada pregunta, tipo, sección y valor formateado.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta' })
+  @ApiResponse({ status: 200, description: 'Respuestas de la encuesta con detalle de preguntas y opciones.' })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  getSurveyResponses(@Param('id', ParseUUIDPipe) id: string) {
+    return this.surveysService.findSurveyResponses(id);
+  }
+
   @Patch(':id/sync')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
