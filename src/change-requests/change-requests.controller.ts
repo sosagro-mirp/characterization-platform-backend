@@ -31,7 +31,7 @@ export class ChangeRequestsController {
 
   @Get()
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Listar todos los tickets con filtros opcionales' })
   @ApiResponse({ status: 200, description: 'Listado de solicitudes.' })
   findAll(@Query() query: ListChangeRequestsQueryDto) {
@@ -52,7 +52,7 @@ export class ChangeRequestsController {
 
   @Get(':id')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Detalle de una solicitud de cambio' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200 })
@@ -63,7 +63,7 @@ export class ChangeRequestsController {
 
   @Patch(':id/resolve')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Marcar solicitud como resuelta' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Solicitud resuelta.' })
