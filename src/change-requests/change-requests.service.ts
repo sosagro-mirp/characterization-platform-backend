@@ -33,7 +33,7 @@ export class ChangeRequestsService {
         where: { localId: dto.localId, createdBy: { userId } },
         relations: { createdBy: true, farmer: true, resolvedBy: true },
       });
-      if (existing) return existing;
+      if (existing) return { ticket: existing, wasCreated: false };
     }
 
     const user = await this.usersRepo.findOne({ where: { userId } });
@@ -57,7 +57,8 @@ export class ChangeRequestsService {
       resolvedAt: null,
     });
 
-    return this.repo.save(request);
+    const ticket = await this.repo.save(request);
+    return { ticket, wasCreated: true };
   }
 
   async findAll(query: ListChangeRequestsQueryDto): Promise<ChangeRequest[]> {

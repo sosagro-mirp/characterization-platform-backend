@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ChangeRequestsService } from './change-requests.service';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
@@ -22,11 +23,14 @@ export class ChangeRequestsController {
   @ApiResponse({ status: 200, description: 'Ticket ya existía (idempotencia por localId).' })
   @ApiResponse({ status: 400, description: 'Faltan category (web) o localId (mobile).' })
   @ApiResponse({ status: 404, description: 'Usuario o agricultor no encontrado.' })
-  create(
+  async create(
     @Body() dto: CreateChangeRequestDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    return this.service.create(dto, user.userId);
+    const { ticket, wasCreated } = await this.service.create(dto, user.userId);
+    res.status(wasCreated ? 201 : 200);
+    return ticket;
   }
 
   @Get()
