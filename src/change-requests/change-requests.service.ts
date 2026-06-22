@@ -19,7 +19,7 @@ export class ChangeRequestsService {
     private readonly farmersRepo: Repository<Farmer>,
   ) {}
 
-  async create(dto: CreateChangeRequestDto, userId: string): Promise<ChangeRequest> {
+  async create(dto: CreateChangeRequestDto, userId: string): Promise<{ ticket: ChangeRequest; wasCreated: boolean }> {
     const hasLocalId = !!dto.localId;
     const hasCategory = !!dto.category;
 
