@@ -446,6 +446,7 @@ export class SurveysService {
       .innerJoinAndSelect('question.type', 'type')
       .innerJoinAndSelect('question.section', 'section')
       .leftJoinAndSelect('response.option', 'option')
+      .leftJoinAndSelect('response.attachments', 'attachment')
       .where('response.survey = :surveyId', { surveyId })
       .orderBy('section.order', 'ASC')
       .addOrderBy('question.order', 'ASC')
@@ -455,17 +456,23 @@ export class SurveysService {
       surveyId: survey.surveyId,
       instrumentName: survey.instruments?.[0]?.name ?? null,
       syncedAt: survey.updatedAt.toISOString(),
-      responses: responses.map((r) => ({
-        responseId: r.responseId,
-        questionId: r.question.questionId,
-        questionText: r.question.text,
-        questionType: r.question.type.name,
-        sectionTitle: r.question.section.name,
-        textValue: r.textValue ?? null,
-        numericValue: r.numericValue ?? null,
-        booleanValue: r.booleanValue ?? null,
-        optionText: r.option?.text ?? null,
-      })),
+      responses: responses.map((r) => {
+        const attachment = r.attachments?.[0] ?? null;
+        return {
+          responseId: r.responseId,
+          questionId: r.question.questionId,
+          questionText: r.question.text,
+          questionType: r.question.type.name,
+          sectionTitle: r.question.section.name,
+          textValue: r.textValue ?? null,
+          numericValue: r.numericValue ?? null,
+          booleanValue: r.booleanValue ?? null,
+          optionText: r.option?.text ?? null,
+          publicUrl: attachment?.publicUrl ?? null,
+          mimeType: attachment?.mimeType ?? null,
+          originalFilename: attachment?.originalFilename ?? null,
+        };
+      }),
     };
   }
 
