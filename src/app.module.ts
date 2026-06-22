@@ -38,6 +38,9 @@ import { AuthModule } from './auth/auth.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.module';
 import { HealthModule } from './health/health.module';
+import { ChangeRequestsModule } from './change-requests/change-requests.module';
+import { MediaAttachmentsModule } from './media-attachments/media-attachments.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -118,6 +121,9 @@ import { HealthModule } from './health/health.module';
     CampaignsModule,
     CampaignSessionsModule,
     HealthModule,
+    ChangeRequestsModule,
+    MediaAttachmentsModule,
+    StorageModule,
   ],
   controllers: [AppController],
   providers: [
