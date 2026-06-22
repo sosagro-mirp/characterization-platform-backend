@@ -52,4 +52,10 @@ export class CreateResponseDto {
   @IsOptional()
   @IsBoolean()
   booleanValue?: boolean;
+
+  /** UUID del MediaAttachment ya confirmado — usar para preguntas de tipo image, voice_recording, document */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  attachmentId?: string;
 }

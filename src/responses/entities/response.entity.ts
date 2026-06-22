@@ -1,3 +1,4 @@
+import { MediaAttachment } from 'src/media-attachments/entities/media-attachment.entity';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
@@ -7,6 +8,7 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -68,6 +70,9 @@ export class Response {
     nullable: true,
   })
   booleanValue?: boolean;
+
+  @OneToMany(() => MediaAttachment, (attachment) => attachment.response)
+  attachments?: MediaAttachment[];
 
   @CreateDateColumn({
     name: 'created_at',
