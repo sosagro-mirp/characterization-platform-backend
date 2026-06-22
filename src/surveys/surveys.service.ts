@@ -262,6 +262,14 @@ export class SurveysService {
       farmerEmail = fieldMap['farmer.producerEmail'] as string | undefined;
       farmerDocumentId = fieldMap['farmer.producerDocumentId'] as string | undefined;
 
+      // Fallback: if producer name/documentId unknown, use respondent's as provisional
+      if (!farmerName) {
+        farmerName = fieldMap['farmer.name'] as string | undefined;
+      }
+      if (!farmerDocumentId) {
+        farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
+      }
+
       await this.surveysRepository.update(surveyId, {
         respondentName: (fieldMap['farmer.name'] as string | undefined) || undefined,
         respondentPhone: (fieldMap['farmer.phone'] as string | undefined) || undefined,
@@ -447,11 +455,23 @@ export class SurveysService {
     if (survey.campaignSession) {
       const session = await this.campaignSessionsRepository.findOne({
         where: { sessionId: survey.campaignSession.sessionId },
-        relations: ['crops'],
+        relations: ['crops', 'farmer', 'farmer.farm'],
       });
       if (session) {
         session.crops = crops;
         await this.campaignSessionsRepository.save(session);
+
+        // Propagate crops to the farmer's Farm so the admin edit UI reflects real data
+        if (session.farmer?.farm?.farmId) {
+          const farm = await this.farmsRepository.findOne({
+            where: { farmId: session.farmer.farm.farmId },
+            relations: ['crops'],
+          });
+          if (farm) {
+            farm.crops = crops;
+            await this.farmsRepository.save(farm);
+          }
+        }
       }
     }
 
