@@ -38,6 +38,7 @@ import { AuthModule } from './auth/auth.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { CampaignSessionsModule } from './campaign-sessions/campaign-sessions.module';
 import { HealthModule } from './health/health.module';
+import { ChangeRequestsModule } from './change-requests/change-requests.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { HealthModule } from './health/health.module';
     CampaignsModule,
     CampaignSessionsModule,
     HealthModule,
+    ChangeRequestsModule,
   ],
   controllers: [AppController],
   providers: [
