@@ -7,7 +7,7 @@ import { Town } from 'src/towns/entities/town.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 
-const FARMER_RELATIONS = ['farm', 'farm.town'];
+const FARMER_RELATIONS = ['farm', 'farm.town', 'farm.crops'];
 
 @Injectable()
 export class FarmersService {

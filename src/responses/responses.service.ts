@@ -8,6 +8,7 @@ import { EntityManager, Repository } from 'typeorm';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
+import { MediaAttachment, MediaAttachmentStatus } from 'src/media-attachments/entities/media-attachment.entity';
 import { CreateResponseDto } from './dto/create-response.dto';
 import { Response } from './entities/response.entity';
 
@@ -22,6 +23,8 @@ export class ResponsesService {
     private readonly questionsRepository: Repository<Question>,
     @InjectRepository(OptionQuestion)
     private readonly optionsQuestionRepository: Repository<OptionQuestion>,
+    @InjectRepository(MediaAttachment)
+    private readonly attachmentRepository: Repository<MediaAttachment>,
   ) {}
 
   async create(createResponseDto: CreateResponseDto): Promise<Response> {
@@ -87,13 +90,15 @@ export class ResponsesService {
       textValue,
       numericValue,
       booleanValue,
+      attachmentId,
     } = createResponseDto;
 
     if (
       optionId === undefined &&
       textValue === undefined &&
       numericValue === undefined &&
-      booleanValue === undefined
+      booleanValue === undefined &&
+      attachmentId === undefined
     ) {
       throw new BadRequestException(
         'At least one response value must be provided',
@@ -135,6 +140,24 @@ export class ResponsesService {
       }
     }
 
+    let attachment: MediaAttachment | null = null;
+
+    if (attachmentId) {
+      attachment = await manager.getRepository(MediaAttachment).findOne({
+        where: { attachmentId },
+      });
+
+      if (!attachment) {
+        throw new NotFoundException('Media attachment not found');
+      }
+
+      if (attachment.status !== MediaAttachmentStatus.UPLOADED) {
+        throw new BadRequestException(
+          'Media attachment has not been confirmed as uploaded',
+        );
+      }
+    }
+
     const response = manager.getRepository(Response).create({
       survey,
       question,
@@ -144,6 +167,15 @@ export class ResponsesService {
       booleanValue,
     });
 
-    return await manager.getRepository(Response).save(response);
+    const saved = await manager.getRepository(Response).save(response);
+
+    if (attachment) {
+      await manager.getRepository(MediaAttachment).update(
+        { attachmentId },
+        { response: saved },
+      );
+    }
+
+    return saved;
   }
 }

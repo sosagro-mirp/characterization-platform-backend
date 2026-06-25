@@ -6,6 +6,7 @@ import { Department } from 'src/departments/entities/department.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
+import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -48,6 +49,8 @@ export class SurveysService {
     private readonly typesOfCropsRepository: Repository<TypeOfCrop>,
     @InjectRepository(CampaignSession)
     private readonly campaignSessionsRepository: Repository<CampaignSession>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
   ) {}
 
   async create(createSurveyDto: CreateSurveyDto, userId?: string): Promise<Survey> {
@@ -262,6 +265,14 @@ export class SurveysService {
       farmerEmail = fieldMap['farmer.producerEmail'] as string | undefined;
       farmerDocumentId = fieldMap['farmer.producerDocumentId'] as string | undefined;
 
+      // Fallback: if producer name/documentId unknown, use respondent's as provisional
+      if (!farmerName) {
+        farmerName = fieldMap['farmer.name'] as string | undefined;
+      }
+      if (!farmerDocumentId) {
+        farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
+      }
+
       await this.surveysRepository.update(surveyId, {
         respondentName: (fieldMap['farmer.name'] as string | undefined) || undefined,
         respondentPhone: (fieldMap['farmer.phone'] as string | undefined) || undefined,
@@ -419,6 +430,52 @@ export class SurveysService {
     return { surveyId: saved.surveyId };
   }
 
+  async findSurveyResponses(surveyId: string) {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+      relations: { instruments: true },
+    });
+
+    if (!survey) {
+      throw new NotFoundException('Survey not found');
+    }
+
+    const responses = await this.responsesRepository
+      .createQueryBuilder('response')
+      .innerJoinAndSelect('response.question', 'question')
+      .innerJoinAndSelect('question.type', 'type')
+      .innerJoinAndSelect('question.section', 'section')
+      .leftJoinAndSelect('response.option', 'option')
+      .leftJoinAndSelect('response.attachments', 'attachment')
+      .where('response.survey = :surveyId', { surveyId })
+      .orderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC')
+      .getMany();
+
+    return {
+      surveyId: survey.surveyId,
+      instrumentName: survey.instruments?.[0]?.name ?? null,
+      syncedAt: survey.updatedAt.toISOString(),
+      responses: responses.map((r) => {
+        const attachment = r.attachments?.[0] ?? null;
+        return {
+          responseId: r.responseId,
+          questionId: r.question.questionId,
+          questionText: r.question.text,
+          questionType: r.question.type.name,
+          sectionTitle: r.question.section.name,
+          textValue: r.textValue ?? null,
+          numericValue: r.numericValue ?? null,
+          booleanValue: r.booleanValue ?? null,
+          optionText: r.option?.text ?? null,
+          publicUrl: attachment?.publicUrl ?? null,
+          mimeType: attachment?.mimeType ?? null,
+          originalFilename: attachment?.originalFilename ?? null,
+        };
+      }),
+    };
+  }
+
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
@@ -447,11 +504,23 @@ export class SurveysService {
     if (survey.campaignSession) {
       const session = await this.campaignSessionsRepository.findOne({
         where: { sessionId: survey.campaignSession.sessionId },
-        relations: ['crops'],
+        relations: ['crops', 'farmer', 'farmer.farm'],
       });
       if (session) {
         session.crops = crops;
         await this.campaignSessionsRepository.save(session);
+
+        // Propagate crops to the farmer's Farm so the admin edit UI reflects real data
+        if (session.farmer?.farm?.farmId) {
+          const farm = await this.farmsRepository.findOne({
+            where: { farmId: session.farmer.farm.farmId },
+            relations: ['crops'],
+          });
+          if (farm) {
+            farm.crops = crops;
+            await this.farmsRepository.save(farm);
+          }
+        }
       }
     }
 

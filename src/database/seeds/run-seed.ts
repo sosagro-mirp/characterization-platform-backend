@@ -8,6 +8,7 @@ import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
+import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
 import { Cooperative } from 'src/cooperatives/entities/cooperative.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Device } from 'src/devices/entities/device.entity';
@@ -33,6 +34,7 @@ import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { TypeOfInstitution } from 'src/types-of-institutions/entities/type-of-institution.entity';
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
 import { User } from 'src/users/entities/user.entity';
+import { MediaAttachment } from 'src/media-attachments/entities/media-attachment.entity';
 import { seedActorTypes } from './actor-types.seed';
 import { seedGeography } from './geography.seed';
 import { seedTypesOfCrops } from './types-of-crops.seed';
@@ -72,9 +74,11 @@ import { seedInstrumentoS9AsociatividadYCanalesDeComercializacion } from './inst
 
 const ALL_ENTITIES = [
   ActorType,
+  MediaAttachment,
   Campaign,
   CampaignSession,
   CampaignStep,
+  StepCondition,
   Cooperative,
   Department,
   Device,

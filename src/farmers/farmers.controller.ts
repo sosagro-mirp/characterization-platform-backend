@@ -49,7 +49,7 @@ export class FarmersController {
   }
 
   @Get()
-  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({ summary: 'List all farmers' })
   @ApiResponse({ status: 200, description: 'List of farmers.' })
   findAll() {
