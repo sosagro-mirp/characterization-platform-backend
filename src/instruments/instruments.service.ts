@@ -176,6 +176,7 @@ export class InstrumentsService {
           text: question.text,
           isRequired: question.isRequired,
           isSelectionCriteria: question.isSelectionCriteria,
+          isKeyQuestion: question.isKeyQuestion,
           order: question.order,
           systemField: question.systemField ?? null,
           type: question.type

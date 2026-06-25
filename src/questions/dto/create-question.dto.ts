@@ -40,6 +40,15 @@ export class CreateQuestionDto {
   @IsBoolean()
   isSelectionCriteria?: boolean;
 
+  /**
+   * Indica si la pregunta es estratégica para el despliegue de requerimientos
+   * y la caracterización tecnológica de la zona. Por defecto `false`.
+   */
+  @ApiPropertyOptional({ example: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  isKeyQuestion?: boolean;
+
   /** Posición de la pregunta dentro de la sección (empieza en 1) */
   @ApiProperty({ example: 1, minimum: 1 })
   @IsInt()
