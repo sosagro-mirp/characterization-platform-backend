@@ -484,13 +484,23 @@ export class SurveysService {
 
     if (!survey) throw new NotFoundException('Survey not found');
 
+    // Maps ASCII camelCase systemField keys to TypeOfCrop display names in DB
+    const CROP_FIELD_MAP: Record<string, string> = {
+      cacao:    'Cacao',
+      cafe:     'Café',
+      cannabis: 'Cannabis',
+      canamo:   'Cáñamo',
+    };
+
     // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
     const cropNames: string[] = [];
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
       if (!sf?.startsWith('crop.')) continue;
       if (response.booleanValue === true) {
-        cropNames.push(sf.split('.')[1]);
+        const key = sf.split('.')[1];
+        const resolved = CROP_FIELD_MAP[key] ?? key;
+        cropNames.push(resolved);
       }
     }
 
