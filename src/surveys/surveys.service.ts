@@ -312,10 +312,18 @@ export class SurveysService {
           this.farmsRepository.create({
             name: farmName,
             location: null,
-            vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
-            latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
-            longitude: (fieldMap['farm.longitude'] as number | undefined) ?? null,
-            altitude: (fieldMap['farm.altitude'] as number | undefined) ?? null,
+            vereda:                (fieldMap['farm.vereda']                as string  | undefined) ?? null,
+            latitude:              (fieldMap['farm.latitude']              as number  | undefined) ?? null,
+            longitude:             (fieldMap['farm.longitude']             as number  | undefined) ?? null,
+            altitude:              (fieldMap['farm.altitude']              as number  | undefined) ?? null,
+            area:                  (fieldMap['farm.area']                  as number  | undefined) ?? null,
+            waterAccess:           (fieldMap['farm.waterAccess']           as boolean | undefined) ?? null,
+            internetAccess:        (fieldMap['farm.internetAccess']        as boolean | undefined) ?? null,
+            hasElectricityAccess:  (fieldMap['farm.hasElectricityAccess']  as boolean | undefined) ?? null,
+            mainAccessType:        (fieldMap['farm.mainAccessType']        as string  | undefined) ?? null,
+            electricitySourceType: (fieldMap['farm.electricitySourceType'] as string  | undefined) ?? null,
+            waterSourceType:       (fieldMap['farm.waterSourceType']       as string  | undefined) ?? null,
+            plotCount:             (fieldMap['farm.plotCount']             as number  | undefined) ?? null,
           }),
         );
       }
@@ -324,9 +332,14 @@ export class SurveysService {
         this.farmersRepository.create({
           name: farmerName,
           lastName: null,
-          documentId: farmerDocumentId ?? null,
-          phone: farmerPhone ?? null,
-          email: farmerEmail ?? null,
+          documentId:      farmerDocumentId ?? null,
+          phone:           farmerPhone ?? null,
+          email:           farmerEmail ?? null,
+          gender:          (fieldMap['farmer.gender']          as string  | undefined) ?? null,
+          age:             (fieldMap['farmer.age']             as number  | undefined) ?? null,
+          experienceYears: (fieldMap['farmer.experienceYears'] as number  | undefined) ?? null,
+          isMainIncome:    (fieldMap['farmer.isMainIncome']    as boolean | undefined) ?? null,
+          educationLevel:  (fieldMap['farmer.educationLevel']  as string  | undefined) ?? null,
           farm: farm ?? undefined,
         }),
       );
@@ -484,13 +497,23 @@ export class SurveysService {
 
     if (!survey) throw new NotFoundException('Survey not found');
 
+    // Maps ASCII camelCase systemField keys to TypeOfCrop display names in DB
+    const CROP_FIELD_MAP: Record<string, string> = {
+      cacao:    'Cacao',
+      cafe:     'Café',
+      cannabis: 'Cannabis',
+      canamo:   'Cáñamo',
+    };
+
     // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
     const cropNames: string[] = [];
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
       if (!sf?.startsWith('crop.')) continue;
       if (response.booleanValue === true) {
-        cropNames.push(sf.split('.')[1]);
+        const key = sf.split('.')[1];
+        const resolved = CROP_FIELD_MAP[key] ?? key;
+        cropNames.push(resolved);
       }
     }
 
