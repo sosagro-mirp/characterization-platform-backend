@@ -312,10 +312,17 @@ export class SurveysService {
           this.farmsRepository.create({
             name: farmName,
             location: null,
-            vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
-            latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
-            longitude: (fieldMap['farm.longitude'] as number | undefined) ?? null,
-            altitude: (fieldMap['farm.altitude'] as number | undefined) ?? null,
+            vereda:                (fieldMap['farm.vereda']                as string  | undefined) ?? null,
+            latitude:              (fieldMap['farm.latitude']              as number  | undefined) ?? null,
+            longitude:             (fieldMap['farm.longitude']             as number  | undefined) ?? null,
+            altitude:              (fieldMap['farm.altitude']              as number  | undefined) ?? null,
+            area:                  (fieldMap['farm.area']                  as number  | undefined) ?? null,
+            waterAccess:           (fieldMap['farm.waterAccess']           as boolean | undefined) ?? null,
+            internetAccess:        (fieldMap['farm.internetAccess']        as boolean | undefined) ?? null,
+            mainAccessType:        (fieldMap['farm.mainAccessType']        as string  | undefined) ?? null,
+            electricitySourceType: (fieldMap['farm.electricitySourceType'] as string  | undefined) ?? null,
+            waterSourceType:       (fieldMap['farm.waterSourceType']       as string  | undefined) ?? null,
+            plotCount:             (fieldMap['farm.plotCount']             as number  | undefined) ?? null,
           }),
         );
       }
