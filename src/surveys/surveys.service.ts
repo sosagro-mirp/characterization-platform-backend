@@ -319,6 +319,7 @@ export class SurveysService {
             area:                  (fieldMap['farm.area']                  as number  | undefined) ?? null,
             waterAccess:           (fieldMap['farm.waterAccess']           as boolean | undefined) ?? null,
             internetAccess:        (fieldMap['farm.internetAccess']        as boolean | undefined) ?? null,
+            hasElectricityAccess:  (fieldMap['farm.hasElectricityAccess']  as boolean | undefined) ?? null,
             mainAccessType:        (fieldMap['farm.mainAccessType']        as string  | undefined) ?? null,
             electricitySourceType: (fieldMap['farm.electricitySourceType'] as string  | undefined) ?? null,
             waterSourceType:       (fieldMap['farm.waterSourceType']       as string  | undefined) ?? null,
