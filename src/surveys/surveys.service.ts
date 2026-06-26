@@ -331,9 +331,14 @@ export class SurveysService {
         this.farmersRepository.create({
           name: farmerName,
           lastName: null,
-          documentId: farmerDocumentId ?? null,
-          phone: farmerPhone ?? null,
-          email: farmerEmail ?? null,
+          documentId:      farmerDocumentId ?? null,
+          phone:           farmerPhone ?? null,
+          email:           farmerEmail ?? null,
+          gender:          (fieldMap['farmer.gender']          as string  | undefined) ?? null,
+          age:             (fieldMap['farmer.age']             as number  | undefined) ?? null,
+          experienceYears: (fieldMap['farmer.experienceYears'] as number  | undefined) ?? null,
+          isMainIncome:    (fieldMap['farmer.isMainIncome']    as boolean | undefined) ?? null,
+          educationLevel:  (fieldMap['farmer.educationLevel']  as string  | undefined) ?? null,
           farm: farm ?? undefined,
         }),
       );
