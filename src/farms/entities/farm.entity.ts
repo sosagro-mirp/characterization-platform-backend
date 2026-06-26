@@ -64,11 +64,11 @@ export class Farm {
   internetAccess: boolean | null;
 
   @Column({
-    name: 'has_stability_electricity',
+    name: 'has_electricity_access',
     type: 'boolean',
     nullable: true,
   })
-  hasStabilityElectricity: boolean | null;
+  hasElectricityAccess: boolean | null;
 
   @Column({
     name: 'technical_assistance_access',
