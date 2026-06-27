@@ -71,6 +71,7 @@ import { seedInstrumentoS8cInfraestructuraDeProduccionCannabis } from './instrum
 import { seedInstrumentoS8dInfraestructuraDeProduccionCanamo } from './instrumento-s8d-infraestructura-de-produccion-canamo.seed';
 import { seedInstrumentoS8eServiciosEInfraestructuraGeneral } from './instrumento-s8e-servicios-e-infraestructura-general.seed';
 import { seedInstrumentoS9AsociatividadYCanalesDeComercializacion } from './instrumento-s9-asociatividad-y-canales-de-comercializacion.seed';
+import { seedMunicipioOptions } from './municipio-options.seed';
 
 const ALL_ENTITIES = [
   ActorType,
@@ -165,6 +166,7 @@ async function run(): Promise<void> {
       await seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manager);
       await seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager);
       await seedInstrumentoS9AsociatividadYCanalesDeComercializacion(manager);
+      await seedMunicipioOptions(manager);
     });
     console.log('[seed] Completado exitosamente');
   } catch (error) {

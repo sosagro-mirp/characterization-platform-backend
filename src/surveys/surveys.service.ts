@@ -227,19 +227,36 @@ export class SurveysService {
   async extractFarmer(surveyId: string): Promise<{ farmer: Farmer; existed: boolean }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: ['responses', 'responses.question', 'campaignSession'],
+      relations: ['responses', 'responses.question', 'responses.option', 'campaignSession'],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
 
-    // Build systemField → value map from all responses that have systemField set
+    // Build systemField → value map from all responses that have systemField set.
+    // farm.town is excluded: it resolves via option.metadataId, not a scalar value.
     const fieldMap: Record<string, string | number | boolean> = {};
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
-      if (!sf) continue;
+      if (!sf || sf === 'farm.town') continue;
       const value = response.textValue ?? response.numericValue ?? response.booleanValue;
       if (value !== undefined && value !== null) {
         fieldMap[sf] = value;
+      }
+    }
+
+    // Resolve farm.town from the selected option's metadataId (townId)
+    let resolvedTown: Town | null = null;
+    const townResponse = (survey.responses ?? []).find(
+      (r) => r.question?.systemField === 'farm.town',
+    );
+    if (townResponse?.option?.metadataId) {
+      resolvedTown = await this.townsRepository.findOne({
+        where: { townId: townResponse.option.metadataId },
+      });
+      if (!resolvedTown) {
+        console.warn(
+          `[extractFarmer] Town not found for metadataId=${townResponse.option.metadataId} — farm.town left null`,
+        );
       }
     }
 
@@ -324,6 +341,7 @@ export class SurveysService {
             electricitySourceType: (fieldMap['farm.electricitySourceType'] as string  | undefined) ?? null,
             waterSourceType:       (fieldMap['farm.waterSourceType']       as string  | undefined) ?? null,
             plotCount:             (fieldMap['farm.plotCount']             as number  | undefined) ?? null,
+            town:                  resolvedTown ?? undefined,
           }),
         );
       }
