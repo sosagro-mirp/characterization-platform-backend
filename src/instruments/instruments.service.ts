@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
+import { Town } from 'src/towns/entities/town.entity';
 import { In, IsNull, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
@@ -16,6 +17,8 @@ export class InstrumentsService {
     private readonly actorTypesRepository: Repository<ActorType>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Town)
+    private readonly townsRepository: Repository<Town>,
   ) {}
 
   async create(createInstrumentDto: CreateInstrumentDto, userId?: string): Promise<Instrument> {
@@ -160,6 +163,32 @@ export class InstrumentsService {
       throw new NotFoundException('Instrument not found');
     }
 
+    // Recolectar townIds únicos de las preguntas farm.town para resolverlos en una sola query
+    const townIds = new Set<string>();
+    for (const section of instrument.sections ?? []) {
+      for (const question of section.questions ?? []) {
+        if (question.systemField === 'farm.town') {
+          for (const option of question.options ?? []) {
+            if (option.metadataId) townIds.add(option.metadataId);
+          }
+        }
+      }
+    }
+
+    // Mapa townId → departmentId (query única si hay towns referenciados)
+    const townToDepartment = new Map<string, string>();
+    if (townIds.size > 0) {
+      const towns = await this.townsRepository.find({
+        where: { townId: In([...townIds]) },
+        relations: ['department'],
+      });
+      for (const town of towns) {
+        if (town.department) {
+          townToDepartment.set(town.townId, town.department.departmentId);
+        }
+      }
+    }
+
     return {
       instrumentId: instrument.instrumentId,
       name: instrument.name,
@@ -185,12 +214,22 @@ export class InstrumentsService {
                 name: question.type.name,
               }
             : null,
-          options: (question.options ?? []).map((option) => ({
-            optionId: option.optionId,
-            text: option.text,
-            value: option.value,
-            isOther: option.isOther,
-          })),
+          options: (question.options ?? []).map((option) => {
+            let departmentId: string | null = null;
+            if (question.systemField === 'farm.department') {
+              departmentId = option.metadataId ?? null;
+            } else if (question.systemField === 'farm.town') {
+              departmentId = (option.metadataId && townToDepartment.get(option.metadataId)) || null;
+            }
+            return {
+              optionId: option.optionId,
+              text: option.text,
+              value: option.value ?? null,
+              isOther: option.isOther,
+              metadataId: option.metadataId ?? null,
+              departmentId,
+            };
+          }),
           conditionQuestionId: question.conditionQuestion?.questionId ?? null,
           conditionValue: question.conditionValue ?? null,
         })),

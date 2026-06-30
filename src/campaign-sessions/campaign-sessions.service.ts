@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Not, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { CampaignStep } from 'src/campaigns/entities/campaign-step.entity';
 import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
@@ -40,11 +40,14 @@ export class CampaignSessionsService {
     lastName: string | null;
     farm?: { name: string };
   } | null> {
-    const session = await this.sessionsRepository.findOne({
-      where: { user: { userId }, farmer: Not(IsNull()) },
-      relations: ['farmer', 'farmer.farm'],
-      order: { createdAt: 'DESC' },
-    });
+    const session = await this.sessionsRepository
+      .createQueryBuilder('session')
+      .leftJoinAndSelect('session.farmer', 'farmer')
+      .leftJoinAndSelect('farmer.farm', 'farm')
+      .where('session.user_id = :userId', { userId })
+      .andWhere('session.farmer_id IS NOT NULL')
+      .orderBy('session.created_at', 'DESC')
+      .getOne();
 
     if (!session?.farmer) return null;
 
