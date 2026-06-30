@@ -59,11 +59,11 @@ export class CampaignSession {
   @JoinTable({
     name: 'campaign_sessions_crops',
     joinColumn: {
-      name: 'campaignSessionsSessionId',
+      name: 'campaign_sessions_session_id',
       referencedColumnName: 'sessionId',
     },
     inverseJoinColumn: {
-      name: 'typesOfCropsCropId',
+      name: 'types_of_crops_crop_id',
       referencedColumnName: 'cropId',
     },
   })
