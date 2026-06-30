@@ -63,3 +63,6 @@ openapi.json
 skills-lock.json
 CLAUDE.md
 
+# Standalone seed runners (environment-specific, not for version control)
+src/database/seeds/run-*.ts
+
