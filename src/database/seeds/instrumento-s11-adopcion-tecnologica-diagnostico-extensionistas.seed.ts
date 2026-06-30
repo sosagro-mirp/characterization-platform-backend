@@ -68,7 +68,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
     return;
   }
 
-  const typeNames = ["multiple_choice", "numeric", "single_choice", "yes_no"];
+  const typeNames = ["likert", "multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -217,7 +217,92 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       { text: `Grupos comunitarios / asambleas` },
     ]);
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil contar con una app para registrar mis visitas de campo y hacer seguimiento al estado productivo de cada unidad que atiendo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría contar con una plataforma donde pueda ver el estado actualizado de todas las fincas que atiendo (alertas sanitarias, parámetros de cultivo, pendientes de visita) desde mi celular o computador.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil poder enviar recomendaciones técnicas personalizadas a cada productor que atiendo directamente desde una plataforma, sin necesidad de visitarlo físicamente.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Preferiría compartir contenido técnico con mis productores en formato de fichas breves o videos cortos de 2 a 3 minutos a través de una app, en lugar de documentos extensos.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_5 = await saveQuestion(manager, {
+      text: `Si una plataforma registrara automáticamente mis visitas (fecha, finca, observaciones), la usaría para mis reportes institucionales y me ahorraría tiempo significativo cada semana.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_5, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (8 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (13 preguntas).`);
 }

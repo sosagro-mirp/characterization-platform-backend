@@ -68,7 +68,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     return;
   }
 
-  const typeNames = ["open_text", "single_choice"];
+  const typeNames = ["likert", "open_text", "single_choice"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -159,7 +159,75 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
       { text: `R (Resistente)` },
     ]);
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil contar con una guía digital con fotografías y criterios visuales para identificar en campo el nivel de susceptibilidad a enfermedades de cada clon de cacao que evalúe.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría acceder desde mi celular a una base de datos de clones de cacao con sus perfiles de resistencia documentados, para comparar con lo que observo en campo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una app que registrara automáticamente las evaluaciones de susceptibilidad por árbol y generara un reporte del estado sanitario del lote al finalizar el recorrido.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Consultaría información técnica sobre resistencia varietal de cacao en una plataforma digital durante mis visitas de campo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (5 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (9 preguntas).`);
 }

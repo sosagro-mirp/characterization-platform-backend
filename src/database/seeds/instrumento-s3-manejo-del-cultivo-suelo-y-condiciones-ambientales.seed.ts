@@ -147,6 +147,8 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       text: `¿Qué tan útil le sería recibir en su celular el pronóstico del tiempo y alertas climáticas (heladas, lluvias extremas) específicas para su zona?`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec1,
     });
@@ -324,7 +326,75 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       conditionValue: 'true',
     });
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil recibir en mi celular una alerta cuando sea el momento recomendado para hacer un nuevo análisis de suelo, según el intervalo que yo mismo defina.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me sería útil una app que interpretara los resultados de mi análisis de suelo y me sugiriera ajustes en la fertilización de forma sencilla, sin necesidad de un técnico presente.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me gustaría llevar un registro digital de los fertilizantes que aplico (producto, dosis, fecha) para comparar con los resultados productivos al final de la campaña.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me sería útil que una herramienta digital me indicara qué fertilizantes son compatibles con las certificaciones que busco (orgánico, Rainforest Alliance, etc.).`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (20 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (24 preguntas).`);
 }

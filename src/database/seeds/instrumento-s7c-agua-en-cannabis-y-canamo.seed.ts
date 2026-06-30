@@ -68,7 +68,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     return;
   }
 
-  const typeNames = ["multiple_choice", "numeric", "open_text", "single_choice", "yes_no"];
+  const typeNames = ["likert", "multiple_choice", "numeric", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -774,7 +774,75 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       { text: `Sí` },
     ]);
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil recibir en mi celular alertas cuando los parámetros del agua de riego (pH, conductividad eléctrica, temperatura) estén fuera del rango óptimo para mi cultivo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec7,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría llevar en una app un registro del volumen de agua que uso por ciclo de riego o fertirriego, para detectar tendencias de consumo y reducir costos.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec7,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una herramienta que me indicara qué ajustes de fertilización o tratamiento de agua aplicar según los parámetros que mido en campo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec7,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me gustaría recibir recomendaciones digitales sobre cómo gestionar el vertimiento de aguas residuales de mi cultivo para cumplir con las regulaciones ambientales colombianas.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec7,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (64 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (68 preguntas).`);
 }

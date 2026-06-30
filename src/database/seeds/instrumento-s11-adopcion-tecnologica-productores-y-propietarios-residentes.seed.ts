@@ -211,6 +211,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `Me siento cómodo(a) usando aplicaciones en el celular o computador.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -226,6 +228,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `Uso internet o el celular regularmente para actividades de mi producción.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -241,6 +245,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `La tecnología me ayudaría a tomar mejores decisiones en mi finca.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -256,6 +262,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `El uso de tecnología podría aumentar mis ingresos o mejorar mi producción.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -271,6 +279,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `Me genera desconfianza que la tecnología falle en momentos importantes.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -286,6 +296,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `Prefiero mantener mis métodos actuales antes de arriesgarme con tecnología nueva.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -301,6 +313,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `Me gusta probar nuevas herramientas y tecnologías cuando están disponibles.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -316,6 +330,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       text: `Aprendería a usar una app nueva si alguien me enseña cómo funciona.`,
       type: types.likert,
       isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
       order: o++,
       section: sec2,
     });
@@ -410,7 +426,75 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       { text: `Llamada telefónica` },
     ]);
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `La función que usaría primero en una app de gestión de finca sería el registro de mi producción o el acceso al precio de mercado de mi cultivo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec3,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría que la app se pudiera entender sola con imágenes e íconos, sin necesidad de leer instrucciones largas.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec3,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me gustaría que la app me hablara (instrucciones en audio) en lugar de solo mostrar texto, para usarla más fácilmente mientras trabajo en el campo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec3,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Abandonaría una app si registrar un dato me tomara más de cuatro pasos o acciones en la pantalla.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec3,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (19 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (23 preguntas).`);
 }
