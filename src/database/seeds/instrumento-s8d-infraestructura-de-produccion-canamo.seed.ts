@@ -81,7 +81,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -104,20 +104,20 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
     await saveOptions(manager, q_14cd478f_a3fa_40cd_837f_d3e6a19d5716, [
       { text: `Bodega de producto terminado` },
-      { text: `Báscula` },
+      { text: `Área de empaque y etiquetado` },
       { text: `Campo abierto (sin estructura)` },
+      { text: `Invernadero` },
+      { text: `Báscula` },
+      { text: `Sistema de riego tecnificado` },
       { text: `Decorticadora / desfibrado mecánico` },
       { text: `Desfibrado manual` },
-      { text: `Equipo de extracción de CBD` },
-      { text: `Invernadero` },
-      { text: `Prensa de semilla (para aceite)` },
-      { text: `Sistema de riego tecnificado` },
-      { text: `Área de empaque y etiquetado` },
       { text: `Área de secado de fibra / semilla / flor` },
+      { text: `Prensa de semilla (para aceite)` },
+      { text: `Equipo de extracción de CBD` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8D.2 ★ — Área de cultivo a campo abierto (ha)`,
+      text: `Área de cultivo a campo abierto (ha)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -134,7 +134,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.4 ★ — ¿Tiene maquinaria de cosecha (cosechadora, segadora)?`,
+      text: `¿Tiene maquinaria de cosecha (cosechadora, segadora)?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -143,7 +143,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.5 ★ — Capacidad de procesamiento de fibra (valor numérico)`,
+      text: `Capacidad de procesamiento de fibra (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -160,8 +160,8 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
       section: sec1,
     });
     await saveOptions(manager, q_3d5ac54a_efe3_4860_897f_cdf8eb783d9d, [
-      { text: `kg / día` },
       { text: `t / cosecha` },
+      { text: `kg / día` },
     ]);
 
     await saveQuestion(manager, {
@@ -174,7 +174,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.7 ★ — ¿Tiene tomas eléctricas disponibles para instalación de sensores?`,
+      text: `¿Tiene tomas eléctricas disponibles para instalación de sensores?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

@@ -81,7 +81,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -98,7 +98,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     let o = 1;
 
     const q_f5de0b7b_545d_4378_833f_935e5e1f4863 = await saveQuestion(manager, {
-      text: `5.1 ★ — ¿Cuáles son sus principales dificultades para cumplir los estándares de calidad?`,
+      text: `¿Cuáles son sus principales dificultades para cumplir los estándares de calidad?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -106,23 +106,23 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec1,
     });
     await saveOptions(manager, q_f5de0b7b_545d_4378_833f_935e5e1f4863, [
-      { text: `Acceso limitado a insumos de calidad (semillas certificadas, fertilizantes)` },
-      { text: `Agua de mala calidad para los procesos de beneficio` },
-      { text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)` },
-      { text: `Contaminación por residuos de pesticidas o metales pesados` },
       { text: `Dificultades de transporte del producto al punto de venta` },
+      { text: `Falta de conocimiento / apoyo institucional` },
+      { text: `Otro`, isOther: true },
+      { text: `Agua de mala calidad para los procesos de beneficio` },
+      { text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)` },
+      { text: `Falta de conocimiento técnico sobre procesos de poscosecha` },
+      { text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)` },
+      { text: `Infraestructura deficiente (marquesinas, cajones de fermentación, bodegas)` },
+      { text: `Acceso limitado a insumos de calidad (semillas certificadas, fertilizantes)` },
       { text: `Dificultades en el proceso de fermentación (duración, temperatura, volteo)` },
       { text: `Dificultades en el secado (tiempo, temperatura, uniformidad)` },
-      { text: `Exigencias de certificaciones que no puede costear` },
-      { text: `Falta de conocimiento / apoyo institucional` },
-      { text: `Falta de conocimiento técnico sobre procesos de poscosecha` },
-      { text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)` },
-      { text: `Falta de financiamiento para mejorar procesos` },
-      { text: `Falta de laboratorios de análisis de calidad accesibles o económicos` },
-      { text: `Infraestructura deficiente (marquesinas, cajones de fermentación, bodegas)` },
-      { text: `Otro`, isOther: true },
-      { text: `Poca información sobre las normas técnicas aplicables` },
       { text: `Problemas de plagas y enfermedades que afectan la calidad` },
+      { text: `Contaminación por residuos de pesticidas o metales pesados` },
+      { text: `Poca información sobre las normas técnicas aplicables` },
+      { text: `Exigencias de certificaciones que no puede costear` },
+      { text: `Falta de laboratorios de análisis de calidad accesibles o económicos` },
+      { text: `Falta de financiamiento para mejorar procesos` },
     ]);
 
     await saveQuestion(manager, {
@@ -140,7 +140,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     let o = 1;
 
     const q_bff4d6a1_8f14_4127_aeb7_943bc16b0fa5 = await saveQuestion(manager, {
-      text: `5.2 ★ — ¿Qué tipo de apoyo necesitaría principalmente para superar esas dificultades?`,
+      text: `¿Qué tipo de apoyo necesitaría principalmente para superar esas dificultades?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -148,12 +148,12 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec2,
     });
     await saveOptions(manager, q_bff4d6a1_8f14_4127_aeb7_943bc16b0fa5, [
-      { text: `Acceso a mercados` },
-      { text: `Acompañamiento técnico continuo` },
-      { text: `Capacitación técnica` },
-      { text: `Equipos / tecnología` },
       { text: `Financiamiento / crédito` },
+      { text: `Equipos / tecnología` },
+      { text: `Acompañamiento técnico continuo` },
       { text: `Normas y certificaciones` },
+      { text: `Acceso a mercados` },
+      { text: `Capacitación técnica` },
     ]);
 
   }
@@ -194,8 +194,8 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec3,
     });
     await saveOptions(manager, q_2e08c74a_2c56_4999_b458_c3f07113dab5, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
@@ -215,7 +215,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     const q_fc5c8a53_ca6d_4b7e_b41f_d093f59b42b1 = await saveQuestion(manager, {
-      text: `5.4 ★ — Frecuencia de rechazo de producto por calidad`,
+      text: `Frecuencia de rechazo de producto por calidad`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -225,12 +225,12 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     await saveOptions(manager, q_fc5c8a53_ca6d_4b7e_b41f_d093f59b42b1, [
       { text: `Frecuentemente (> 30%)` },
       { text: `Nunca` },
-      { text: `Ocasionalmente (10–30%)` },
       { text: `Raramente (< 10% de la producción)` },
+      { text: `Ocasionalmente (10–30%)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `5.5 ★ — ¿Qué hace con el producto rechazado?`,
+      text: `¿Qué hace con el producto rechazado?`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -239,7 +239,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     await saveQuestion(manager, {
-      text: `5.5a — ¿Cuál variedad / clon le han rechazado?`,
+      text: `¿Cuál variedad / clon le han rechazado?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -247,7 +247,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     await saveQuestion(manager, {
-      text: `5.6 — Estimación de pérdidas económicas por calidad (COP / año)`,
+      text: `Estimación de pérdidas económicas por calidad (COP / año)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -255,16 +255,16 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     const q_e8655701_d850_4636_97ac_730421590eb1 = await saveQuestion(manager, {
-      text: `5.7 — ¿Conoce el precio diferencial que pagarían por producto de mejor calidad?`,
+      text: `¿Conoce el precio diferencial que pagarían por producto de mejor calidad?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec4,
     });
     const opts_e8655701_d850_4636_97ac_730421590eb1 = await saveOptions(manager, q_e8655701_d850_4636_97ac_730421590eb1, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
     const opt_218dc095_2f36_49e3_8cfa_4032a58ab752 = opts_e8655701_d850_4636_97ac_730421590eb1.get(`Sí`)!;
 

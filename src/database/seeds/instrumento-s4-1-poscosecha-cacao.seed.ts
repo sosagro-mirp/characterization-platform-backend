@@ -81,7 +81,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -95,25 +95,25 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     let o = 1;
 
     const q_d4839467_79af_4f9d_8005_87906942004e = await saveQuestion(manager, {
-      text: `4.1 — Actividades de poscosecha que realiza en cacao`,
+      text: `Actividades de poscosecha que realiza en cacao`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_d4839467_79af_4f9d_8005_87906942004e, [
+      { text: `Transformación del grano` },
       { text: `Almacenamiento` },
+      { text: `Empaque y etiquetado` },
+      { text: `Fermentación` },
       { text: `Clasificación / selección de grano` },
       { text: `Cosecha selectiva por madurez` },
       { text: `Desgrane / apertura de mazorcas` },
-      { text: `Empaque y etiquetado` },
-      { text: `Fermentación` },
       { text: `Secado` },
-      { text: `Transformación del grano` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.1.1 ★ — ¿Realiza fermentación?`,
+      text: `¿Realiza fermentación?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -131,10 +131,10 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
     await saveOptions(manager, q_195a4961_8455_4872_9236_283c1f05c447, [
       { text: `Cajones de madera` },
-      { text: `Montón` },
-      { text: `No realiza fermentación` },
-      { text: `Otro`, isOther: true },
       { text: `Sacos de yute` },
+      { text: `Montón` },
+      { text: `Otro`, isOther: true },
+      { text: `No realiza fermentación` },
     ]);
 
     const q_442d6940_34f0_41e7_8565_5ebc23bb4e6a = await saveQuestion(manager, {
@@ -151,7 +151,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     ]);
 
     await saveQuestion(manager, {
-      text: `4.1.4 — Clones en fermentación actualmente`,
+      text: `Clones en fermentación actualmente`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -159,7 +159,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.5 ★ — Duración promedio de la fermentación (días)`,
+      text: `Duración promedio de la fermentación (días)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -186,7 +186,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.8 ★ — Análisis de control de calidad en finca al cacao fermentado`,
+      text: `Análisis de control de calidad en finca al cacao fermentado`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -195,7 +195,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.9 — Análisis de control de calidad que manda hacer a laboratorio (fermentado)`,
+      text: `Análisis de control de calidad que manda hacer a laboratorio (fermentado)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -203,7 +203,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.10 — Calidad sensorial habitual de la fermentación`,
+      text: `Calidad sensorial habitual de la fermentación`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -211,7 +211,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.11 — ¿Comercializa el grano en estado fermentado?`,
+      text: `¿Comercializa el grano en estado fermentado?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -219,7 +219,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.12 ★ — ¿Realiza secado?`,
+      text: `¿Realiza secado?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -228,7 +228,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     const q_f43580a4_cd2c_4707_8480_7920fa7ab24f = await saveQuestion(manager, {
-      text: `4.1.13 ★ — Tipo de secado que utiliza`,
+      text: `Tipo de secado que utiliza`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -236,16 +236,16 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
       section: sec1,
     });
     await saveOptions(manager, q_f43580a4_cd2c_4707_8480_7920fa7ab24f, [
-      { text: `Al sol directo sobre lonas` },
       { text: `Marquesina plástica` },
-      { text: `Otro`, isOther: true },
       { text: `Patio de cemento` },
-      { text: `Secador mecánico` },
       { text: `Secador solar tipo domo` },
+      { text: `Secador mecánico` },
+      { text: `Al sol directo sobre lonas` },
+      { text: `Otro`, isOther: true },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.1.14 — ¿Realiza volteos durante el secado?`,
+      text: `¿Realiza volteos durante el secado?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -253,7 +253,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.15 — Frecuencia de volteos durante el secado`,
+      text: `Frecuencia de volteos durante el secado`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -261,7 +261,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.16 ★ — Duración promedio del secado (días)`,
+      text: `Duración promedio del secado (días)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -270,7 +270,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.17 ★ — ¿Cómo sabe que el grano está bien seco?`,
+      text: `¿Cómo sabe que el grano está bien seco?`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -279,7 +279,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     const q_e1930248_4388_405f_8098_d6af937e3b14 = await saveQuestion(manager, {
-      text: `4.1.18 ★ — ¿Mide la humedad final del grano seco?`,
+      text: `¿Mide la humedad final del grano seco?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -288,7 +288,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.18b — Instrumento utilizado para medir humedad`,
+      text: `Instrumento utilizado para medir humedad`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -298,7 +298,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.19 ★ — Humedad final habitual del grano seco (%)`,
+      text: `Humedad final habitual del grano seco (%)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -307,7 +307,7 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     await saveQuestion(manager, {
-      text: `4.1.20 ★ — Análisis de calidad en finca al cacao seco`,
+      text: `Análisis de calidad en finca al cacao seco`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -332,13 +332,13 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
       section: sec1,
     });
     await saveOptions(manager, q_10ccd666_6438_4ca0_9da7_168ca30ce88a, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.1.23 — ¿Mide el índice de mazorca (IM)?`,
+      text: `¿Mide el índice de mazorca (IM)?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -365,17 +365,17 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
     });
 
     const q_6c369f58_5f1a_4b96_9ad9_cb0e425ca2a5 = await saveQuestion(manager, {
-      text: `4.1.25 — ¿Comercializa el grano seco? Indique ámbito`,
+      text: `¿Comercializa el grano seco? Indique ámbito`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_6c369f58_5f1a_4b96_9ad9_cb0e425ca2a5, [
-      { text: `Internacional` },
       { text: `Nacional` },
-      { text: `Regional` },
       { text: `Todas las anteriores` },
+      { text: `Regional` },
+      { text: `Internacional` },
     ]);
 
     const q_5430b235_1587_4519_8427_84bf0905e29c = await saveQuestion(manager, {
@@ -387,30 +387,30 @@ export async function seedInstrumentoS41PoscosechaCacao(manager: EntityManager):
       section: sec1,
     });
     await saveOptions(manager, q_5430b235_1587_4519_8427_84bf0905e29c, [
-      { text: `Comercializador nacional` },
+      { text: `Otro`, isOther: true },
+      { text: `Industria / Transformador` },
+      { text: `Venta directa local` },
+      { text: `Intermediario / Acopiador` },
       { text: `Cooperativa / Asociación` },
       { text: `Exportación directa` },
-      { text: `Industria / transformador` },
-      { text: `Intermediario / Acopiador` },
-      { text: `Otro`, isOther: true },
-      { text: `Venta directa local` },
+      { text: `Comercializador nacional` },
     ]);
 
     const q_f95b8042_dd15_47fc_971c_75373cff8e14 = await saveQuestion(manager, {
-      text: `4.1.27 — ¿Tiene alguna certificación?`,
+      text: `¿Tiene alguna certificación?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_f95b8042_dd15_47fc_971c_75373cff8e14, [
+      { text: `Otro`, isOther: true },
+      { text: `Ninguna` },
       { text: `Denominación de Origen` },
       { text: `Fair Trade / Comercio Justo` },
-      { text: `Ninguna` },
       { text: `Orgánico NTC/USDA` },
-      { text: `Otro`, isOther: true },
-      { text: `Rainforest Alliance` },
       { text: `UTZ` },
+      { text: `Rainforest Alliance` },
     ]);
 
     await saveQuestion(manager, {

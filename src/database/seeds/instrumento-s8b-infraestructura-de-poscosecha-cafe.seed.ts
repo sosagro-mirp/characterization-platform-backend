@@ -81,7 +81,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -103,19 +103,19 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
     await saveOptions(manager, q_4f2ed018_e8fc_420c_b0bb_fa9a9590ca11, [
-      { text: `Beneficiadero (área completa de beneficio húmedo)` },
-      { text: `Bodega para café pergamino seco` },
       { text: `Báscula / balanza` },
-      { text: `Canal de correteo` },
-      { text: `Despulpadora (cilíndrica o de disco)` },
+      { text: `Área de empaque y etiquetado` },
       { text: `Equipo de catación / cata en taza` },
-      { text: `Marquesina para secado` },
-      { text: `Patio de cemento para secado` },
-      { text: `Pilas de fermentación` },
-      { text: `Secador mecánico / guardiola` },
+      { text: `Bodega para café pergamino seco` },
       { text: `Tostadora` },
       { text: `Trilladora` },
-      { text: `Área de empaque y etiquetado` },
+      { text: `Secador mecánico / guardiola` },
+      { text: `Patio de cemento para secado` },
+      { text: `Marquesina para secado` },
+      { text: `Canal de correteo` },
+      { text: `Pilas de fermentación` },
+      { text: `Despulpadora (cilíndrica o de disco)` },
+      { text: `Beneficiadero (área completa de beneficio húmedo)` },
     ]);
 
     await saveQuestion(manager, {
@@ -128,7 +128,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     const q_a7cfb090_9da0_4f3f_a602_4f6d339d63ba = await saveQuestion(manager, {
-      text: `8B.2b ★ — Unidad de capacidad de la despulpadora`,
+      text: `Unidad de capacidad de la despulpadora`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -136,12 +136,12 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
     await saveOptions(manager, q_a7cfb090_9da0_4f3f_a602_4f6d339d63ba, [
-      { text: `cargas / día` },
       { text: `kg / hora` },
+      { text: `cargas / día` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.3 ★ — Capacidad de las pilas de fermentación (valor numérico)`,
+      text: `Capacidad de las pilas de fermentación (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -150,7 +150,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     const q_8a0a36a1_fe54_4b10_b544_4265f0b1578b = await saveQuestion(manager, {
-      text: `8B.3b ★ — Unidad de capacidad de las pilas de fermentación`,
+      text: `Unidad de capacidad de las pilas de fermentación`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -163,7 +163,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.4 ★ — Área de secado disponible (m²)`,
+      text: `Área de secado disponible (m²)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -172,7 +172,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     await saveQuestion(manager, {
-      text: `8B.5 ★ — Capacidad de almacenamiento de café pergamino seco (valor numérico)`,
+      text: `Capacidad de almacenamiento de café pergamino seco (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -181,7 +181,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     const q_caff962f_d16d_4228_91e4_d9ecbc0b096d = await saveQuestion(manager, {
-      text: `8B.5b ★ — Unidad de capacidad de almacenamiento`,
+      text: `Unidad de capacidad de almacenamiento`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -189,8 +189,8 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
     await saveOptions(manager, q_caff962f_d16d_4228_91e4_d9ecbc0b096d, [
-      { text: `cargas` },
       { text: `kg` },
+      { text: `cargas` },
     ]);
 
     await saveQuestion(manager, {
@@ -203,7 +203,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     await saveQuestion(manager, {
-      text: `8B.7 ★ — ¿Tiene tomas eléctricas disponibles en el área de beneficio?`,
+      text: `¿Tiene tomas eléctricas disponibles en el área de beneficio?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

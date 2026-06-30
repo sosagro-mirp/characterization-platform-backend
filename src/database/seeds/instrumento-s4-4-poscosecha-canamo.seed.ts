@@ -81,7 +81,7 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -102,13 +102,13 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
       section: sec1,
     });
     await saveOptions(manager, q_2267bc3f_7a29_497a_a1bc_71c33691aef9, [
-      { text: `Clasificación de fibra` },
-      { text: `Cosecha mecánica / manual` },
-      { text: `Desfibrado` },
-      { text: `Empaque` },
-      { text: `Extracción de CBD` },
-      { text: `Prensado de semilla / aceite` },
       { text: `Secado de fibra / semilla / flor` },
+      { text: `Empaque` },
+      { text: `Prensado de semilla / aceite` },
+      { text: `Extracción de CBD` },
+      { text: `Clasificación de fibra` },
+      { text: `Desfibrado` },
+      { text: `Cosecha mecánica / manual` },
     ]);
 
     const q_63497df5_35dd_4ef4_bd85_3eca40d24fc3 = await saveQuestion(manager, {
@@ -120,15 +120,15 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
       section: sec1,
     });
     await saveOptions(manager, q_63497df5_35dd_4ef4_bd85_3eca40d24fc3, [
+      { text: `Uso médico y científico (ley 1787/2016)` },
+      { text: `Uso adulto (ley 2204/2022)` },
+      { text: `Semillas / material vegetal (ICA)` },
       { text: `En trámite` },
       { text: `No tiene licencia` },
-      { text: `Semillas / Material vegetal (ICA)` },
-      { text: `Uso adulto (ley 2204/2022)` },
-      { text: `Uso médico y científico (ley 1787/2016)` },
     ]);
 
     const q_e2952f86_0c05_4795_9a8c_62f0fc5eb618 = await saveQuestion(manager, {
-      text: `4.4.2 ★ — Producto principal obtenido`,
+      text: `Producto principal obtenido`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -137,9 +137,9 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     });
     await saveOptions(manager, q_e2952f86_0c05_4795_9a8c_62f0fc5eb618, [
       { text: `CBD` },
+      { text: `Semilla` },
       { text: `Fibra` },
       { text: `Múltiple` },
-      { text: `Semilla` },
     ]);
 
     const q_144f9486_6a48_41f2_ab8f_b5c7472b8ef3 = await saveQuestion(manager, {
@@ -162,7 +162,7 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     });
 
     await saveQuestion(manager, {
-      text: `4.4.4 ★ — ¿Verifica que el THC sea ≤ 1% (requisito legal)?`,
+      text: `¿Verifica que el THC sea ≤ 1% (requisito legal)?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -171,7 +171,7 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     });
 
     const q_b0e9fe5f_2130_43aa_992d_82e547c354d6 = await saveQuestion(manager, {
-      text: `4.4.5 ★ — ¿Controla la humedad en el secado?`,
+      text: `¿Controla la humedad en el secado?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -180,7 +180,7 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     });
 
     await saveQuestion(manager, {
-      text: `4.4.5b — Valor objetivo de humedad en el secado (%)`,
+      text: `Valor objetivo de humedad en el secado (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -190,24 +190,24 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     });
 
     const q_7664ecc9_a891_4311_a7ce_e38973583706 = await saveQuestion(manager, {
-      text: `4.4.6 — ¿Tiene alguna certificación?`,
+      text: `¿Tiene alguna certificación?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_7664ecc9_a891_4311_a7ce_e38973583706, [
+      { text: `Ninguna` },
+      { text: `Otro`, isOther: true },
       { text: `Denominación de Origen` },
       { text: `Fair Trade / Comercio Justo` },
-      { text: `Ninguna` },
-      { text: `Orgánico NTC/USDA` },
-      { text: `Otro`, isOther: true },
-      { text: `Rainforest Alliance` },
       { text: `UTZ` },
+      { text: `Rainforest Alliance` },
+      { text: `Orgánico NTC/USDA` },
     ]);
 
     const q_d063fe28_f736_4ec1_9e01_01d9df8ba097 = await saveQuestion(manager, {
-      text: `4.4.7 ★ — Destino principal del producto`,
+      text: `Destino principal del producto`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -215,13 +215,13 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
       section: sec1,
     });
     await saveOptions(manager, q_d063fe28_f736_4ec1_9e01_01d9df8ba097, [
-      { text: `Comercializador nacional` },
-      { text: `Cooperativa / Asociación` },
-      { text: `Exportación directa` },
-      { text: `Industria / transformador` },
-      { text: `Intermediario / Acopiador` },
-      { text: `Otro`, isOther: true },
       { text: `Venta directa local` },
+      { text: `Cooperativa / Asociación` },
+      { text: `Intermediario / Acopiador` },
+      { text: `Exportación directa` },
+      { text: `Industria / Transformador` },
+      { text: `Comercializador nacional` },
+      { text: `Otro`, isOther: true },
     ]);
 
   }

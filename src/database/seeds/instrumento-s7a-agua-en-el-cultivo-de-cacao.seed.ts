@@ -81,7 +81,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -95,7 +95,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `7A.1 ★ — ¿Tiene acceso a fuente(s) de agua en la finca?`,
+      text: `¿Tiene acceso a fuente(s) de agua en la finca?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -113,19 +113,19 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       systemField: 'farm.waterSourceType',
     });
     await saveOptions(manager, q_06d20475_624e_4fee_9cc8_c7472a99f41d, [
-      { text: `Acueducto municipal` },
+      { text: `Río` },
+      { text: `Reservorio / Jagüey` },
       { text: `Acueducto veredal` },
+      { text: `Acueducto municipal` },
       { text: `Agua lluvia` },
       { text: `Otro`, isOther: true },
-      { text: `Pozo profundo` },
       { text: `Pozo somero` },
+      { text: `Pozo profundo` },
       { text: `Quebrada` },
-      { text: `Reservorio / Jagüey` },
-      { text: `Río` },
     ]);
 
     await saveQuestion(manager, {
-      text: `7A.3 ★ — ¿Cuántas fuentes de agua tiene cerca de la finca?`,
+      text: `¿Cuántas fuentes de agua tiene cerca de la finca?`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -134,7 +134,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     await saveQuestion(manager, {
-      text: `7A.4 ★ — ¿Usa agua para riego del cultivo de cacao?`,
+      text: `¿Usa agua para riego del cultivo de cacao?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -152,7 +152,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     await saveQuestion(manager, {
-      text: `7A.6 — ¿Cuánta agua usa por ciclo de fermentación / lavado? (Indique valor y unidad: L o m³)`,
+      text: `¿Cuánta agua usa por ciclo de fermentación / lavado? (Indique valor y unidad: L o m³)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -160,7 +160,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     await saveQuestion(manager, {
-      text: `7A.7 — ¿Usa agua adicional durante el despulpado o apertura de mazorcas?`,
+      text: `¿Usa agua adicional durante el despulpado o apertura de mazorcas?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -168,7 +168,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     await saveQuestion(manager, {
-      text: `7A.8 ★ — ¿Se generan aguas mieles / lixiviados durante el beneficio?`,
+      text: `¿Se generan aguas mieles / lixiviados durante el beneficio?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -177,7 +177,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     const q_f637adbe_b388_4217_941c_356a704e8995 = await saveQuestion(manager, {
-      text: `7A.9 ★ — Destino de las aguas mieles / lixiviados`,
+      text: `Destino de las aguas mieles / lixiviados`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -185,16 +185,16 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_f637adbe_b388_4217_941c_356a704e8995, [
-      { text: `Alcantarillado` },
-      { text: `Cuerpo de agua (quebrada / río)` },
-      { text: `Otro`, isOther: true },
-      { text: `Reúso en cultivo` },
       { text: `Suelo sin tratar` },
+      { text: `Reúso en cultivo` },
+      { text: `Otro`, isOther: true },
       { text: `Tanque de almacenamiento` },
+      { text: `Cuerpo de agua (quebrada / río)` },
+      { text: `Alcantarillado` },
     ]);
 
     await saveQuestion(manager, {
-      text: `7A.10 — ¿Cuál es el volumen estimado de lixiviados por tonelada procesada? (L/t)`,
+      text: `¿Cuál es el volumen estimado de lixiviados por tonelada procesada? (L/t)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -202,7 +202,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     const q_b348b69b_49b2_44a3_b5e4_7f900795f2d3 = await saveQuestion(manager, {
-      text: `7A.11 ★ — ¿Conoce la calidad del agua que usa?`,
+      text: `¿Conoce la calidad del agua que usa?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -216,7 +216,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     ]);
 
     await saveQuestion(manager, {
-      text: `7A.12 ★ — ¿Ha realizado análisis de calidad del agua (pH, turbidez, microbiológico)?`,
+      text: `¿Ha realizado análisis de calidad del agua (pH, turbidez, microbiológico)?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -234,8 +234,8 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
     await saveOptions(manager, q_3d2c78da_31e3_4272_939c_49d0ce5464cf, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
     const q_214b9b62_f1f3_4bb8_82d0_ed8069dc0775 = await saveQuestion(manager, {
@@ -247,13 +247,13 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_214b9b62_f1f3_4bb8_82d0_ed8069dc0775, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     const q_b5cf7ddc_3c69_4e66_9e46_33906c794850 = await saveQuestion(manager, {
-      text: `7A.15 ★ — ¿Realiza algún tratamiento al agua antes de usarla en el proceso?`,
+      text: `¿Realiza algún tratamiento al agua antes de usarla en el proceso?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -262,7 +262,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     const q_da3f3c42_0c26_4c1f_8d45_d32a4e8bc00c = await saveQuestion(manager, {
-      text: `7A.16 — Tipo de tratamiento del agua (Aplica si respondió Sí en 7A.15)`,
+      text: `Tipo de tratamiento del agua`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -271,18 +271,18 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       conditionValue: 'true',
     });
     await saveOptions(manager, q_da3f3c42_0c26_4c1f_8d45_d32a4e8bc00c, [
-      { text: `Acidificación / alcalinización` },
-      { text: `Carbón activado` },
-      { text: `Cloración` },
-      { text: `Desinfección UV` },
-      { text: `Filtración (arena, grava)` },
       { text: `Otro`, isOther: true },
-      { text: `Sin tratamiento` },
+      { text: `Filtración (arena, grava)` },
+      { text: `Carbón activado` },
       { text: `Ósmosis inversa` },
+      { text: `Desinfección UV` },
+      { text: `Cloración` },
+      { text: `Acidificación / alcalinización` },
+      { text: `Sin tratamiento` },
     ]);
 
     const q_a43bec8f_2edb_4c23_879a_70fcfead7b0a = await saveQuestion(manager, {
-      text: `7A.17 ★ — ¿Cómo descarta las aguas residuales del beneficio?`,
+      text: `¿Cómo descarta las aguas residuales del beneficio?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -290,16 +290,16 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_a43bec8f_2edb_4c23_879a_70fcfead7b0a, [
-      { text: `Alcantarillado` },
+      { text: `Suelo sin tratar` },
       { text: `Cuerpo de agua (quebrada / río)` },
+      { text: `Alcantarillado` },
       { text: `Otro`, isOther: true },
       { text: `Reúso en cultivo` },
-      { text: `Suelo sin tratar` },
       { text: `Tanque de almacenamiento` },
     ]);
 
     await saveQuestion(manager, {
-      text: `7A.18 ★ — ¿Tiene algún sistema de tratamiento de aguas residuales?`,
+      text: `¿Tiene algún sistema de tratamiento de aguas residuales?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -316,9 +316,9 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_11e82432_6066_40c3_99d0_40cd57c512a8, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_08ada2ea_4ff0_4f58_80f4_7e329100dffe = await saveQuestion(manager, {
@@ -330,8 +330,8 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_08ada2ea_4ff0_4f58_80f4_7e329100dffe, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 

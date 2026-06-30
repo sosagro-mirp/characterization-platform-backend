@@ -81,7 +81,7 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -120,9 +120,9 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       section: sec1,
     });
     await saveOptions(manager, q_8e0d7c60_892f_40c0_9728_35a55107e56e, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
@@ -150,13 +150,13 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       section: sec2,
     });
     await saveOptions(manager, q_9acaf637_2a45_4529_8788_244c1d18aaff, [
-      { text: `Capacitaciones en uso de la App de conectividad y plataforma digital` },
+      { text: `Unidad productiva para instalación de sensores (Objetivo 1 — tecnología de campo)` },
+      { text: `Unidad productiva para análisis de calidad en plataforma SOS AGRO (Objetivo 3)` },
+      { text: `Unidad productiva para valorización de residuos (Objetivo 2 — energía, materiales, agua)` },
       { text: `Diagnóstico de la cadena (talleres, encuestas, grupos focales)` },
       { text: `No tengo interés en participar` },
       { text: `Socialización de resultados y adopción de tecnologías exitosas` },
-      { text: `Unidad productiva para análisis de calidad en plataforma SOS AGRO (Objetivo 3)` },
-      { text: `Unidad productiva para instalación de sensores (Objetivo 1 — tecnología de campo)` },
-      { text: `Unidad productiva para valorización de residuos (Objetivo 2 — energía, materiales, agua)` },
+      { text: `Capacitaciones en uso de la App de conectividad y plataforma digital` },
     ]);
 
   }
@@ -174,9 +174,9 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       section: sec3,
     });
     await saveOptions(manager, q_d3b91476_71a7_46ec_b122_631c1bf36cff, [
+      { text: `Tal vez` },
       { text: `No` },
       { text: `Sí` },
-      { text: `Tal vez` },
     ]);
 
     const q_46736f1f_88a4_47e1_b1ab_0b0b34e987a2 = await saveQuestion(manager, {
@@ -188,8 +188,8 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       section: sec3,
     });
     await saveOptions(manager, q_46736f1f_88a4_47e1_b1ab_0b0b34e987a2, [
-      { text: `No` },
       { text: `Sí` },
+      { text: `No` },
       { text: `Tal vez` },
     ]);
 
@@ -202,8 +202,8 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       section: sec3,
     });
     await saveOptions(manager, q_ddc5deec_0fbd_47f1_b84e_f6f1a54e2a83, [
-      { text: `No` },
       { text: `Sí` },
+      { text: `No` },
       { text: `Tal vez` },
     ]);
 
@@ -216,7 +216,7 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
     });
 
     await saveQuestion(manager, {
-      text: `Comentarios adicionales o preguntas sobre el proyecto`,
+      text: `¿Tiene comentarios adicionales o preguntas sobre el proyecto?`,
       type: types.open_text,
       isRequired: false,
       order: o++,

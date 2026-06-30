@@ -81,7 +81,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -95,7 +95,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `Susceptibilidad a cuál enfermedad o plaga — ¿Cuál?`,
+      text: `Susceptibilidad a enfermedad o plaga — ¿Cuál?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -111,10 +111,10 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
       section: sec1,
     });
     await saveOptions(manager, q_19d5fb5a_3ac9_4d49_a200_57618b5dda6a, [
-      { text: `MR (Moderadamente resistente)` },
       { text: `MS (Muy susceptible)` },
-      { text: `R (Resistente)` },
+      { text: `MR (Moderadamente resistente)` },
       { text: `S (Susceptible)` },
+      { text: `R (Resistente)` },
     ]);
 
     const q_3fe8f7dd_201a_4580_baa8_bfd957a53b65 = await saveQuestion(manager, {
@@ -125,14 +125,14 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
       section: sec1,
     });
     await saveOptions(manager, q_3fe8f7dd_201a_4580_baa8_bfd957a53b65, [
-      { text: `MR (Moderadamente resistente)` },
-      { text: `MS (Muy susceptible)` },
-      { text: `R (Resistente)` },
       { text: `S (Susceptible)` },
+      { text: `MS (Muy susceptible)` },
+      { text: `MR (Moderadamente resistente)` },
+      { text: `R (Resistente)` },
     ]);
 
     const q_55c9d143_7a24_4967_9529_10da3df29401 = await saveQuestion(manager, {
-      text: `Reacción a Monilia`,
+      text: `Susceptibilidad a Monilia`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -141,8 +141,8 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     await saveOptions(manager, q_55c9d143_7a24_4967_9529_10da3df29401, [
       { text: `MR (Moderadamente resistente)` },
       { text: `MS (Muy susceptible)` },
-      { text: `R (Resistente)` },
       { text: `S (Susceptible)` },
+      { text: `R (Resistente)` },
     ]);
 
     const q_bf6689c1_3517_4817_a5c7_1b3aaa9680cf = await saveQuestion(manager, {
@@ -153,10 +153,10 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
       section: sec1,
     });
     await saveOptions(manager, q_bf6689c1_3517_4817_a5c7_1b3aaa9680cf, [
-      { text: `MR (Moderadamente resistente)` },
-      { text: `MS (Muy susceptible)` },
-      { text: `R (Resistente)` },
       { text: `S (Susceptible)` },
+      { text: `MS (Muy susceptible)` },
+      { text: `MR (Moderadamente resistente)` },
+      { text: `R (Resistente)` },
     ]);
 
   }

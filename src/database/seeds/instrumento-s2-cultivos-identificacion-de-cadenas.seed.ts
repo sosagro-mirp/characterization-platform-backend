@@ -81,7 +81,7 @@ export async function seedInstrumentoS2CultivosIdentificacionDeCadenas(manager: 
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -144,12 +144,12 @@ export async function seedInstrumentoS2CultivosIdentificacionDeCadenas(manager: 
       section: sec1,
     });
     await saveOptions(manager, q_bb845c10_5def_41be_aac1_46d7dabcfb05, [
-      { text: `Comercialización directa` },
-      { text: `Cosecha` },
-      { text: `Cultivo / producción en campo` },
-      { text: `Exportación` },
-      { text: `Poscosecha / procesamiento` },
       { text: `Transformación industrial` },
+      { text: `Cultivo / producción en campo` },
+      { text: `Cosecha` },
+      { text: `Poscosecha / procesamiento` },
+      { text: `Comercialización directa` },
+      { text: `Exportación` },
     ]);
 
     const q_b05d66f7_404e_46a6_aac8_5774b5bc777f = await saveQuestion(manager, {
@@ -160,9 +160,9 @@ export async function seedInstrumentoS2CultivosIdentificacionDeCadenas(manager: 
       section: sec1,
     });
     await saveOptions(manager, q_b05d66f7_404e_46a6_aac8_5774b5bc777f, [
-      { text: `Ambas` },
       { text: `De terceros` },
       { text: `Propia` },
+      { text: `Ambas` },
     ]);
 
   }

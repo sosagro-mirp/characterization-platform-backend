@@ -81,7 +81,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -95,7 +95,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     let o = 1;
 
     const q_efb262d9_545d_4f3b_8a30_6f85e6d6a3b1 = await saveQuestion(manager, {
-      text: `4.3 — Actividades de poscosecha que realiza en cannabis`,
+      text: `Actividades de poscosecha que realiza en cannabis`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
@@ -103,16 +103,16 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
     await saveOptions(manager, q_efb262d9_545d_4f3b_8a30_6f85e6d6a3b1, [
       { text: `Clasificación` },
+      { text: `Empaque y embalaje` },
       { text: `Cosecha (corte de planta)` },
+      { text: `Secado` },
       { text: `Curado` },
       { text: `Despalillado / Trimming` },
-      { text: `Empaque y embalaje` },
       { text: `Extracción (aceites, resinas, etc.)` },
-      { text: `Secado` },
     ]);
 
     const q_57edabc6_5022_43e5_a13b_32d8cf6c37ba = await saveQuestion(manager, {
-      text: `Tipo de licencia con que opera`,
+      text: `¿Tipo de licencia con que opera?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -120,15 +120,15 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       section: sec1,
     });
     await saveOptions(manager, q_57edabc6_5022_43e5_a13b_32d8cf6c37ba, [
-      { text: `En trámite` },
       { text: `No tiene licencia` },
-      { text: `Semillas / Material vegetal (ICA)` },
+      { text: `Semillas / material vegetal (ICA)` },
       { text: `Uso adulto (ley 2204/2022)` },
       { text: `Uso médico y científico (ley 1787/2016)` },
+      { text: `En trámite` },
     ]);
 
     const q_be0ddfa6_d202_47dc_89be_72f7ebc7454e = await saveQuestion(manager, {
-      text: `4.3.2 ★ — ¿Controla el porcentaje de humedad en flor seca?`,
+      text: `¿Controla el porcentaje de humedad en flor seca?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -137,7 +137,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.2b — Valor habitual de humedad en flor seca (%)`,
+      text: `Valor habitual de humedad en flor seca (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -156,7 +156,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.4 ★ — ¿Tiene análisis microbiológicos de sus productos?`,
+      text: `¿Tiene análisis microbiológicos de sus productos?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -182,9 +182,9 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       section: sec1,
     });
     await saveOptions(manager, q_14638379_14fc_4048_9045_239cfa9f60c9, [
+      { text: `Sí` },
       { text: `En trámite` },
       { text: `No` },
-      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
@@ -196,7 +196,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     const q_66114bae_41ec_48e4_ba7e_5a4a601e6681 = await saveQuestion(manager, {
-      text: `4.3.8 ★ — Destino principal del producto`,
+      text: `Destino principal del producto`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -205,12 +205,12 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
     await saveOptions(manager, q_66114bae_41ec_48e4_ba7e_5a4a601e6681, [
       { text: `Comercializador nacional` },
+      { text: `Industria / Transformador` },
+      { text: `Venta directa local` },
+      { text: `Intermediario / Acopiador` },
       { text: `Cooperativa / Asociación` },
       { text: `Exportación directa` },
-      { text: `Industria / transformador` },
-      { text: `Intermediario / Acopiador` },
       { text: `Otro`, isOther: true },
-      { text: `Venta directa local` },
     ]);
 
   }

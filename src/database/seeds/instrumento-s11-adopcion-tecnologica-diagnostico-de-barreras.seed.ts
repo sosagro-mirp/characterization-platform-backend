@@ -81,7 +81,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       name: NAME,
       version: VERSION,
       publishDate: '2026-06-25',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -106,13 +106,13 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       systemField: 'farmer.educationLevel',
     });
     await saveOptions(manager, q_b4361b92_977b_4504_ba3f_84b8dde6299c, [
-      { text: `Media (10°–11°)` },
-      { text: `Posgrado` },
+      { text: `Sin escolaridad` },
       { text: `Primaria (1°–5°)` },
       { text: `Secundaria (6°–9°)` },
-      { text: `Sin escolaridad` },
+      { text: `Media (10°–11°)` },
       { text: `Técnico o tecnológico` },
       { text: `Universitario` },
+      { text: `Posgrado` },
     ]);
 
     const q_e3e1736d_554f_4b99_a492_27bc4db508b3 = await saveQuestion(manager, {
@@ -124,14 +124,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec1,
     });
     await saveOptions(manager, q_e3e1736d_554f_4b99_a492_27bc4db508b3, [
-      { text: `Buscar, descargar e instalar aplicaciones` },
-      { text: `Conectar dispositivos adicionales (impresora, módem)` },
-      { text: `Copiar y pegar información entre documentos` },
       { text: `Enviar correos electrónicos con archivos` },
+      { text: `Buscar, descargar e instalar aplicaciones` },
+      { text: `Copiar y pegar información entre documentos` },
       { text: `Transferir archivos entre dispositivos o por internet` },
+      { text: `Verificar si información de internet es verdadera` },
       { text: `Usar herramientas de Inteligencia Artificial (ChatGPT, Gemini, etc.)` },
       { text: `Usar procesadores de texto (Word / Google Docs)` },
-      { text: `Verificar si información de internet es verdadera` },
+      { text: `Conectar dispositivos adicionales (impresora, módem)` },
     ]);
 
     const q_bf23243a_ced0_4e78_9fd0_620ed1bd5964 = await saveQuestion(manager, {
@@ -144,12 +144,12 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
     });
     await saveOptions(manager, q_bf23243a_ced0_4e78_9fd0_620ed1bd5964, [
       { text: `Actividades productivas / gestión finca` },
-      { text: `Banca móvil` },
       { text: `Consultar precios o mercados agrícolas` },
+      { text: `WhatsApp` },
       { text: `Llamadas personales/familiares` },
+      { text: `Banca móvil` },
       { text: `Navegar en internet` },
       { text: `Redes sociales` },
-      { text: `WhatsApp` },
     ]);
 
     await saveQuestion(manager, {
@@ -179,16 +179,16 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec1,
     });
     await saveOptions(manager, q_2fc46adc_7673_49c1_a089_6480e8f9016c, [
-      { text: `Apps agropecuarias` },
-      { text: `Apps de banca móvil (Nequi, Bancolombia, etc)` },
-      { text: `ChatGPT u otra IA` },
       { text: `Facebook` },
-      { text: `Google (búsquedas)` },
-      { text: `Instagram` },
-      { text: `Ninguna` },
-      { text: `Otros`, isOther: true },
       { text: `WhatsApp` },
       { text: `YouTube` },
+      { text: `Google (búsquedas)` },
+      { text: `Instagram` },
+      { text: `ChatGPT u otra IA` },
+      { text: `Apps de banca móvil (Nequi, Bancolombia, etc.)` },
+      { text: `Apps agropecuarias` },
+      { text: `Ninguna` },
+      { text: `Otros`, isOther: true },
     ]);
 
     const q_8c7b2b56_90b0_4245_84d8_f0265a589725 = await saveQuestion(manager, {
@@ -200,15 +200,15 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec1,
     });
     await saveOptions(manager, q_8c7b2b56_90b0_4245_84d8_f0265a589725, [
+      { text: `Software de contabilidad o inventarios` },
       { text: `Apps móviles agrícolas` },
-      { text: `Cámaras de monitoreo` },
+      { text: `Sensores / IoT` },
       { text: `Drones` },
+      { text: `Cámaras de monitoreo` },
       { text: `Fertilización técnica con análisis de suelos` },
+      { text: `Riego tecnificado` },
       { text: `Ninguna` },
       { text: `Otros`, isOther: true },
-      { text: `Riego tecnificado` },
-      { text: `Sensores / IoT` },
-      { text: `Software de contabilidad o inventarios` },
     ]);
 
   }
@@ -226,10 +226,10 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec2,
     });
     await saveOptions(manager, q_7617ed37_2e51_485c_b2a5_9099ac917150, [
-      { text: `De acuerdo`, value: 4 },
-      { text: `En desacuerdo`, value: 2 },
       { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
       { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `De acuerdo`, value: 4 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
@@ -243,9 +243,9 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
     });
     await saveOptions(manager, q_412dcdcd_b09f_4785_b42e_8ffefa8fd324, [
       { text: `De acuerdo`, value: 4 },
-      { text: `En desacuerdo`, value: 2 },
-      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
       { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
@@ -258,11 +258,11 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec2,
     });
     await saveOptions(manager, q_b60c9c69_f84b_4006_ab7c_88f16c33de37, [
-      { text: `De acuerdo`, value: 4 },
       { text: `En desacuerdo`, value: 2 },
-      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
-      { text: `Totalmente de acuerdo`, value: 5 },
       { text: `Totalmente en desacuerdo`, value: 1 },
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
     ]);
 
     const q_e10c2dee_4b42_4837_99fc_35ac549f1d22 = await saveQuestion(manager, {
@@ -275,9 +275,9 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
     });
     await saveOptions(manager, q_e10c2dee_4b42_4837_99fc_35ac549f1d22, [
       { text: `De acuerdo`, value: 4 },
-      { text: `En desacuerdo`, value: 2 },
       { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
       { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
@@ -290,11 +290,11 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec2,
     });
     await saveOptions(manager, q_c1582ae7_26b5_4b9c_bab1_bccb549f9e4d, [
-      { text: `De acuerdo`, value: 4 },
       { text: `En desacuerdo`, value: 2 },
-      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
       { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
       { text: `Totalmente en desacuerdo`, value: 1 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
     ]);
 
     const q_fe27e551_0d24_45f7_b098_962e7102a888 = await saveQuestion(manager, {
@@ -306,15 +306,15 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec2,
     });
     await saveOptions(manager, q_fe27e551_0d24_45f7_b098_962e7102a888, [
-      { text: `De acuerdo`, value: 4 },
-      { text: `En desacuerdo`, value: 2 },
-      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
-      { text: `Totalmente de acuerdo`, value: 5 },
       { text: `Totalmente en desacuerdo`, value: 1 },
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
     ]);
 
     const q_8dfcc7c7_1f95_429e_8890_acd5d92bb05f = await saveQuestion(manager, {
-      text: `Uso internet regularmente para actividades productivas`,
+      text: `Uso internet regularmente para actividades productivas.`,
       type: types.likert,
       isRequired: true,
       isKeyQuestion: true,
@@ -322,11 +322,11 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec2,
     });
     await saveOptions(manager, q_8dfcc7c7_1f95_429e_8890_acd5d92bb05f, [
+      { text: `Totalmente de acuerdo`, value: 5 },
       { text: `De acuerdo`, value: 4 },
       { text: `En desacuerdo`, value: 2 },
-      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
-      { text: `Totalmente de acuerdo`, value: 5 },
       { text: `Totalmente en desacuerdo`, value: 1 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
     ]);
 
   }
@@ -344,14 +344,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       section: sec3,
     });
     await saveOptions(manager, q_b20e506a_b317_482b_b9c6_18524f38d4fa, [
-      { text: `Alto costo del internet/datos` },
-      { text: `Desconfianza en la tecnología` },
-      { text: `Edad / dificultad aprender` },
-      { text: `Falta de acompañamiento técnico` },
       { text: `Falta de conocimiento para usar` },
       { text: `Falta de dinero para equipos` },
+      { text: `Alto costo del internet/datos` },
       { text: `Mala señal o sin cobertura` },
+      { text: `Desconfianza en la tecnología` },
       { text: `No veo beneficio claro` },
+      { text: `Falta de acompañamiento técnico` },
+      { text: `Edad / dificultad aprender` },
       { text: `Otros`, isOther: true },
     ]);
 

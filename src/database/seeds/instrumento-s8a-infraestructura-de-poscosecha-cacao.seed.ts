@@ -81,7 +81,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -103,23 +103,23 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
       section: sec1,
     });
     await saveOptions(manager, q_33de0422_c44d_4bed_bca0_aa94220ffc9f, [
-      { text: `Bodega / almacén para cacao seco` },
-      { text: `Báscula o balanza` },
-      { text: `Cajones de fermentación de madera` },
       { text: `Clasificadora / seleccionadora de grano` },
-      { text: `Higrómetro (medidor de humedad)` },
-      { text: `Marquesina plástica para secado` },
       { text: `Patio de cemento para secado` },
-      { text: `Sacos / cajas para fermentación` },
-      { text: `Secador mecánico` },
       { text: `Secador solar tipo domo / carpa` },
+      { text: `Secador mecánico` },
+      { text: `Bodega / almacén para cacao seco` },
+      { text: `Higrómetro (medidor de humedad)` },
+      { text: `Báscula o balanza` },
+      { text: `Marquesina plástica para secado` },
       { text: `Termómetro (para fermentación y/o secado)` },
-      { text: `Área de empaque y etiquetado` },
       { text: `Área de recepción y clasificación de mazorcas` },
+      { text: `Cajones de fermentación de madera` },
+      { text: `Sacos / cajas para fermentación` },
+      { text: `Área de empaque y etiquetado` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8A.2 ★ — Capacidad de los cajones de fermentación (valor numérico)`,
+      text: `Capacidad de los cajones de fermentación (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -128,7 +128,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     const q_ddff4b78_434f_4945_888e_938274a0ea3f = await saveQuestion(manager, {
-      text: `8A.2b ★ — Unidad de capacidad de los cajones`,
+      text: `Unidad de capacidad de los cajones`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -141,7 +141,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     ]);
 
     await saveQuestion(manager, {
-      text: `8A.3 ★ — Número de cajones de fermentación disponibles`,
+      text: `Número de cajones de fermentación disponibles`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -158,7 +158,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.5 ★ — Área de secado disponible (m²)`,
+      text: `Área de secado disponible (m²)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -167,7 +167,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.6 ★ — Capacidad de almacenamiento de cacao seco (kg)`,
+      text: `Capacidad de almacenamiento de cacao seco (kg)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -176,7 +176,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.7 ★ — ¿La bodega tiene control de humedad y temperatura?`,
+      text: `¿La bodega tiene control de humedad y temperatura?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

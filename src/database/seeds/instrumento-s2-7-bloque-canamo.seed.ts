@@ -81,7 +81,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -103,12 +103,12 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       section: sec1,
     });
     await saveOptions(manager, q_b7a83883_6cdb_4741_9259_39566983e0af, [
-      { text: `Aeroponía` },
       { text: `Hidroponía` },
       { text: `Mixto` },
-      { text: `Otro`, isOther: true },
       { text: `Suelo` },
+      { text: `Otro`, isOther: true },
       { text: `Sustrato` },
+      { text: `Aeroponía` },
     ]);
 
     const q_b90f538b_adfc_41a4_ad76_5865ac994c1d = await saveQuestion(manager, {
@@ -120,10 +120,10 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       section: sec1,
     });
     await saveOptions(manager, q_b90f538b_adfc_41a4_ad76_5865ac994c1d, [
-      { text: `Campo abierto` },
-      { text: `Indoor (cuarto de cultivo)` },
-      { text: `Invernadero` },
       { text: `Mixto` },
+      { text: `Campo abierto` },
+      { text: `Invernadero` },
+      { text: `Indoor (cuarto de cultivo)` },
     ]);
 
     await saveQuestion(manager, {
@@ -171,10 +171,10 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       section: sec1,
     });
     await saveOptions(manager, q_2a190c64_0a32_40dd_b5e5_8220de02406b, [
-      { text: `CBD` },
-      { text: `Fibra` },
       { text: `Múltiple` },
+      { text: `CBD` },
       { text: `Semilla` },
+      { text: `Fibra` },
     ]);
 
     await saveQuestion(manager, {
@@ -203,10 +203,10 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       section: sec1,
     });
     await saveOptions(manager, q_f3623856_df19_4a46_8135_713efc476f7d, [
-      { text: `En trámite` },
-      { text: `No tiene licencia` },
-      { text: `Semillas / Material vegetal (ICA)` },
       { text: `Uso adulto (Ley 2204/2022)` },
+      { text: `No tiene licencia` },
+      { text: `Semillas / material vegetal (ICA)` },
+      { text: `En trámite` },
       { text: `Uso médico y científico (Ley 1787/2016)` },
     ]);
 

@@ -81,7 +81,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -186,13 +186,13 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       section: sec2,
     });
     await saveOptions(manager, q_263796a1_3f8c_430d_8aad_b4957f189868, [
-      { text: `Comercializador nacional` },
-      { text: `Cooperativa / Asociación` },
-      { text: `Exportación directa` },
-      { text: `Industria / transformador` },
+      { text: `Industria / Transformador` },
       { text: `Intermediario / Acopiador` },
-      { text: `Otro`, isOther: true },
+      { text: `Cooperativa / Asociación` },
       { text: `Venta directa local` },
+      { text: `Exportación directa` },
+      { text: `Comercializador nacional` },
+      { text: `Otro`, isOther: true },
     ]);
 
     const q_07dbbc53_9764_4297_b7d9_6dc5218a986a = await saveQuestion(manager, {
@@ -204,9 +204,9 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       section: sec2,
     });
     await saveOptions(manager, q_07dbbc53_9764_4297_b7d9_6dc5218a986a, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
@@ -226,8 +226,8 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       section: sec2,
     });
     await saveOptions(manager, q_9f8e1f96_aecc_4690_8258_dd15d1ba488c, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
@@ -249,8 +249,8 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
     await saveOptions(manager, q_bd8de6a2_7a88_48c0_96f0_90935b1f4b9c, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
   }

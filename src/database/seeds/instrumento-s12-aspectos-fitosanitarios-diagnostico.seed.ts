@@ -81,7 +81,7 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       name: NAME,
       version: VERSION,
       publishDate: '2026-06-19',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -107,7 +107,7 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
     });
 
     const q_f1b142ee_e02e_475a_b422_4a89bb4d22b0 = await saveQuestion(manager, {
-      text: `¿Qué tipo de problemas ha identificado? (Selección multiple)`,
+      text: `¿Qué tipo de problemas ha identificado?`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
@@ -116,11 +116,11 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       conditionValue: 'true',
     });
     await saveOptions(manager, q_f1b142ee_e02e_475a_b422_4a89bb4d22b0, [
-      { text: `Bacterias` },
-      { text: `Fitoplasmas` },
       { text: `Hongos` },
-      { text: `Nematodos` },
+      { text: `Bacterias` },
       { text: `Virus` },
+      { text: `Fitoplasmas` },
+      { text: `Nematodos` },
     ]);
 
     await saveQuestion(manager, {
@@ -139,9 +139,9 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec1,
     });
     await saveOptions(manager, q_76eff7c3_8e46_42a6_a4a7_9f92bffbe5ed, [
-      { text: `Alto (15–30%)` },
       { text: `Bajo (<5% pérdidas)` },
       { text: `Moderado (5–15%)` },
+      { text: `Alto (15–30%)` },
       { text: `Muy alto (>30%)` },
     ]);
 
@@ -159,12 +159,12 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec2,
     });
     await saveOptions(manager, q_047699e7_80ba_4b48_9f8e_6dc05616b070, [
-      { text: `Asistente técnico` },
       { text: `Inspección visual propia` },
-      { text: `Instituto de investigación` },
+      { text: `Asistente técnico` },
       { text: `Laboratorio externo` },
-      { text: `Otros`, isOther: true },
       { text: `Universidad` },
+      { text: `Instituto de investigación` },
+      { text: `Otros`, isOther: true },
     ]);
 
     const q_0bb0fd91_95ac_4a70_a7e1_9af2af98409a = await saveQuestion(manager, {
@@ -186,12 +186,12 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
     });
     await saveOptions(manager, q_89fc8bcf_d1be_4910_b83f_d0ec9eedd57a, [
       { text: `Análisis microbiológicos` },
+      { text: `Pruebas ELISA` },
       { text: `Diagnóstico molecular (PCR/qPCR)` },
       { text: `Diagnóstico viral` },
       { text: `Nematología` },
-      { text: `Otros`, isOther: true },
-      { text: `Pruebas ELISA` },
       { text: `Secuenciación genética` },
+      { text: `Otros`, isOther: true },
     ]);
 
     const q_1cdfdd65_83cc_4318_b24a_ac4c06e4f8d4 = await saveQuestion(manager, {
@@ -202,20 +202,20 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec2,
     });
     await saveOptions(manager, q_1cdfdd65_83cc_4318_b24a_ac4c06e4f8d4, [
-      { text: `Análisis microbiológicos` },
-      { text: `Calidad fisicoquímica del producto` },
-      { text: `Certificaciones de sostenibilidad o huella ambiental` },
-      { text: `Certificación BPA` },
-      { text: `Certificados fitosanitarios` },
-      { text: `Fairtrade (Comercio Justo)` },
-      { text: `Global G.A.P` },
-      { text: `Humedad y actividad de agua` },
+      { text: `Residuos de plaguicidas` },
       { text: `Metales pesados` },
+      { text: `Análisis microbiológicos` },
+      { text: `Humedad y actividad de agua` },
+      { text: `Calidad fisicoquímica del producto` },
+      { text: `Trazabilidad de la producción` },
+      { text: `Certificados fitosanitarios` },
+      { text: `Certificación BPA` },
+      { text: `Global G.A.P` },
+      { text: `Rainforest Alliance` },
+      { text: `Fairtrade (Comercio Justo)` },
+      { text: `Certificaciones de sostenibilidad o huella ambiental` },
       { text: `Ninguno` },
       { text: `Otros`, isOther: true },
-      { text: `Rainforest Alliance` },
-      { text: `Residuos de plaguicidas` },
-      { text: `Trazabilidad de la producción` },
     ]);
 
     const q_49c1395b_2a75_4ae0_82f9_4fa7877dd36a = await saveQuestion(manager, {
@@ -244,11 +244,11 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec2,
     });
     await saveOptions(manager, q_77deff74_fe40_4dee_aebe_3521ab36c5e3, [
-      { text: `Buena` },
-      { text: `Mala` },
       { text: `Muy buena` },
-      { text: `Muy mala` },
+      { text: `Buena` },
       { text: `Regular` },
+      { text: `Mala` },
+      { text: `Muy mala` },
     ]);
 
     const q_d420f405_10e1_4c1b_bcc8_683fd67779a3 = await saveQuestion(manager, {
@@ -260,12 +260,12 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
     });
     await saveOptions(manager, q_d420f405_10e1_4c1b_bcc8_683fd67779a3, [
       { text: `Costos` },
-      { text: `Desconocimiento` },
       { text: `Distancia` },
-      { text: `Falta de oferta especializada` },
-      { text: `Otros`, isOther: true },
-      { text: `Requisitos regulatorios` },
       { text: `Tiempo de respuesta` },
+      { text: `Falta de oferta especializada` },
+      { text: `Desconocimiento` },
+      { text: `Requisitos regulatorios` },
+      { text: `Otros`, isOther: true },
     ]);
 
   }
@@ -282,14 +282,14 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec3,
     });
     await saveOptions(manager, q_55f286a3_81db_4e74_aaa9_e5ea47e32420, [
-      { text: `Agrosavia` },
       { text: `Asistente técnico privado` },
-      { text: `Asociación de productores` },
       { text: `Cooperativa` },
-      { text: `Empresa proveedora de insumos` },
+      { text: `Asociación de productores` },
       { text: `ICA` },
-      { text: `Ninguno` },
+      { text: `Agrosavia` },
       { text: `Universidad` },
+      { text: `Empresa proveedora de insumos` },
+      { text: `Ninguno` },
     ]);
 
     await saveQuestion(manager, {
@@ -308,12 +308,12 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec3,
     });
     await saveOptions(manager, q_2de9cbef_2bc9_4dcc_acd3_9ee25ebf5876, [
-      { text: `Bioseguridad` },
       { text: `Diagnóstico molecular` },
+      { text: `Vigilancia fitosanitaria` },
       { text: `Identificación de plagas` },
       { text: `Manejo integrado` },
+      { text: `Bioseguridad` },
       { text: `Trazabilidad` },
-      { text: `Vigilancia fitosanitaria` },
     ]);
 
   }
@@ -331,18 +331,18 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec4,
     });
     await saveOptions(manager, q_e613bc0c_c1cb_4618_97ae_02504653d570, [
-      { text: `Diagnóstico rápido en campo` },
+      { text: `PCR convencional` },
+      { text: `qPCR en tiempo real` },
       { text: `Diagnóstico viral` },
+      { text: `Secuenciación` },
       { text: `Microbiología agrícola` },
       { text: `Nematología` },
+      { text: `Diagnóstico rápido en campo` },
       { text: `Otros`, isOther: true },
-      { text: `PCR convencional` },
-      { text: `Secuenciación` },
-      { text: `qPCR en tiempo real` },
     ]);
 
     const q_6ae8bbfd_dc85_4cc9_bbe5_7f72cfdb6b9b = await saveQuestion(manager, {
-      text: `Tiempo de respuesta ideal para resultados`,
+      text: `¿Cuál es el tiempo de respuesta ideal para resultados?`,
       type: types.single_choice,
       isRequired: false,
       isKeyQuestion: true,
@@ -350,10 +350,10 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec4,
     });
     await saveOptions(manager, q_6ae8bbfd_dc85_4cc9_bbe5_7f72cfdb6b9b, [
-      { text: `1–2 semanas` },
+      { text: `Menos de 24 horas` },
       { text: `1–3 días` },
       { text: `4–7 días` },
-      { text: `Menos de 24 horas` },
+      { text: `1–2 semanas` },
     ]);
 
     await saveQuestion(manager, {
@@ -372,9 +372,9 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec4,
     });
     await saveOptions(manager, q_0ec1831a_aeba_40d2_8bec_9d9af544807c, [
-      { text: `Entre $25.000 - $50.000` },
-      { text: `Entre $50.000 - $100.000` },
       { text: `Menos de $25.000` },
+      { text: `Entre $25.000 – $50.000` },
+      { text: `Entre $50.000 - $100.000` },
       { text: `Más de $100.000` },
     ]);
 
@@ -411,12 +411,12 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
     });
     await saveOptions(manager, q_d4de1745_8884_42b5_968a_9fd52e81377c, [
       { text: `Cambio climático` },
-      { text: `Deficiencias de bioseguridad` },
       { text: `Material vegetal contaminado` },
       { text: `Movimiento de personas` },
       { text: `Movimiento de plantas` },
-      { text: `Otros`, isOther: true },
+      { text: `Deficiencias de bioseguridad` },
       { text: `Resistencia a agroquímicos` },
+      { text: `Otros`, isOther: true },
     ]);
 
     const q_3d8619ee_6dfe_4653_b053_6ca9eddd946d = await saveQuestion(manager, {
@@ -427,13 +427,13 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       section: sec5,
     });
     await saveOptions(manager, q_3d8619ee_6dfe_4653_b053_6ca9eddd946d, [
+      { text: `Laboratorios regionales` },
       { text: `Capacitación` },
       { text: `Diagnóstico molecular` },
-      { text: `Herramientas digitales` },
-      { text: `Investigación aplicada` },
-      { text: `Laboratorios regionales` },
-      { text: `Programas de certificación` },
       { text: `Vigilancia fitosanitaria` },
+      { text: `Herramientas digitales` },
+      { text: `Programas de certificación` },
+      { text: `Investigación aplicada` },
     ]);
 
   }

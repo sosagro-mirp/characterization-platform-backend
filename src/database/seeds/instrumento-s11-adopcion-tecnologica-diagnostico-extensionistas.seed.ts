@@ -81,7 +81,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -113,13 +113,13 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       section: sec1,
     });
     await saveOptions(manager, q_108c6d4d_8023_4ed0_895e_7b695a3f04bb, [
-      { text: `Baja percepción de utilidad` },
-      { text: `Costo elevado de dispositivos o internet` },
-      { text: `Desconfianza del productor en la tecnología` },
       { text: `Falta de acompañamiento técnico continuo` },
+      { text: `Resistencia al cambio` },
       { text: `Falta de conocimiento / alfabetización digital del productor` },
       { text: `Mala calidad o ausencia de señal móvil` },
-      { text: `Resistencia al cambio` },
+      { text: `Costo elevado de dispositivos o internet` },
+      { text: `Desconfianza del productor en la tecnología` },
+      { text: `Baja percepción de utilidad` },
     ]);
 
     await saveQuestion(manager, {
@@ -142,14 +142,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       section: sec1,
     });
     await saveOptions(manager, q_5a8bd830_db75_48c0_85fd_20ba19efd142, [
-      { text: `Apps agropecuarias especializadas` },
-      { text: `Formularios digitales (KoBoToolbox / Survey123)` },
       { text: `Google Maps / georreferenciación` },
-      { text: `Hojas de cálculo (Excel / Sheets)` },
       { text: `Ninguna` },
-      { text: `Otros`, isOther: true },
       { text: `Registro fotográfico` },
+      { text: `Apps agropecuarias especializadas` },
+      { text: `Hojas de cálculo (Excel / Sheets)` },
+      { text: `Formularios digitales (KoBoToolbox / Survey123)` },
       { text: `WhatsApp / Telegram` },
+      { text: `Otros`, isOther: true },
     ]);
 
     await saveQuestion(manager, {
@@ -172,14 +172,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       section: sec1,
     });
     await saveOptions(manager, q_897849da_07cb_4f67_bc73_d6693043e369, [
-      { text: `Apps de gestión de finca` },
-      { text: `Apps móviles de consulta (clima/precios)` },
-      { text: `Ninguna` },
-      { text: `Otros`, isOther: true },
+      { text: `Apps móviles de consulta (clima / precios)` },
       { text: `Plataformas de comercialización` },
-      { text: `Registro fotográfico y envío de imágenes` },
+      { text: `Ninguna` },
       { text: `Sensores / IoT` },
       { text: `WhatsApp para alertas` },
+      { text: `Registro fotográfico y envío de imágenes` },
+      { text: `Apps de gestión de finca` },
+      { text: `Otros`, isOther: true },
     ]);
 
     const q_d0563cb2_373f_47d0_b7ce_63c1f988776c = await saveQuestion(manager, {
@@ -191,11 +191,11 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       section: sec1,
     });
     await saveOptions(manager, q_d0563cb2_373f_47d0_b7ce_63c1f988776c, [
-      { text: `Cada 2–3 meses` },
-      { text: `Mensual` },
-      { text: `Ocasional / según demanda` },
       { text: `Quincenal` },
+      { text: `Ocasional / según demanda` },
+      { text: `Cada 2–3 meses` },
       { text: `Semanal o más frecuente` },
+      { text: `Mensual` },
     ]);
 
     const q_5f459f2c_9351_4395_8e0d_36befbb6833c = await saveQuestion(manager, {
@@ -208,13 +208,13 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       section: sec1,
     });
     await saveOptions(manager, q_5f459f2c_9351_4395_8e0d_36befbb6833c, [
-      { text: `Grupos comunitarios / asambleas` },
       { text: `Llamada telefónica` },
+      { text: `SMS` },
+      { text: `WhatsApp` },
+      { text: `Visita presencial en campo` },
       { text: `Plataforma institucional` },
       { text: `Radio comunitaria` },
-      { text: `SMS` },
-      { text: `Visita presencial en campo` },
-      { text: `WhatsApp` },
+      { text: `Grupos comunitarios / asambleas` },
     ]);
 
   }

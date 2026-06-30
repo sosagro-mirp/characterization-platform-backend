@@ -81,7 +81,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -97,7 +97,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     let o = 1;
 
     const q_cb24df19_85b2_4b98_acd3_8930ca5aef7a = await saveQuestion(manager, {
-      text: `6.1.1 — ¿Genera cáscara de mazorca de cacao?`,
+      text: `¿Genera cáscara de mazorca de cacao?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -105,7 +105,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.1.1 — Cantidad estimada por año de cáscara de mazorca de cacao`,
+      text: `Cantidad estimada por año de cáscara de mazorca de cacao`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -115,7 +115,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_9157ae6b_7b52_4127_893f_abddf707f4e3 = await saveQuestion(manager, {
-      text: `6.1.1 — Unidad de medida para Cáscara / cascarilla de mazorca de cacao`,
+      text: `Unidad de medida para Cáscara / cascarilla de mazorca de cacao`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -124,13 +124,13 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_9157ae6b_7b52_4127_893f_abddf707f4e3, [
-      { text: `L` },
-      { text: `kg` },
       { text: `t` },
+      { text: `kg` },
+      { text: `L` },
     ]);
 
     const q_c04e25f6_5171_4098_8e55_fd1529ef2223 = await saveQuestion(manager, {
-      text: `6.1.1 — Manejo actual de Cáscara / cascarilla de mazorca de cacao`,
+      text: `Manejo actual de Cáscara / cascarilla de mazorca de cacao`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -140,17 +140,17 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
     await saveOptions(manager, q_c04e25f6_5171_4098_8e55_fd1529ef2223, [
       { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
       { text: `Incorporación al suelo / compostaje` },
+      { text: `Alimentación animal` },
+      { text: `Venta o donación` },
       { text: `Ningún manejo especial` },
+      { text: `Aprovechamiento energético` },
       { text: `Otro` },
       { text: `Quema` },
-      { text: `Venta o donación` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.1.1 — Efectos negativos observados de Cáscara / cascarilla de mazorca de cacao`,
+      text: `Efectos negativos observados de Cáscara / cascarilla de mazorca de cacao`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -160,7 +160,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_6eead935_9ac0_4a3c_8203_cf7f9afc6086 = await saveQuestion(manager, {
-      text: `6.1.2 — ¿Genera Mucílago / baba de cacao?`,
+      text: `¿Genera Mucílago / baba de cacao?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -168,7 +168,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.1.2 — Cantidad estimada por año de Mucílago / baba de cacao`,
+      text: `Cantidad estimada por año de Mucílago / baba de cacao`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -178,7 +178,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_d5b88421_c285_495e_a256_3a6e6cebc60b = await saveQuestion(manager, {
-      text: `6.1.2 — Unidad de medida para Mucílago / baba de cacao`,
+      text: `Unidad de medida para Mucílago / baba de cacao`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -187,13 +187,13 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_d5b88421_c285_495e_a256_3a6e6cebc60b, [
-      { text: `L` },
       { text: `kg` },
+      { text: `L` },
       { text: `t` },
     ]);
 
     const q_71e1d7fc_7f80_4244_86ba_dce0b9b5b5c6 = await saveQuestion(manager, {
-      text: `6.1.2 — Manejo actual de Mucílago / baba de cacao`,
+      text: `Manejo actual de Mucílago / baba de cacao`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -202,18 +202,18 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_71e1d7fc_7f80_4244_86ba_dce0b9b5b5c6, [
-      { text: `Abandono en campo` },
       { text: `Alimentación animal` },
+      { text: `Venta o donación` },
       { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
       { text: `Ningún manejo especial` },
       { text: `Otro` },
+      { text: `Incorporación al suelo / compostaje` },
       { text: `Quema` },
-      { text: `Venta o donación` },
+      { text: `Abandono en campo` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.1.2 — Efectos negativos observados de Mucílago / baba de cacao`,
+      text: `Efectos negativos observados de Mucílago / baba de cacao`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -250,8 +250,8 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_08c20699_6762_4ca2_bbba_3c6891e7700e, [
-      { text: `L` },
       { text: `kg` },
+      { text: `L` },
       { text: `t` },
     ]);
 
@@ -265,18 +265,18 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_3edba324_9407_4fb5_ae60_90ff1987c42b, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
-      { text: `Otro` },
-      { text: `Quema` },
       { text: `Venta o donación` },
+      { text: `Alimentación animal` },
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Quema` },
+      { text: `Abandono en campo` },
+      { text: `Otro` },
+      { text: `Ningún manejo especial` },
+      { text: `Aprovechamiento energético` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.1.3 — Efectos negativos observados de Semillas defectuosas / cacao de baja calidad`,
+      text: `Efectos negativos observados de Semillas defectuosas / cacao de baja calidad`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -294,7 +294,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.1.4 — Cantidad estimada por año de Aguas mieles del beneficio húmedo de cacao`,
+      text: `Cantidad estimada por año de Aguas mieles del beneficio húmedo de cacao`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -304,7 +304,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_7442ed67_b496_4379_b883_4e80160054f3 = await saveQuestion(manager, {
-      text: `6.1.4 — Unidad de medida para Aguas mieles del beneficio húmedo de cacao`,
+      text: `Unidad de medida para Aguas mieles del beneficio húmedo de cacao`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -314,8 +314,8 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
     await saveOptions(manager, q_7442ed67_b496_4379_b883_4e80160054f3, [
       { text: `L` },
-      { text: `kg` },
       { text: `t` },
+      { text: `kg` },
     ]);
 
     const q_50a87a91_fc8e_4dfa_b9e6_4e9d37c290ce = await saveQuestion(manager, {
@@ -328,14 +328,14 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_50a87a91_fc8e_4dfa_b9e6_4e9d37c290ce, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
       { text: `Ningún manejo especial` },
       { text: `Otro` },
       { text: `Quema` },
+      { text: `Abandono en campo` },
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Alimentación animal` },
       { text: `Venta o donación` },
+      { text: `Aprovechamiento energético` },
     ]);
 
     await saveQuestion(manager, {
@@ -349,7 +349,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_a536d0e8_5e51_45f8_b6ca_12b19d2aff7f = await saveQuestion(manager, {
-      text: `6.1.5 — ¿Genera Restos de poda de cacao?`,
+      text: `¿Genera Restos de poda de cacao?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -376,8 +376,8 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_1499c143_980d_4c40_9327_d4d18a4f987c, [
-      { text: `L` },
       { text: `kg` },
+      { text: `L` },
       { text: `t` },
     ]);
 
@@ -392,17 +392,17 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
     await saveOptions(manager, q_5250ba52_14f5_47d7_bd39_72be641d3b43, [
       { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
       { text: `Otro` },
-      { text: `Quema` },
       { text: `Venta o donación` },
+      { text: `Ningún manejo especial` },
+      { text: `Aprovechamiento energético` },
+      { text: `Alimentación animal` },
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Quema` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.1.5 — Efectos negativos observados de Restos de poda de cacao`,
+      text: `Efectos negativos observados de Restos de poda de cacao`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -412,7 +412,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_e381c872_aa0c_4d35_9006_ab2038edbe04 = await saveQuestion(manager, {
-      text: `6.1.6 — ¿Genera Cascarilla de cacao tostado?`,
+      text: `¿Genera Cascarilla de cacao tostado?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -430,7 +430,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_8f9a92cd_a614_410a_890e_214e2428d513 = await saveQuestion(manager, {
-      text: `6.1.6 — Unidad de medida para Cascarilla de cacao tostado`,
+      text: `Unidad de medida para Cascarilla de cacao tostado`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -439,9 +439,9 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_8f9a92cd_a614_410a_890e_214e2428d513, [
-      { text: `L` },
-      { text: `kg` },
       { text: `t` },
+      { text: `kg` },
+      { text: `L` },
     ]);
 
     const q_2b2aaf86_55af_4bea_a9be_01eca7416aec = await saveQuestion(manager, {
@@ -454,18 +454,18 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_2b2aaf86_55af_4bea_a9be_01eca7416aec, [
-      { text: `Abandono en campo` },
       { text: `Alimentación animal` },
+      { text: `Venta o donación` },
       { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
       { text: `Ningún manejo especial` },
       { text: `Otro` },
       { text: `Quema` },
-      { text: `Venta o donación` },
+      { text: `Abandono en campo` },
+      { text: `Incorporación al suelo / compostaje` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.1.6 — Efectos negativos observados de Cascarilla de cacao tostado`,
+      text: `Efectos negativos observados de Cascarilla de cacao tostado`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -528,13 +528,13 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
     await saveOptions(manager, q_2278a2c2_2766_481b_b4b5_0ef75dc4fb85, [
       { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
       { text: `Ningún manejo especial` },
-      { text: `Otro` },
-      { text: `Quema` },
+      { text: `Alimentación animal` },
       { text: `Venta o donación` },
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Otro` },
+      { text: `Aprovechamiento energético` },
+      { text: `Quema` },
     ]);
 
     await saveQuestion(manager, {
@@ -554,7 +554,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `6.2.1 ★ — ¿Cuál es la parte del cultivo que constituye el residuo o los residuos más abundantes? (Ej: cáscara de cacao, mucílago de café, tallos de cáñamo)`,
+      text: `¿Cuál es la parte del cultivo que constituye el residuo o los residuos más abundantes? (Ej: cáscara de cacao, mucílago de café, tallos de cáñamo)`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -562,7 +562,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.2 — ¿El residuo es homogéneo o viene mezclado con otros materiales (tierra, piedras, plásticos)?`,
+      text: `¿El residuo es homogéneo o viene mezclado con otros materiales (tierra, piedras, plásticos)?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -578,7 +578,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_fc39b713_78e4_4d75_bc91_ae1e990a9ccd = await saveQuestion(manager, {
-      text: `6.2.4 — ¿El material es fibroso o denso?`,
+      text: `¿El material es fibroso o denso?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -598,8 +598,8 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       section: sec2,
     });
     const opts_39a9251f_1739_42bc_ab07_fbc4dd794548 = await saveOptions(manager, q_39a9251f_1739_42bc_ab07_fbc4dd794548, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
     const opt_3b66c3d2_a040_4368_a2f3_18a3cf39e96b = opts_39a9251f_1739_42bc_ab07_fbc4dd794548.get(`Sí`)!;
@@ -619,7 +619,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     ]);
 
     await saveQuestion(manager, {
-      text: `6.2.7 — ¿Tiene idea del contenido de humedad del residuo al momento de la recolección?`,
+      text: `¿Tiene idea del contenido de humedad del residuo al momento de la recolección?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -627,7 +627,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.8 — ¿Cuánto tiempo transcurre desde la generación del residuo hasta que puede ser recolectado? ¿Observa señales de descomposición?`,
+      text: `¿Cuánto tiempo transcurre desde la generación del residuo hasta que puede ser recolectado? ¿Observa señales de descomposición?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -642,36 +642,36 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       section: sec2,
     });
     await saveOptions(manager, q_29fafcbf_fc6a_4b9d_b709_1237937423b7, [
-      { text: `A la intemperie` },
       { text: `Bajo techo sin control` },
-      { text: `Contacto directo con suelo` },
       { text: `En cuarto controlado` },
+      { text: `Contacto directo con suelo` },
       { text: `En silos` },
+      { text: `A la intemperie` },
     ]);
 
     const q_fa56378d_dc26_4417_8331_4afcc6bf6336 = await saveQuestion(manager, {
-      text: `6.2.10 ★ — ¿Existe algún proceso de secado previo (solar o mecánico) antes de entregar / usar el residuo?`,
+      text: `¿Existe algún proceso de secado previo (solar o mecánico) antes de entregar / usar el residuo?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_fa56378d_dc26_4417_8331_4afcc6bf6336, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     const q_a48a4283_5742_4361_82fd_b26d811e4f59 = await saveQuestion(manager, {
-      text: `6.2.11 ★ — ¿Sería posible enviar los residuos secos al laboratorio del proyecto?`,
+      text: `¿Sería posible enviar los residuos secos al laboratorio del proyecto?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_a48a4283_5742_4361_82fd_b26d811e4f59, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
@@ -684,7 +684,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.13 ★ — ¿Cómo es el proceso de beneficio: vía seca o húmeda?`,
+      text: `¿Cómo es el proceso de beneficio: vía seca o húmeda?`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -692,7 +692,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.14 ★ — ¿Cuál es el volumen estimado de lixiviados o "aguas mieles" por tonelada de producto procesado? (L/t o m³/t)`,
+      text: `¿Cuál es el volumen estimado de lixiviados o "aguas mieles" por tonelada de producto procesado? (L/t o m³/t)`,
       type: types.numeric,
       isRequired: true,
       order: o++,
@@ -700,7 +700,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.15 — ¿Se añade agua adicional durante el proceso de extracción o despulpado?`,
+      text: `¿Se añade agua adicional durante el proceso de extracción o despulpado?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -716,7 +716,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.17 ★ — ¿El residuo se genera de manera constante o solo en meses específicos de cosecha? (Indique los meses si aplica)`,
+      text: `¿El residuo se genera de manera constante o solo en meses específicos de cosecha? (Indique los meses si aplica)`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -724,7 +724,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.18 ★ — ¿Qué volumen o masa total genera por lote de producción? (Incluya cantidad y unidad: kg, t o L)`,
+      text: `¿Qué volumen o masa total genera por lote de producción? (Incluya cantidad y unidad: kg, t o L)`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -740,7 +740,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.20 — ¿Cuánto tiempo máximo permanece almacenado el residuo antes de ser usado o despachado? (horas / días / semanas)`,
+      text: `¿Cuánto tiempo máximo permanece almacenado el residuo antes de ser usado o despachado? (horas / días / semanas)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -748,16 +748,16 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_8f721796_2dbc_4fcb_83cc_bf6a44cf418e = await saveQuestion(manager, {
-      text: `6.2.21 — ¿Se observa lixiviación (pérdida de líquidos) durante el almacenamiento del residuo sólido?`,
+      text: `¿Se observa lixiviación (pérdida de líquidos) durante el almacenamiento del residuo sólido?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_8f721796_2dbc_4fcb_83cc_bf6a44cf418e, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
@@ -769,16 +769,16 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_9d1a8b50_ce86_4098_a625_d1a50e5e0f40 = await saveQuestion(manager, {
-      text: `6.2.23 ★ — ¿Se ha evaluado la presencia de metales pesados (Pb, Cd, As, Hg) en el residuo? (Clave para seguridad en valorización energética y de materiales)`,
+      text: `¿Se ha evaluado la presencia de metales pesados (Pb, Cd, As, Hg) en el residuo? (Clave para seguridad en valorización energética y de materiales)`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     const opts_9d1a8b50_ce86_4098_a625_d1a50e5e0f40 = await saveOptions(manager, q_9d1a8b50_ce86_4098_a625_d1a50e5e0f40, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
     const opt_178d71dc_c3dc_4e9c_b17e_0439c1c98fcc = opts_9d1a8b50_ce86_4098_a625_d1a50e5e0f40.get(`Sí`)!;
 
@@ -792,8 +792,8 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       conditionValue: opt_178d71dc_c3dc_4e9c_b17e_0439c1c98fcc,
     });
     await saveOptions(manager, q_160418ca_01e5_4c79_aebd_63d5bc94078f, [
-      { text: `No` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
@@ -805,7 +805,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.2.26 ◆ — Si el residuo es fibroso (tallo de cáñamo, cáscara de cacao), ¿cuál es la longitud promedio de la fibra? (cm)`,
+      text: `Si el residuo es fibroso (tallo de cáñamo, cáscara de cacao), ¿cuál es la longitud promedio de la fibra? (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -826,23 +826,23 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       section: sec3,
     });
     await saveOptions(manager, q_5a226864_f50c_4314_b33b_9ca88c783b38, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     const q_e4221c52_435a_42bf_8e33_4d1d4c2abde5 = await saveQuestion(manager, {
-      text: `6.3.2a ★ — ¿Para qué usos consideraría viable aprovechar sus residuos? (Marque todos los que apliquen)`,
+      text: `¿Para qué usos consideraría viable aprovechar sus residuos? (Marque todos los que apliquen)`,
       type: types.multiple_choice,
       isRequired: true,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_e4221c52_435a_42bf_8e33_4d1d4c2abde5, [
-      { text: `Fertilizantes / abonos` },
-      { text: `Ingredientes funcionales / cosméticos` },
       { text: `Materiales / empaques` },
+      { text: `Ingredientes funcionales / cosméticos` },
       { text: `Producción de energía (biochar, biogás)` },
+      { text: `Fertilizantes / abonos` },
       { text: `Tratamiento de agua (filtros, carbón activado)` },
     ]);
 
@@ -854,13 +854,13 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       section: sec3,
     });
     await saveOptions(manager, q_3443c7c3_a668_4d67_a181_5fae37d82418, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.5.4 ★ — ¿Actualmente aprovecha algún residuo para generar energía?`,
+      text: `¿Actualmente aprovecha algún residuo para generar energía?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -868,7 +868,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_c8f6d181_5e81_4e44_b1c5_805448c7c1bf = await saveQuestion(manager, {
-      text: `4.5.5 ★ — ¿Estaría interesado en tecnologías para generar gas para usar en los procesos requeridos en su unidad productiva?`,
+      text: `¿Estaría interesado en tecnologías para generar gas para usar en los procesos requeridos en su unidad productiva?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
@@ -876,12 +876,12 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
     await saveOptions(manager, q_c8f6d181_5e81_4e44_b1c5_805448c7c1bf, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.5.6 — ¿Qué uso le daría a esa energía?`,
+      text: `¿Qué uso le daría a esa energía?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -889,7 +889,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     const q_8281fa33_49de_4a90_8cab_2c5648da9df9 = await saveQuestion(manager, {
-      text: `6.3.3 ★ — ¿Le interesaría usar sus residuos para producir biochar, biogás o bioaceite (pirólisis)?`,
+      text: `¿Le interesaría usar sus residuos para producir biochar, biogás o bioaceite (pirólisis)?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
@@ -909,13 +909,13 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       section: sec3,
     });
     await saveOptions(manager, q_0ff868d6_0d74_4ba3_82a2_2642e9d80048, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_82b167a4_88dd_4b03_8785_d4c4c0915cc1 = await saveQuestion(manager, {
-      text: `6.3.5 ★ — ¿Le interesaría usar sus residuos para tratamiento de aguas?`,
+      text: `¿Le interesaría usar sus residuos para tratamiento de aguas?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
@@ -923,21 +923,21 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
     await saveOptions(manager, q_82b167a4_88dd_4b03_8785_d4c4c0915cc1, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
     const q_fa9187b1_04d0_4197_9164_1f409b8d9306 = await saveQuestion(manager, {
-      text: `6.3.6a — ¿Sus residuos podrían tener potencial para ingredientes funcionales (con beneficio para la salud)?`,
+      text: `¿Sus residuos podrían tener potencial para ingredientes funcionales (con beneficio para la salud)?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_fa9187b1_04d0_4197_9164_1f409b8d9306, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_4fc7621e_6633_4ecd_9e0c_6c200204276c = await saveQuestion(manager, {
@@ -948,9 +948,9 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
       section: sec3,
     });
     await saveOptions(manager, q_4fc7621e_6633_4ecd_9e0c_6c200204276c, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
 
     const q_490dabb7_8e67_4ec9_9657_ff155e31a500 = await saveQuestion(manager, {
@@ -967,16 +967,16 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     ]);
 
     const q_d8040b91_5fa0_4a64_b31c_8ac559a074e8 = await saveQuestion(manager, {
-      text: `6.3.8 ★ — ¿Estaría dispuesto a probar filtros fabricados a partir de sus propios residuos?`,
+      text: `¿Estaría dispuesto a probar filtros fabricados a partir de sus propios residuos?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_d8040b91_5fa0_4a64_b31c_8ac559a074e8, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
@@ -988,7 +988,7 @@ export async function seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `6.3 — ¿Ha incorporado alguna ruta de valorización? Si Sí: ¿Cuál? ¿Cómo le ha funcionado? Si No: ¿Cuál intentó sin éxito? ¿Por qué no funcionó? ¿Quién se la dio o vendió?`,
+      text: `¿Ha incorporado alguna ruta de valorización? Si Sí: ¿Cuál? ¿Cómo le ha funcionado? Si No: ¿Cuál intentó sin éxito? ¿Por qué no funcionó? ¿Quién se la dio o vendió?`,
       type: types.open_text,
       isRequired: false,
       order: o++,

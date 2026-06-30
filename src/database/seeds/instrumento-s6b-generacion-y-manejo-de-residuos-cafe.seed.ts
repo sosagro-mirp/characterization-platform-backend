@@ -81,7 +81,7 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -124,9 +124,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_27caa290_9f6a_4ae1_b081_168ff5e0b5d1, [
-      { text: `L` },
       { text: `kg` },
       { text: `t` },
+      { text: `L` },
     ]);
 
     const q_a3239178_9976_4d9d_9254_e0529aa1e627 = await saveQuestion(manager, {
@@ -139,14 +139,14 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_a3239178_9976_4d9d_9254_e0529aa1e627, [
+      { text: `Incorporación al suelo / compostaje` },
       { text: `Abandono en campo` },
       { text: `Alimentación animal` },
       { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
-      { text: `Otro` },
-      { text: `Quema` },
       { text: `Venta o donación` },
+      { text: `Quema` },
+      { text: `Otro` },
+      { text: `Ningún manejo especial` },
     ]);
 
     await saveQuestion(manager, {
@@ -202,14 +202,14 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_85137b2b_16cf_4480_a33e_3238a54e5e57, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
       { text: `Ningún manejo especial` },
-      { text: `Otro` },
-      { text: `Quema` },
       { text: `Venta o donación` },
+      { text: `Quema` },
+      { text: `Aprovechamiento energético` },
+      { text: `Otro` },
+      { text: `Abandono en campo` },
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Alimentación animal` },
     ]);
 
     await saveQuestion(manager, {
@@ -231,7 +231,7 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
     });
 
     await saveQuestion(manager, {
-      text: `Cantidad estimada por año de aguas mieles de café`,
+      text: `Cantidad estimada por año de Aguas mieles de café`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -250,8 +250,8 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_7aa93771_31d1_4ba1_b282_969178ed236d, [
-      { text: `L` },
       { text: `kg` },
+      { text: `L` },
       { text: `t` },
     ]);
 
@@ -265,14 +265,14 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_07f3e5dd_0566_4bb0_b477_ba086706895e, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
       { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
-      { text: `Otro` },
-      { text: `Quema` },
       { text: `Venta o donación` },
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Otro` },
+      { text: `Alimentación animal` },
+      { text: `Abandono en campo` },
+      { text: `Quema` },
+      { text: `Ningún manejo especial` },
     ]);
 
     await saveQuestion(manager, {
@@ -313,9 +313,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_e9fdcd78_b568_4e9b_85ab_9ffc20891c41, [
+      { text: `t` },
       { text: `L` },
       { text: `kg` },
-      { text: `t` },
     ]);
 
     const q_6f478632_f9c4_4c7d_bd45_db932684d59f = await saveQuestion(manager, {
@@ -328,14 +328,14 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_6f478632_f9c4_4c7d_bd45_db932684d59f, [
-      { text: `Abandono en campo` },
+      { text: `Otro` },
       { text: `Alimentación animal` },
+      { text: `Venta o donación` },
       { text: `Aprovechamiento energético` },
+      { text: `Quema` },
+      { text: `Abandono en campo` },
       { text: `Incorporación al suelo / compostaje` },
       { text: `Ningún manejo especial` },
-      { text: `Otro` },
-      { text: `Quema` },
-      { text: `Venta o donación` },
     ]);
 
     await saveQuestion(manager, {
@@ -376,8 +376,8 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_747d6c02_b12d_4bb9_bfb7_70e6b6bf4de2, [
-      { text: `L` },
       { text: `kg` },
+      { text: `L` },
       { text: `t` },
     ]);
 
@@ -391,14 +391,14 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_d04c1386_bd9c_4008_a677_55e6bc8153be, [
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Venta o donación` },
+      { text: `Ningún manejo especial` },
+      { text: `Aprovechamiento energético` },
       { text: `Abandono en campo` },
       { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
-      { text: `Otro` },
       { text: `Quema` },
-      { text: `Venta o donación` },
+      { text: `Otro` },
     ]);
 
     await saveQuestion(manager, {
@@ -440,8 +440,8 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
     });
     await saveOptions(manager, q_82e494b0_2823_4065_b29b_755d9a9f83d2, [
       { text: `L` },
-      { text: `kg` },
       { text: `t` },
+      { text: `kg` },
     ]);
 
     const q_b3b885de_1125_4199_ae79_3126c0a706f3 = await saveQuestion(manager, {
@@ -454,14 +454,14 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionValue: 'true',
     });
     await saveOptions(manager, q_b3b885de_1125_4199_ae79_3126c0a706f3, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
       { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
+      { text: `Venta o donación` },
       { text: `Ningún manejo especial` },
       { text: `Otro` },
+      { text: `Abandono en campo` },
       { text: `Quema` },
-      { text: `Venta o donación` },
+      { text: `Incorporación al suelo / compostaje` },
+      { text: `Alimentación animal` },
     ]);
 
     await saveQuestion(manager, {
@@ -526,8 +526,8 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
     });
     const opts_50a03f41_74a5_4698_b39c_a11a0894d2ef = await saveOptions(manager, q_50a03f41_74a5_4698_b39c_a11a0894d2ef, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
     const opt_0dcb81ee_2103_49fd_8901_7b06e8d0db04 = opts_50a03f41_74a5_4698_b39c_a11a0894d2ef.get(`Sí`)!;
 
@@ -569,11 +569,11 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec2,
     });
     await saveOptions(manager, q_9fd05110_c168_4645_be18_2dcd3a9e5a2c, [
-      { text: `A la intemperie` },
-      { text: `Bajo techo sin control` },
-      { text: `Contacto directo con suelo` },
       { text: `En cuarto controlado` },
+      { text: `Contacto directo con suelo` },
       { text: `En silos` },
+      { text: `Bajo techo sin control` },
+      { text: `A la intemperie` },
     ]);
 
     const q_abec22d1_3909_4d5f_ac60_c0820d51c0c3 = await saveQuestion(manager, {
@@ -584,9 +584,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec2,
     });
     await saveOptions(manager, q_abec22d1_3909_4d5f_ac60_c0820d51c0c3, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     const q_ef258e73_fa65_4a00_8507_a0ecdfb3d577 = await saveQuestion(manager, {
@@ -598,12 +598,12 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
     });
     await saveOptions(manager, q_ef258e73_fa65_4a00_8507_a0ecdfb3d577, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
     await saveQuestion(manager, {
-      text: `¿Se aplican agentes químicos durante el cultivo o poscosecha (pesticidas, fungicidas)? Liste los agentes empleados. (Clave para seguridad en valorización)`,
+      text: `¿Se aplican agentes químicos durante el cultivo o poscosecha (pesticidas, fungicidas)? Liste los agentes empleados.`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -682,9 +682,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec2,
     });
     await saveOptions(manager, q_e9bdd1b9_e372_4572_b276_bdedb3fd7626, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
@@ -696,16 +696,16 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
     });
 
     const q_1291925d_2725_4daa_9c73_c936ba954ea0 = await saveQuestion(manager, {
-      text: `¿Se ha evaluado la presencia de metales pesados (Pb, Cd, As, Hg) en el residuo? (Clave para seguridad en valorización energética y de materiales)`,
+      text: `¿Se ha evaluado la presencia de metales pesados (Pb, Cd, As, Hg) en el residuo?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     const opts_1291925d_2725_4daa_9c73_c936ba954ea0 = await saveOptions(manager, q_1291925d_2725_4daa_9c73_c936ba954ea0, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
     const opt_73cdf984_60ed_48ec_9034_c22256fc40d4 = opts_1291925d_2725_4daa_9c73_c936ba954ea0.get(`Sí`)!;
 
@@ -739,9 +739,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec2,
     });
     await saveOptions(manager, q_49b108dc_12be_4420_939a_69f54449c92a, [
-      { text: `Hexosas (C6): glucosa, fructosa` },
-      { text: `No sabe` },
       { text: `Pentosas (C5): xilosa` },
+      { text: `No sabe` },
+      { text: `Hexosas (C6): glucosa, fructosa` },
     ]);
 
   }
@@ -760,8 +760,8 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
     });
     await saveOptions(manager, q_db9d8d78_cc17_4c15_bdbe_9cbf99e1c3bc, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
     const q_aaab1815_8ffb_468b_85e3_9d926325363c = await saveQuestion(manager, {
@@ -773,11 +773,11 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec3,
     });
     await saveOptions(manager, q_aaab1815_8ffb_468b_85e3_9d926325363c, [
-      { text: `Fertilizantes / abonos` },
-      { text: `Ingredientes funcionales / cosméticos` },
-      { text: `Materiales / empaques` },
       { text: `Producción de energía (biochar, biogás)` },
+      { text: `Fertilizantes / abonos` },
       { text: `Tratamiento de agua (filtros, carbón activado)` },
+      { text: `Materiales / empaques` },
+      { text: `Ingredientes funcionales / cosméticos` },
     ]);
 
     const q_8c9e9320_3267_4f99_b60b_80eddfc1f056 = await saveQuestion(manager, {
@@ -811,9 +811,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec3,
     });
     await saveOptions(manager, q_95d6a9a5_3328_4959_8fe7_44c84ca9410b, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
@@ -848,8 +848,8 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
     });
     await saveOptions(manager, q_9b8f1f8c_a123_451c_b345_8979625053fd, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
     const q_ca241921_0c64_472b_b479_41cd2943e5ea = await saveQuestion(manager, {
@@ -861,9 +861,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec3,
     });
     await saveOptions(manager, q_ca241921_0c64_472b_b479_41cd2943e5ea, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_719e7547_bf35_4643_94c8_5aab52f43178 = await saveQuestion(manager, {
@@ -887,9 +887,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec3,
     });
     await saveOptions(manager, q_c0ab3c98_900a_45ce_9ae9_c1ed21cd2b62, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     const q_0eaac7c2_2f85_415b_9315_b213b92c227c = await saveQuestion(manager, {
@@ -900,9 +900,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec3,
     });
     await saveOptions(manager, q_0eaac7c2_2f85_415b_9315_b213b92c227c, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_6be1ac42_dbe8_4f1a_acdb_63a3b64986fd = await saveQuestion(manager, {
@@ -913,9 +913,9 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       section: sec3,
     });
     await saveOptions(manager, q_6be1ac42_dbe8_4f1a_acdb_63a3b64986fd, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {

@@ -81,7 +81,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -97,7 +97,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     let o = 1;
 
     const q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954 = await saveQuestion(manager, {
-      text: `8C.1 ★ — Tipo de estructura principal`,
+      text: `Tipo de estructura principal`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -105,15 +105,15 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       section: sec1,
     });
     const opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954 = await saveOptions(manager, q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954, [
-      { text: `Campo abierto` },
-      { text: `Indoor (cuarto de cultivo)` },
       { text: `Invernadero` },
       { text: `Mixto` },
+      { text: `Indoor (cuarto de cultivo)` },
+      { text: `Campo abierto` },
     ]);
     const opt_9b8673ec_aab3_48d5_9cdf_270ac046a200 = opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954.get(`Invernadero`)!;
 
     const q_dce512a8_ac9e_4449_85e5_24a196d45958 = await saveQuestion(manager, {
-      text: `8C.2 ★ — Material de cubierta del invernadero`,
+      text: `Material de cubierta del invernadero`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -123,13 +123,13 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       conditionValue: opt_9b8673ec_aab3_48d5_9cdf_270ac046a200,
     });
     await saveOptions(manager, q_dce512a8_ac9e_4449_85e5_24a196d45958, [
-      { text: `Plástico` },
       { text: `Policarbonato` },
       { text: `Vidrio` },
+      { text: `Plástico` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8C.3 ★ — Área del invernadero (m²)`,
+      text: `Área del invernadero (m²)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -140,7 +140,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     const q_db34e748_7576_4920_8d37_5af945c341f2 = await saveQuestion(manager, {
-      text: `8C.4 ★ — ¿Tiene sistema de ventilación?`,
+      text: `¿Tiene sistema de ventilación?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -149,7 +149,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     const q_6bdea0e4_486d_4033_a534_9147592594b4 = await saveQuestion(manager, {
-      text: `8C.5 — Tipo de ventilación`,
+      text: `Tipo de ventilación`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -158,13 +158,13 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_6bdea0e4_486d_4033_a534_9147592594b4, [
-      { text: `Forzada (extractores)` },
       { text: `HVAC completo` },
       { text: `Natural` },
+      { text: `Forzada (extractores)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8C.6 ★ — ¿Tiene control automático de temperatura y humedad relativa?`,
+      text: `¿Tiene control automático de temperatura y humedad relativa?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -182,7 +182,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `8C.7b ★ — Temperatura máxima manejada (°C)`,
+      text: `Temperatura máxima manejada (°C)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -191,7 +191,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `8C.8a ★ — Humedad relativa mínima manejada (%)`,
+      text: `Humedad relativa mínima manejada (%)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -220,12 +220,12 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       { text: `CMH` },
       { text: `HPS` },
       { text: `LED` },
-      { text: `Mixto` },
       { text: `Natural` },
+      { text: `Mixto` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8C.10 ★ — ¿Tiene sistema de control de fotoperiodo?`,
+      text: `¿Tiene sistema de control de fotoperiodo?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -248,13 +248,13 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       section: sec2,
     });
     await saveOptions(manager, q_22ce2846_3396_4078_9f77_2a1d855e423b, [
-      { text: `Aeroponía` },
-      { text: `Aspersión` },
       { text: `DWC (Cultivo en agua profunda)` },
-      { text: `NFT (Nutrient Film Technique)` },
-      { text: `Riego manual` },
       { text: `Riego por goteo` },
+      { text: `Aspersión` },
+      { text: `Riego manual` },
+      { text: `Aeroponía` },
       { text: `Sistema recirculante` },
+      { text: `NFT (Nutrient Film Technique)` },
     ]);
 
   }
@@ -272,14 +272,14 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       section: sec3,
     });
     await saveOptions(manager, q_51dee359_13ac_4cee_9794_d4c7a9af8d01, [
+      { text: `Equipo de análisis de humedad` },
+      { text: `Área de empaque y etiquetado bajo condiciones controladas` },
       { text: `Bodega de producto terminado` },
       { text: `Báscula de precisión (gramos)` },
-      { text: `Cuarto de curado` },
-      { text: `Cuarto de secado con control de temperatura y HR` },
-      { text: `Equipo de análisis de humedad` },
-      { text: `Equipo de extracción (prensa, CO₂, etanol, etc.)` },
-      { text: `Área de empaque y etiquetado bajo condiciones controladas` },
       { text: `Área de trimming / despalillado` },
+      { text: `Cuarto de curado` },
+      { text: `Cuarto de secado con control de temperatura y humedad relativa` },
+      { text: `Equipo de extracción (prensa, CO₂, etanol, etc.)` },
     ]);
 
     await saveQuestion(manager, {
@@ -292,7 +292,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `8C.14 ★ — ¿Cuenta con medidor de humedad / higrómetro en el cuarto de secado?`,
+      text: `¿Cuenta con medidor de humedad / higrómetro en el cuarto de secado?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -301,7 +301,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `8C.15 ★ — ¿Tiene tomas eléctricas disponibles para instalación de sensores en el cultivo?`,
+      text: `¿Tiene tomas eléctricas disponibles para instalación de sensores en el cultivo?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -310,7 +310,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     const q_850312c3_2409_46c8_ba7e_2207a2725007 = await saveQuestion(manager, {
-      text: `8C.16 ★ — ¿El área de extracción cumple normas de seguridad ATEX / INVIMA?`,
+      text: `¿El área de extracción cumple normas de seguridad ATEX / INVIMA?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -319,8 +319,8 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
     await saveOptions(manager, q_850312c3_2409_46c8_ba7e_2207a2725007, [
       { text: `No` },
-      { text: `No aplica` },
       { text: `Sí` },
+      { text: `No aplica` },
     ]);
 
   }

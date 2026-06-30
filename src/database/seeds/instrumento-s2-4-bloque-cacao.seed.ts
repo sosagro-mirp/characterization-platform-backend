@@ -81,7 +81,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -95,7 +95,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `2.4.1 ★ — Hectáreas sembradas en cacao (ha)`,
+      text: `Hectáreas sembradas en cacao (ha)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -132,7 +132,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
     });
 
     await saveQuestion(manager, {
-      text: `Especie vegetal de sombra (si aplica)`,
+      text: `Especie vegetal de sombra (sí aplica)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -160,7 +160,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
     });
 
     const q_c94eeb9d_2f93_464e_a8b2_ffc9e4d84460 = await saveQuestion(manager, {
-      text: `2.4.7 — ¿Tiene sombra permanente?`,
+      text: `¿Tiene sombra permanente?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -168,7 +168,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
     });
 
     await saveQuestion(manager, {
-      text: `2.4.7b — Porcentaje de sombra permanente (%)`,
+      text: `Porcentaje de sombra permanente (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -196,7 +196,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
     });
 
     const q_3994d299_0d3c_4826_86e9_2b3db41f3347 = await saveQuestion(manager, {
-      text: `Variedad predominante de cacao (trazabilidad parental si existe)`,
+      text: `Variedad predominante de cacao (trazabilidad parental sí existe)`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -204,25 +204,25 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
       section: sec1,
     });
     await saveOptions(manager, q_3994d299_0d3c_4826_86e9_2b3db41f3347, [
-      { text: `CCN-51` },
-      { text: `Criollo` },
-      { text: `EET-8` },
-      { text: `FEC-2` },
+      { text: `Nativo / Silvestres` },
       { text: `Híbrido trinitario` },
-      { text: `ICS-1` },
+      { text: `Trinitario` },
+      { text: `Criollo` },
+      { text: `FEC-2` },
+      { text: `EET-8` },
+      { text: `TSH-565` },
+      { text: `ICS-95` },
       { text: `ICS-39` },
       { text: `ICS-6` },
+      { text: `ICS-1` },
+      { text: `CCN-51` },
       { text: `ICS-60` },
-      { text: `ICS-95` },
-      { text: `Nativo / Silvestres` },
       { text: `Otro`, isOther: true },
       { text: `Sin identificar` },
-      { text: `TSH-565` },
-      { text: `Trinitario` },
     ]);
 
     await saveQuestion(manager, {
-      text: `2.4.10 ★ — Clones sembrados en el cultivo — indique nombre y % sembrado de cada uno (Ej: CCN-51: 60%, ICS-60: 40%)`,
+      text: `Clones sembrados en el cultivo — indique nombre y % sembrado de cada uno (Ej: CCN-51: 60%, ICS-60: 40%)`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -290,7 +290,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
     });
 
     await saveQuestion(manager, {
-      text: `2.4.14b — ¿A cuál asociación cacaotera pertenece?`,
+      text: `¿A cuál asociación cacaotera pertenece?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -310,7 +310,7 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
     });
 
     const q_c756df67_9db8_4a08_9a93_331c718a4709 = await saveQuestion(manager, {
-      text: `2.4.15 ★ — ¿En qué meses se presenta la cosecha principal de cacao? (Marque todos los que apliquen)`,
+      text: `¿En qué meses se presenta la cosecha principal de cacao? (Marque todos los que apliquen)`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -318,42 +318,42 @@ export async function seedInstrumentoS24BloqueCacao(manager: EntityManager): Pro
       section: sec1,
     });
     await saveOptions(manager, q_c756df67_9db8_4a08_9a93_331c718a4709, [
-      { text: `Abril` },
-      { text: `Agosto` },
-      { text: `Diciembre` },
-      { text: `Enero` },
-      { text: `Febrero` },
-      { text: `Julio` },
-      { text: `Junio` },
-      { text: `Marzo` },
-      { text: `Mayo` },
-      { text: `No aplica` },
-      { text: `Noviembre` },
-      { text: `Octubre` },
       { text: `Septiembre` },
+      { text: `Octubre` },
+      { text: `Noviembre` },
+      { text: `Diciembre` },
+      { text: `Mayo` },
+      { text: `Abril` },
+      { text: `Marzo` },
+      { text: `Febrero` },
+      { text: `No aplica` },
+      { text: `Junio` },
+      { text: `Julio` },
+      { text: `Agosto` },
+      { text: `Enero` },
     ]);
 
     const q_720e844d_e7c0_4ff3_b467_3c09774d7720 = await saveQuestion(manager, {
-      text: `2.4.16 — ¿En qué meses se presenta la cosecha transitoria (secundaria) de cacao? (Marque todos los que apliquen)`,
+      text: `¿En qué meses se presenta la cosecha transitoria (secundaria) de cacao? (Marque todos los que apliquen)`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_720e844d_e7c0_4ff3_b467_3c09774d7720, [
-      { text: `Abril` },
-      { text: `Agosto` },
-      { text: `Diciembre` },
       { text: `Enero` },
-      { text: `Febrero` },
-      { text: `Julio` },
-      { text: `Junio` },
-      { text: `Marzo` },
-      { text: `Mayo` },
       { text: `No aplica` },
+      { text: `Diciembre` },
       { text: `Noviembre` },
       { text: `Octubre` },
       { text: `Septiembre` },
+      { text: `Agosto` },
+      { text: `Julio` },
+      { text: `Junio` },
+      { text: `Mayo` },
+      { text: `Abril` },
+      { text: `Marzo` },
+      { text: `Febrero` },
     ]);
 
   }

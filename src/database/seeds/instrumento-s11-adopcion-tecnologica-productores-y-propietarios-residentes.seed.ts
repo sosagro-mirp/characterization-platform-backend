@@ -105,14 +105,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec1,
     });
     await saveOptions(manager, q_5df2fa25_84e8_4a21_8b2c_c0e2084948e0, [
-      { text: `Buscar, descargar e instalar aplicaciones` },
       { text: `Conectar dispositivos adicionales (impresora, módem)` },
+      { text: `Usar procesadores de texto (Word / Google Docs)` },
       { text: `Copiar y pegar información entre documentos` },
       { text: `Enviar correos electrónicos con archivos` },
+      { text: `Buscar, descargar e instalar aplicaciones` },
       { text: `Transferir archivos entre dispositivos o por internet` },
-      { text: `Usar herramientas de Inteligencia Artificial (ChatGPT, Gemini, etc.)` },
-      { text: `Usar procesadores de texto (Word / Google Docs)` },
       { text: `Verificar si información de internet es verdadera` },
+      { text: `Usar herramientas de Inteligencia Artificial (ChatGPT, Gemini, etc.)` },
     ]);
 
     const q_4eaadce7_e66d_4725_977e_e6f590c23eaa = await saveQuestion(manager, {
@@ -124,15 +124,15 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec1,
     });
     await saveOptions(manager, q_4eaadce7_e66d_4725_977e_e6f590c23eaa, [
-      { text: `Al menos una vez al mes` },
       { text: `Al menos una vez por semana` },
+      { text: `Todos los días` },
       { text: `No utiliza` },
       { text: `Ocasionalmente` },
-      { text: `Todos los días` },
+      { text: `Al menos una vez al mes` },
     ]);
 
     const q_a9df2d70_f673_4dfd_a6b7_6a3694581460 = await saveQuestion(manager, {
-      text: `D.3 ★ — ¿Para qué usa principalmente el teléfono celular?`,
+      text: `¿Para qué usa principalmente el teléfono celular?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -140,12 +140,12 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec1,
     });
     await saveOptions(manager, q_a9df2d70_f673_4dfd_a6b7_6a3694581460, [
-      { text: `Actividades productivas / gestión finca` },
+      { text: `Llamadas personales/familiares` },
       { text: `Banca móvil` },
       { text: `Consultar precios o mercados agrícolas` },
-      { text: `Llamadas personales/familiares` },
-      { text: `Navegar en internet` },
+      { text: `Actividades productivas / gestión finca` },
       { text: `Redes sociales` },
+      { text: `Navegar en internet` },
       { text: `WhatsApp` },
     ]);
 
@@ -158,7 +158,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
     });
 
     const q_67b0269e_a506_4b2c_91c0_e41d6da49abb = await saveQuestion(manager, {
-      text: `D.5 ★ — ¿Cuáles plataformas o aplicaciones usa actualmente?`,
+      text: `¿Cuáles plataformas o aplicaciones usa actualmente?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -166,15 +166,15 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec1,
     });
     await saveOptions(manager, q_67b0269e_a506_4b2c_91c0_e41d6da49abb, [
+      { text: `YouTube` },
+      { text: `Facebook` },
+      { text: `WhatsApp` },
+      { text: `Ninguna` },
       { text: `Apps agropecuarias (Agrosavia / AgroApp / otras)` },
       { text: `Apps de banca móvil` },
       { text: `ChatGPT u otra IA` },
-      { text: `Facebook` },
       { text: `Google (búsquedas)` },
       { text: `Instagram` },
-      { text: `Ninguna` },
-      { text: `WhatsApp` },
-      { text: `YouTube` },
     ]);
 
     const q_1f758c88_37ef_4085_ace4_205a37cc71db = await saveQuestion(manager, {
@@ -186,15 +186,15 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec1,
     });
     await saveOptions(manager, q_1f758c88_37ef_4085_ace4_205a37cc71db, [
+      { text: `Ocasionalmente` },
+      { text: `No utiliza` },
       { text: `Al menos una vez al mes` },
       { text: `Al menos una vez por semana` },
-      { text: `No utiliza` },
-      { text: `Ocasionalmente` },
       { text: `Todos los días` },
     ]);
 
     await saveQuestion(manager, {
-      text: `D.7 — ¿Desde qué lugares accede principalmente a internet?`,
+      text: `¿Desde qué lugares accede principalmente a internet?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -208,63 +208,63 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
     let o = 1;
 
     const q_b8c5a0f2_933f_43a5_b28a_4783ba56034e = await saveQuestion(manager, {
-      text: `F.1 — Me siento cómodo(a) usando aplicaciones en el celular o computador.`,
+      text: `Me siento cómodo(a) usando aplicaciones en el celular o computador.`,
       type: types.likert,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_b8c5a0f2_933f_43a5_b28a_4783ba56034e, [
-      { text: `1` },
-      { text: `2` },
       { text: `3` },
       { text: `4` },
       { text: `5` },
+      { text: `2` },
+      { text: `1` },
     ]);
 
     const q_98d70990_078a_443c_aa6b_ff1fc89ebce4 = await saveQuestion(manager, {
-      text: `F.2 — Uso internet o el celular regularmente para actividades de mi producción.`,
+      text: `Uso internet o el celular regularmente para actividades de mi producción.`,
       type: types.likert,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_98d70990_078a_443c_aa6b_ff1fc89ebce4, [
+      { text: `5` },
       { text: `1` },
       { text: `2` },
       { text: `3` },
       { text: `4` },
-      { text: `5` },
     ]);
 
     const q_9c1467db_7ee8_4584_9447_1b1d71dda46d = await saveQuestion(manager, {
-      text: `F.3 — La tecnología me ayudaría a tomar mejores decisiones en mi finca.`,
+      text: `La tecnología me ayudaría a tomar mejores decisiones en mi finca.`,
       type: types.likert,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_9c1467db_7ee8_4584_9447_1b1d71dda46d, [
-      { text: `1` },
-      { text: `2` },
-      { text: `3` },
-      { text: `4` },
       { text: `5` },
+      { text: `4` },
+      { text: `3` },
+      { text: `2` },
+      { text: `1` },
     ]);
 
     const q_e712d588_b830_4683_8c67_81996ced4bd9 = await saveQuestion(manager, {
-      text: `F.4 — El uso de tecnología podría aumentar mis ingresos o mejorar mi producción.`,
+      text: `El uso de tecnología podría aumentar mis ingresos o mejorar mi producción.`,
       type: types.likert,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_e712d588_b830_4683_8c67_81996ced4bd9, [
-      { text: `1` },
       { text: `2` },
+      { text: `5` },
       { text: `3` },
       { text: `4` },
-      { text: `5` },
+      { text: `1` },
     ]);
 
     const q_63e71f7b_f1f8_42da_8104_b96529e94ee0 = await saveQuestion(manager, {
@@ -275,11 +275,11 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec2,
     });
     await saveOptions(manager, q_63e71f7b_f1f8_42da_8104_b96529e94ee0, [
-      { text: `1` },
-      { text: `2` },
-      { text: `3` },
-      { text: `4` },
       { text: `5` },
+      { text: `3` },
+      { text: `2` },
+      { text: `1` },
+      { text: `4` },
     ]);
 
     const q_5dc974b0_508d_41eb_aa39_7aaae6ce9388 = await saveQuestion(manager, {
@@ -291,14 +291,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
     });
     await saveOptions(manager, q_5dc974b0_508d_41eb_aa39_7aaae6ce9388, [
       { text: `1` },
-      { text: `2` },
       { text: `3` },
       { text: `4` },
       { text: `5` },
+      { text: `2` },
     ]);
 
     const q_91c1d0f4_d65c_4d52_9633_f09c2e4cbf85 = await saveQuestion(manager, {
-      text: `F.7 — Me gusta probar nuevas herramientas y tecnologías cuando están disponibles.`,
+      text: `Me gusta probar nuevas herramientas y tecnologías cuando están disponibles.`,
       type: types.likert,
       isRequired: true,
       order: o++,
@@ -306,23 +306,23 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
     });
     await saveOptions(manager, q_91c1d0f4_d65c_4d52_9633_f09c2e4cbf85, [
       { text: `1` },
-      { text: `2` },
       { text: `3` },
       { text: `4` },
       { text: `5` },
+      { text: `2` },
     ]);
 
     const q_807670d7_b459_4443_abc2_d653f19b4de9 = await saveQuestion(manager, {
-      text: `F.8 — Aprendería a usar una app nueva si alguien me enseña cómo funciona.`,
+      text: `Aprendería a usar una app nueva si alguien me enseña cómo funciona.`,
       type: types.likert,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_807670d7_b459_4443_abc2_d653f19b4de9, [
+      { text: `3` },
       { text: `1` },
       { text: `2` },
-      { text: `3` },
       { text: `4` },
       { text: `5` },
     ]);
@@ -334,7 +334,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
     let o = 1;
 
     const q_f2b621df_9a5f_4122_8583_57507cba47c6 = await saveQuestion(manager, {
-      text: `G.1 ★ — ¿Cuáles de estas tecnologías usa actualmente en su finca?`,
+      text: `¿Cuáles de estas tecnologías usa actualmente en su finca?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -342,14 +342,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec3,
     });
     await saveOptions(manager, q_f2b621df_9a5f_4122_8583_57507cba47c6, [
-      { text: `Apps móviles agrícolas` },
-      { text: `Cámaras de monitoreo` },
-      { text: `Drones` },
+      { text: `Software de contabilidad o inventarios` },
       { text: `Fertilización técnica con análisis de suelos` },
       { text: `Ninguna` },
       { text: `Riego tecnificado` },
+      { text: `Cámaras de monitoreo` },
+      { text: `Drones` },
       { text: `Sensores / IoT` },
-      { text: `Software de contabilidad o inventarios` },
+      { text: `Apps móviles agrícolas` },
     ]);
 
     const q_06dea5b3_a886_49c9_8e5c_c771a72586ee = await saveQuestion(manager, {
@@ -361,18 +361,18 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec3,
     });
     await saveOptions(manager, q_06dea5b3_a886_49c9_8e5c_c771a72586ee, [
-      { text: `Alto costo del internet/datos` },
+      { text: `No veo beneficio claro` },
       { text: `Desconfianza en la tecnología` },
+      { text: `Falta de dinero para equipos` },
+      { text: `Falta de conocimiento para usar` },
+      { text: `Mala señal o sin cobertura` },
       { text: `Edad / dificultad aprender` },
       { text: `Falta de acompañamiento técnico` },
-      { text: `Falta de conocimiento para usar` },
-      { text: `Falta de dinero para equipos` },
-      { text: `Mala señal o sin cobertura` },
-      { text: `No veo beneficio claro` },
+      { text: `Alto costo del internet/datos` },
     ]);
 
     const q_a284e3ef_eb52_4cf3_b792_184ebefb4220 = await saveQuestion(manager, {
-      text: `G.3 ★ — ¿Qué le gustaría que una herramienta digital le ayudara a gestionar en su finca?`,
+      text: `¿Qué le gustaría que una herramienta digital le ayudara a gestionar en su finca?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -380,16 +380,16 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec3,
     });
     await saveOptions(manager, q_a284e3ef_eb52_4cf3_b792_184ebefb4220, [
-      { text: `Acceso a crédito y servicios financieros` },
-      { text: `Comunicación con compradores o asociaciones` },
       { text: `Consulta de precios de mercado` },
-      { text: `Control sanitario y manejo de plagas` },
+      { text: `Registro y control de producción` },
       { text: `Gestión de costos, ingresos y rentabilidad` },
+      { text: `Control sanitario y manejo de plagas` },
       { text: `Información climática y alertas tempranas` },
+      { text: `Acceso a crédito y servicios financieros` },
       { text: `Monitoreo con sensores (suelo, clima, producción)` },
+      { text: `Comunicación con compradores o asociaciones` },
       { text: `Predicción de rendimiento o ganancias` },
       { text: `Recomendaciones inteligentes con IA` },
-      { text: `Registro y control de producción` },
     ]);
 
     const q_234b2c7e_76a3_455b_9573_bac74747363f = await saveQuestion(manager, {
@@ -401,13 +401,13 @@ export async function seedInstrumentoS11AdopcionTecnologicaProductoresYPropietar
       section: sec3,
     });
     await saveOptions(manager, q_234b2c7e_76a3_455b_9573_bac74747363f, [
+      { text: `WhatsApp (texto)` },
       { text: `Audio/voz` },
       { text: `Imagen / infografía` },
-      { text: `Llamada telefónica` },
+      { text: `Video corto` },
       { text: `Notificación en app` },
       { text: `SMS` },
-      { text: `Video corto` },
-      { text: `WhatsApp (texto)` },
+      { text: `Llamada telefónica` },
     ]);
 
   }

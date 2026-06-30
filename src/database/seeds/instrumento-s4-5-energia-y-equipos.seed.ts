@@ -81,7 +81,7 @@ export async function seedInstrumentoS45EnergiaYEquipos(manager: EntityManager):
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -102,12 +102,12 @@ export async function seedInstrumentoS45EnergiaYEquipos(manager: EntityManager):
       section: sec1,
     });
     await saveOptions(manager, q_14f4a76c_9bfe_43ef_a64d_4dfd004e01c0, [
-      { text: `Calderas` },
-      { text: `Hornos` },
       { text: `Ninguno` },
       { text: `Otro`, isOther: true },
-      { text: `Secadores` },
+      { text: `Calderas` },
       { text: `Tostadores` },
+      { text: `Hornos` },
+      { text: `Secadores` },
     ]);
 
     const q_3977b8d0_cc99_423f_9e69_078f09b219da = await saveQuestion(manager, {
@@ -118,12 +118,12 @@ export async function seedInstrumentoS45EnergiaYEquipos(manager: EntityManager):
       section: sec1,
     });
     await saveOptions(manager, q_3977b8d0_cc99_423f_9e69_078f09b219da, [
+      { text: `Gas natural / propano` },
+      { text: `Otro`, isOther: true },
       { text: `Biogás / biocombustible` },
       { text: `Carbón` },
       { text: `Electricidad` },
-      { text: `Gas natural / propano` },
       { text: `Leña` },
-      { text: `Otro`, isOther: true },
     ]);
 
   }

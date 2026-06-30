@@ -81,7 +81,7 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -151,10 +151,10 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       section: sec1,
     });
     await saveOptions(manager, q_93a618a9_2323_471c_97cb_df76c8755874, [
-      { text: `De acuerdo`, value: 4 },
-      { text: `En desacuerdo`, value: 2 },
-      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
       { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
@@ -165,21 +165,21 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
     let o = 1;
 
     const q_f32e6648_00b6_4bd9_be4d_9cc05fe70cd0 = await saveQuestion(manager, {
-      text: `3.7 — Tipo de suelo o sustrato predominante`,
+      text: `Tipo de suelo o sustrato predominante`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_f32e6648_00b6_4bd9_be4d_9cc05fe70cd0, [
-      { text: `Arcilloso` },
-      { text: `Arenoso` },
-      { text: `Franco` },
-      { text: `Franco arcilloso` },
-      { text: `Franco arenoso` },
       { text: `Limoso` },
       { text: `No sabe` },
       { text: `Orgánico` },
+      { text: `Franco` },
+      { text: `Franco arenoso` },
+      { text: `Franco arcilloso` },
+      { text: `Arcilloso` },
+      { text: `Arenoso` },
     ]);
 
     const q_143f163f_30d3_4437_a8a0_098100a99d97 = await saveQuestion(manager, {
@@ -202,7 +202,7 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
     });
 
     await saveQuestion(manager, {
-      text: `3.8c — ¿Con qué frecuencia realiza análisis de suelos o sustratos?`,
+      text: `¿Con qué frecuencia realiza análisis de suelos o sustratos?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -232,13 +232,13 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       conditionValue: 'true',
     });
     await saveOptions(manager, q_554d5ff2_e6e7_4fa9_aaa2_64d706342dfa, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_6f112c56_6bef_415a_836b_f6fe051bedc3 = await saveQuestion(manager, {
-      text: `3.11 ★ — ¿El estudio incluyó análisis de pesticidas?`,
+      text: `¿El estudio incluyó análisis de pesticidas?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -248,13 +248,13 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       conditionValue: 'true',
     });
     await saveOptions(manager, q_6f112c56_6bef_415a_836b_f6fe051bedc3, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
     const q_957afc39_03a1_4059_ab40_453b457dcfba = await saveQuestion(manager, {
-      text: `3.12 — ¿El estudio incluyó análisis microbiológico?`,
+      text: `¿El estudio incluyó análisis microbiológico?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -263,13 +263,13 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       conditionValue: 'true',
     });
     await saveOptions(manager, q_957afc39_03a1_4059_ab40_453b457dcfba, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
-      text: `3.13 — ¿Puede compartir los resultados del estudio de suelo con el proyecto?`,
+      text: `¿Puede compartir los resultados del estudio de suelo con el proyecto?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -298,13 +298,13 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
       conditionValue: 'true',
     });
     await saveOptions(manager, q_4ec64c5f_c4f0_4d52_a81a_1bcad24e8f8d, [
-      { text: `Orgánica` },
       { text: `Química de síntesis` },
+      { text: `Orgánica` },
       { text: `Química orgánica + síntesis` },
     ]);
 
     await saveQuestion(manager, {
-      text: `3.15 ★ — Fertilizante(s) empleado(s) — nombre comercial / ficha técnica`,
+      text: `Fertilizante(s) empleado(s) — nombre comercial / ficha técnica`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -315,7 +315,7 @@ export async function seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbienta
     });
 
     await saveQuestion(manager, {
-      text: `3.16 — Frecuencia de fertilización`,
+      text: `Frecuencia de fertilización`,
       type: types.open_text,
       isRequired: false,
       order: o++,

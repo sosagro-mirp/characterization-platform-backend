@@ -81,7 +81,7 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       name: NAME,
       version: VERSION,
       publishDate: '2026-06-25',
-      isActive: true,
+      isActive: false,
       code: 'S2',
     }),
   );
@@ -114,13 +114,13 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       section: sec1,
     });
     const opts_2adaaca9_9d98_48e6_a043_b96ab98926b7 = await saveOptions(manager, q_2adaaca9_9d98_48e6_a043_b96ab98926b7, [
-      { text: `Aparcero(a) / Mediería` },
-      { text: `Arrendatario(a)` },
       { text: `Comodato / Préstamo` },
-      { text: `Otros`, isOther: true },
-      { text: `Propietario(a) con título formal` },
+      { text: `Arrendatario(a)` },
       { text: `Propietario(a) sin título formal` },
       { text: `Tierra colectiva (resguardo / comunidad)` },
+      { text: `Propietario(a) con título formal` },
+      { text: `Aparcero(a) / Mediería` },
+      { text: `Otros`, isOther: true },
     ]);
     const opt_d258dab5_059c_480f_825a_a91a7ada6b64 = opts_2adaaca9_9d98_48e6_a043_b96ab98926b7.get(`Arrendatario(a)`)!;
 
@@ -204,12 +204,12 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       section: sec1,
     });
     await saveOptions(manager, q_6f8d74f0_a111_4fe9_8cbc_337d484b566f, [
-      { text: `Comercialización directa` },
-      { text: `Cosecha` },
-      { text: `Cultivo / producción en campo` },
       { text: `Exportación` },
-      { text: `Poscosecha / procesamiento` },
       { text: `Transformación industrial` },
+      { text: `Cultivo / producción en campo` },
+      { text: `Cosecha` },
+      { text: `Poscosecha / procesamiento` },
+      { text: `Comercialización directa` },
     ]);
 
     const q_da281dfe_f5c0_4d60_8656_20af2f891cca = await saveQuestion(manager, {
@@ -220,9 +220,9 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       section: sec1,
     });
     await saveOptions(manager, q_da281dfe_f5c0_4d60_8656_20af2f891cca, [
-      { text: `Ambas` },
-      { text: `De terceros` },
       { text: `Propia` },
+      { text: `De terceros` },
+      { text: `Ambas` },
     ]);
 
     const q_685f02a7_6e19_4c0a_be2a_c6bbdac07f24 = await saveQuestion(manager, {
@@ -244,7 +244,7 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
     });
 
     const q_4e6cb020_053f_4282_a3ea_26ee98e9b99f = await saveQuestion(manager, {
-      text: `¿Su lugar de vivienda es la unidad productora o finca?`,
+      text: `¿Su lugar de vivienda es la unidad productiva o finca?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -254,7 +254,7 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
     });
 
     const q_e98ee4d4_1129_493b_b26f_da68bd6bcad8 = await saveQuestion(manager, {
-      text: `¿Su familia vive en la unidad productora o finca con usted?`,
+      text: `¿Su familia vive en la unidad productiva o finca con usted?`,
       type: types.yes_no,
       isRequired: false,
       isKeyQuestion: true,
@@ -265,7 +265,7 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
     });
 
     await saveQuestion(manager, {
-      text: `¿Su familia participa de las actividades de la unidad productora o finca?`,
+      text: `¿Su familia participa de las actividades de la unidad productiva o finca?`,
       type: types.yes_no,
       isRequired: true,
       isKeyQuestion: true,
@@ -283,9 +283,9 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       section: sec1,
     });
     await saveOptions(manager, q_cb9b8907_d7d4_4c96_b1c3_91a1826dd3e6, [
-      { text: `Ambas` },
       { text: `Pendiente` },
       { text: `Plano` },
+      { text: `Ambas` },
     ]);
 
     await saveQuestion(manager, {

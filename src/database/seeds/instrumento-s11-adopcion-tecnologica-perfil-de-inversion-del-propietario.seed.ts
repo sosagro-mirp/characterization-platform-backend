@@ -81,7 +81,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -95,7 +95,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
     let o = 1;
 
     const q_adba2b71_8e26_4372_8117_0694203c5985 = await saveQuestion(manager, {
-      text: `PR.2 ★ — ¿Ha realizado inversiones en tecnología o infraestructura en los últimos 3 años?`,
+      text: `¿Ha realizado inversiones en tecnología o infraestructura en los últimos 3 años?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -105,8 +105,8 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
     await saveOptions(manager, q_adba2b71_8e26_4372_8117_0694203c5985, [
       { text: `No y sin planes actualmente` },
       { text: `No, pero tengo planes` },
-      { text: `Sí, en los últimos 12 meses` },
       { text: `Sí, entre 1–3 años atrás` },
+      { text: `Sí, en los últimos 12 meses` },
     ]);
 
     const q_5630254a_8540_417c_8a61_1b323d4668ab = await saveQuestion(manager, {
@@ -118,14 +118,14 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       section: sec1,
     });
     await saveOptions(manager, q_5630254a_8540_417c_8a61_1b323d4668ab, [
-      { text: `El productor / administrador` },
-      { text: `El propietario exclusivamente` },
       { text: `Propietario y productor en conjunto` },
       { text: `Una junta familiar` },
+      { text: `El productor / administrador` },
+      { text: `El propietario exclusivamente` },
     ]);
 
     const q_a3996f83_8432_43da_ab02_ee5a041beb7e = await saveQuestion(manager, {
-      text: `PR.4 ★ — ¿Estaría dispuesto a pagar por un servicio digital de monitoreo o gestión de su finca?`,
+      text: `¿Estaría dispuesto a pagar por un servicio digital de monitoreo o gestión de su finca?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -133,15 +133,15 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       section: sec1,
     });
     await saveOptions(manager, q_a3996f83_8432_43da_ab02_ee5a041beb7e, [
-      { text: `No estoy interesado` },
       { text: `Solo si fuera gratuito` },
+      { text: `Sí, pagaría hasta $20.000 COP/mes` },
+      { text: `No estoy interesado` },
       { text: `Sí, $20.001–$50.000 COP/mes` },
       { text: `Sí, más de $50.000 COP/mes` },
-      { text: `Sí, pagaría hasta $20.000 COP/mes` },
     ]);
 
     const q_a6b07573_f857_4688_99ae_a7422ef79e08 = await saveQuestion(manager, {
-      text: `PR.5 ★ — ¿Tiene acceso a crédito o líneas de financiamiento para inversión productiva?`,
+      text: `¿Tiene acceso a crédito o líneas de financiamiento para inversión productiva?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -149,10 +149,10 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       section: sec1,
     });
     await saveOptions(manager, q_a6b07573_f857_4688_99ae_a7422ef79e08, [
+      { text: `Sí, tengo crédito activo` },
+      { text: `Sí, tengo acceso pero sin uso reciente` },
       { text: `He intentado pero no me han aprobado` },
       { text: `No tengo acceso a crédito formal` },
-      { text: `Sí, tengo acceso pero sin uso reciente` },
-      { text: `Sí, tengo crédito activo` },
     ]);
 
   }

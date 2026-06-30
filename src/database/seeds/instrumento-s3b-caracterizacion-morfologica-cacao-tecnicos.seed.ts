@@ -81,14 +81,14 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3, sec4, sec5] = await Promise.all([
     sectionRepo.save(sectionRepo.create({ name: `Árbol`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `3b.2 Hoja`, order: 2, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Hoja`, order: 2, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `Fruto`, order: 3, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `Semilla`, order: 4, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `Flor`, order: 5, instrument }))
@@ -106,9 +106,9 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec1,
     });
     await saveOptions(manager, q_eadd2e65_1de6_4183_bb5f_b9edb6460850, [
-      { text: `Criollo` },
-      { text: `Híbrido por trinitario` },
       { text: `Trinitario` },
+      { text: `Híbrido por trinitario` },
+      { text: `Criollo` },
       { text: `Trinitario x Criollo` },
     ]);
 
@@ -173,8 +173,8 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
     await saveOptions(manager, q_9b6839d3_64ef_4aa6_80a7_c9631da6347a, [
       { text: `Escaso` },
-      { text: `Intermedio` },
       { text: `Vigoroso` },
+      { text: `Intermedio` },
     ]);
 
     const q_3ba6a9d8_9298_4f45_9d41_5d10031f7d95 = await saveQuestion(manager, {
@@ -185,8 +185,8 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec1,
     });
     await saveOptions(manager, q_3ba6a9d8_9298_4f45_9d41_5d10031f7d95, [
-      { text: `Abundante` },
       { text: `Escaso` },
+      { text: `Abundante` },
     ]);
 
     await saveQuestion(manager, {
@@ -199,7 +199,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
 
   }
 
-  // ── 3b.2 Hoja ──
+  // ── Hoja ──
   {
     let o = 1;
 
@@ -243,11 +243,11 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec2,
     });
     await saveOptions(manager, q_b7d51b7e_cf21_4e0f_b13e_403901bfc3b5, [
-      { text: `Acorazonada` },
-      { text: `Acuñada` },
       { text: `Elíptica` },
-      { text: `Obovada` },
       { text: `Ovada` },
+      { text: `Obovada` },
+      { text: `Acuñada` },
+      { text: `Acorazonada` },
       { text: `Ovoide` },
     ]);
 
@@ -259,9 +259,9 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec2,
     });
     await saveOptions(manager, q_40bfff67_312b_471e_af77_412be7c830b7, [
-      { text: `Acuminado corto` },
-      { text: `Acuminado largo` },
       { text: `Agudo` },
+      { text: `Acuminado largo` },
+      { text: `Acuminado corto` },
     ]);
 
     const q_33414693_4fda_4c4e_80bc_8d6dc2dcc723 = await saveQuestion(manager, {
@@ -272,9 +272,9 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec2,
     });
     await saveOptions(manager, q_33414693_4fda_4c4e_80bc_8d6dc2dcc723, [
-      { text: `Aguda` },
       { text: `Obtusa` },
       { text: `Redondeada` },
+      { text: `Aguda` },
     ]);
 
     const q_7c2212ff_b357_4441_8d1a_49fdf459bb6f = await saveQuestion(manager, {
@@ -285,10 +285,10 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec2,
     });
     await saveOptions(manager, q_7c2212ff_b357_4441_8d1a_49fdf459bb6f, [
-      { text: `Rojo brillante` },
       { text: `Rojo claro` },
-      { text: `Rojo intermedio` },
+      { text: `Rojo brillante` },
       { text: `Rojo oscuro` },
+      { text: `Rojo intermedio` },
     ]);
 
   }
@@ -305,10 +305,10 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec3,
     });
     await saveOptions(manager, q_cf072469_76f1_4fa1_a87a_f56d71f38198, [
-      { text: `Ausente` },
       { text: `Intermedia` },
-      { text: `Ligera` },
+      { text: `Ausente` },
       { text: `Pronunciada` },
+      { text: `Ligera` },
     ]);
 
     await saveQuestion(manager, {
@@ -372,9 +372,9 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec3,
     });
     await saveOptions(manager, q_53eed3dc_9c2c_44cf_83af_2716e1eaeae1, [
-      { text: `Amarillo` },
       { text: `Naranja` },
       { text: `Rojo` },
+      { text: `Amarillo` },
     ]);
 
     const q_eb56a02a_43e5_4110_9aa4_2586a750e76c = await saveQuestion(manager, {
@@ -385,9 +385,9 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec3,
     });
     await saveOptions(manager, q_eb56a02a_43e5_4110_9aa4_2586a750e76c, [
+      { text: `Calabacillo` },
       { text: `Amelonado` },
       { text: `Angoleta` },
-      { text: `Calabacillo` },
       { text: `Cundeamor` },
     ]);
 
@@ -399,10 +399,10 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec3,
     });
     await saveOptions(manager, q_92ba1769_1d87_42ac_b918_293ce199ae31, [
-      { text: `Agudo` },
       { text: `Atenuado` },
-      { text: `Mamiforme` },
       { text: `Obtuso` },
+      { text: `Mamiforme` },
+      { text: `Agudo` },
     ]);
 
     const q_99ad5f44_aecb_4659_85b2_3c849c497646 = await saveQuestion(manager, {
@@ -414,8 +414,8 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
     await saveOptions(manager, q_99ad5f44_aecb_4659_85b2_3c849c497646, [
       { text: `Intensa` },
-      { text: `Intermedia` },
       { text: `Ligera` },
+      { text: `Intermedia` },
     ]);
 
     await saveQuestion(manager, {
@@ -635,10 +635,10 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec5,
     });
     await saveOptions(manager, q_6f84a19f_f9e5_420c_bdb9_506ce326578a, [
-      { text: `Blanco` },
       { text: `Rojo` },
       { text: `Rosado` },
       { text: `Verde ligero` },
+      { text: `Blanco` },
     ]);
 
     const q_4bb31f10_df6c_4356_863d_346b380ef30a = await saveQuestion(manager, {
@@ -649,10 +649,10 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       section: sec5,
     });
     await saveOptions(manager, q_4bb31f10_df6c_4356_863d_346b380ef30a, [
-      { text: `Ausente` },
       { text: `Intensa` },
-      { text: `Intermedia` },
+      { text: `Ausente` },
       { text: `Ligera` },
+      { text: `Intermedia` },
     ]);
 
     const q_b1a12947_eb3a_417c_87b2_0c464105be53 = await saveQuestion(manager, {

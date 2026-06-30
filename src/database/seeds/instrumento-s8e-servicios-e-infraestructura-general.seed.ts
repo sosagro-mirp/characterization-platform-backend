@@ -81,7 +81,7 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -117,13 +117,13 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       systemField: 'farm.electricitySourceType',
     });
     await saveOptions(manager, q_12d58e69_0f25_4b73_8041_b6c816f60d76, [
-      { text: `Generador a combustible` },
+      { text: `Panel solar` },
+      { text: `Solo algunas horas al día` },
+      { text: `Red pública con interrupciones frecuentes` },
+      { text: `Red pública 24/7 sin interrupciones` },
       { text: `Mixto` },
       { text: `No tiene acceso` },
-      { text: `Panel solar` },
-      { text: `Red pública 24/7 sin interrupciones` },
-      { text: `Red pública con interrupciones frecuentes` },
-      { text: `Solo algunas horas al día` },
+      { text: `Generador a combustible` },
     ]);
 
     await saveQuestion(manager, {
@@ -173,10 +173,10 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     });
     await saveOptions(manager, q_cc4da8b8_7d5c_4418_a4cf_3706b6ee7f2f, [
       { text: `Datos móviles (plan celular)` },
-      { text: `No tiene acceso` },
-      { text: `Solo fuera de la finca` },
       { text: `WiFi fijo en finca` },
+      { text: `Solo fuera de la finca` },
       { text: `WiFi satelital` },
+      { text: `No tiene acceso` },
     ]);
 
     const q_6a2ab2fa_8b81_41b7_a8b3_8d39126cd3b5 = await saveQuestion(manager, {
@@ -188,11 +188,11 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec2,
     });
     await saveOptions(manager, q_6a2ab2fa_8b81_41b7_a8b3_8d39126cd3b5, [
-      { text: `No usa celular` },
-      { text: `Señal buena` },
-      { text: `Señal mala (llama pero no navega)` },
-      { text: `Señal regular (navega lento)` },
       { text: `Sin señal` },
+      { text: `Señal mala (llama pero no navega)` },
+      { text: `Señal buena` },
+      { text: `Señal regular (navega lento)` },
+      { text: `No usa celular` },
     ]);
 
     const q_b4572df6_c3bd_4eae_b26d_cb5857e15cec = await saveQuestion(manager, {
@@ -206,11 +206,11 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     });
     await saveOptions(manager, q_b4572df6_c3bd_4eae_b26d_cb5857e15cec, [
       { text: `Cobertura deficiente aunque existe` },
+      { text: `No tiene dispositivo` },
       { text: `Es muy costoso` },
       { text: `No hay cobertura en la zona` },
       { text: `No lo considera necesario` },
       { text: `No sabe cómo usarlo` },
-      { text: `No tiene dispositivo` },
     ]);
 
     const q_3c180788_ed85_47ba_ab68_6a69872ceeec = await saveQuestion(manager, {
@@ -222,12 +222,12 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec2,
     });
     await saveOptions(manager, q_3c180788_ed85_47ba_ab68_6a69872ceeec, [
-      { text: `Computador de escritorio` },
       { text: `Computador portátil` },
-      { text: `Ninguno de estos` },
       { text: `Smartphone (teléfono inteligente)` },
-      { text: `Tableta` },
       { text: `Teléfono convencional (no smartphone)` },
+      { text: `Tableta` },
+      { text: `Computador de escritorio` },
+      { text: `Ninguno de estos` },
     ]);
 
     await saveQuestion(manager, {
@@ -240,7 +240,7 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     });
 
     await saveQuestion(manager, {
-      text: `¿Tiene y usa un telefono celular?`,
+      text: `¿Tiene y usa un teléfono celular?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -257,11 +257,11 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec2,
     });
     await saveOptions(manager, q_3d9c5f7b_8c8b_4b8e_ab39_2096a5e4c3c0, [
-      { text: `Al menos una vez al mes` },
       { text: `Al menos una vez por semana` },
-      { text: `No utiliza` },
-      { text: `Ocasionalmente` },
       { text: `Todos los días` },
+      { text: `Al menos una vez al mes` },
+      { text: `Ocasionalmente` },
+      { text: `No utiliza` },
     ]);
 
     const q_6abf8a02_9a07_4f24_82c9_afcf601ce412 = await saveQuestion(manager, {
@@ -274,10 +274,10 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     });
     await saveOptions(manager, q_6abf8a02_9a07_4f24_82c9_afcf601ce412, [
       { text: `Al menos una vez al mes` },
-      { text: `Al menos una vez por semana` },
       { text: `No utiliza` },
-      { text: `Ocasionalmente` },
       { text: `Todos los días` },
+      { text: `Al menos una vez por semana` },
+      { text: `Ocasionalmente` },
     ]);
 
   }

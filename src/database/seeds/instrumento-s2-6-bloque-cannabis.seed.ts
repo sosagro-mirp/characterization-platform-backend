@@ -81,7 +81,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -95,7 +95,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     let o = 1;
 
     const q_7a0f5971_c616_4be5_9c90_41349f1aed73 = await saveQuestion(manager, {
-      text: `2.6.1 ★ — Sistema de cultivo de cannabis`,
+      text: `Sistema de cultivo de cannabis`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -103,16 +103,16 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_7a0f5971_c616_4be5_9c90_41349f1aed73, [
-      { text: `Aeroponía` },
-      { text: `Hidroponía` },
-      { text: `Mixto` },
-      { text: `Otro`, isOther: true },
       { text: `Suelo` },
+      { text: `Hidroponía` },
+      { text: `Otro`, isOther: true },
+      { text: `Mixto` },
       { text: `Sustrato` },
+      { text: `Aeroponía` },
     ]);
 
     const q_f788867e_032c_4996_a9aa_c1a4c359e3f9 = await saveQuestion(manager, {
-      text: `2.6.2 ★ — Condición de cultivo de cannabis`,
+      text: `Condición de cultivo de cannabis`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -120,14 +120,14 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_f788867e_032c_4996_a9aa_c1a4c359e3f9, [
-      { text: `Campo abierto` },
-      { text: `Indoor (cuarto de cultivo)` },
-      { text: `Invernadero` },
       { text: `Mixto` },
+      { text: `Campo abierto` },
+      { text: `Invernadero` },
+      { text: `Indoor (cuarto de cultivo)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `2.6.3 ★ — Área cultivada en cannabis (Indique valor y unidad: ha o m²)`,
+      text: `Área cultivada en cannabis (Indique valor y unidad: ha o m²)`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -136,7 +136,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `2.6.4 ★ — Material genético / variedad de cannabis (nombre comercial o código)`,
+      text: `Material genético / variedad de cannabis (nombre comercial o código)`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -145,7 +145,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     });
 
     const q_f5e22266_8e67_4a20_b147_a8b8c1eb5c76 = await saveQuestion(manager, {
-      text: `2.6.5 — ¿Tiene más de una variedad de cannabis?`,
+      text: `¿Tiene más de una variedad de cannabis?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -163,7 +163,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     });
 
     const q_d1b916a6_a77b_4761_8ef8_49bf905d1090 = await saveQuestion(manager, {
-      text: `2.6.6 ★ — Tipo de producción predominante en cannabis`,
+      text: `Tipo de producción predominante en cannabis`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -171,14 +171,14 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_d1b916a6_a77b_4761_8ef8_49bf905d1090, [
-      { text: `Extractos` },
       { text: `Flor seca` },
-      { text: `Mixto` },
+      { text: `Extractos` },
       { text: `Semillas` },
+      { text: `Mixto` },
     ]);
 
     await saveQuestion(manager, {
-      text: `2.6.7 — Ciclos de producción de cannabis por año`,
+      text: `Ciclos de producción de cannabis por año`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -186,7 +186,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `2.6.8 ★ — Producción promedio de cannabis (Indique valor y unidad: kg flor seca o extracto / año)`,
+      text: `Producción promedio de cannabis (Indique valor y unidad: kg flor seca o extracto / año)`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -203,11 +203,11 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_14c73380_825c_42ef_950c_4f821a35b0f7, [
-      { text: `En trámite` },
       { text: `No tiene licencia` },
-      { text: `Semillas / Material vegetal (ICA)` },
-      { text: `Uso adulto (Ley 2204/2022)` },
+      { text: `Semillas / material vegetal (ICA)` },
+      { text: `En trámite` },
       { text: `Uso médico y científico (Ley 1787/2016)` },
+      { text: `Uso adulto (Ley 2204/2022)` },
     ]);
 
     const q_d6a3aed1_81b1_428b_b439_8ed98502f259 = await saveQuestion(manager, {
@@ -218,13 +218,13 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_d6a3aed1_81b1_428b_b439_8ed98502f259, [
-      { text: `Denominación de Origen` },
-      { text: `Fair Trade / Comercio Justo` },
       { text: `Ninguna` },
-      { text: `Orgánico NTC / USDA` },
       { text: `Otro`, isOther: true },
-      { text: `Rainforest Alliance` },
+      { text: `Orgánico NTC / USDA` },
       { text: `UTZ` },
+      { text: `Fair Trade / Comercio Justo` },
+      { text: `Rainforest Alliance` },
+      { text: `Denominación de Origen` },
     ]);
 
     await saveQuestion(manager, {

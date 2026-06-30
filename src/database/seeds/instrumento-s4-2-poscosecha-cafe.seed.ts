@@ -81,7 +81,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -102,18 +102,18 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_239c01e6_b68e_4622_8645_546db8d58046, [
+      { text: `Lavado` },
+      { text: `Secado` },
+      { text: `Recolección selectiva (solo cerezas maduras)` },
+      { text: `Trillado` },
+      { text: `Tostión` },
       { text: `Clasificación de grano` },
       { text: `Despulpado` },
       { text: `Fermentación (vía húmeda)` },
-      { text: `Lavado` },
-      { text: `Recolección selectiva (solo cerezas maduras)` },
-      { text: `Secado` },
-      { text: `Tostión` },
-      { text: `Trillado` },
     ]);
 
     const q_cbc03f25_3c19_4836_8178_eb8c5d03d909 = await saveQuestion(manager, {
-      text: `4.2.1 ★ — Método de beneficio predominante`,
+      text: `Método de beneficio predominante`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -122,13 +122,13 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
     await saveOptions(manager, q_cbc03f25_3c19_4836_8178_eb8c5d03d909, [
       { text: `Mixto` },
-      { text: `Semi-húmedo (honey)` },
       { text: `Vía húmeda (fermentación + lavado)` },
       { text: `Vía seca (natural / honey)` },
+      { text: `Semi-húmedo (honey)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.2.2 ★ — Tiempo de fermentación (horas)`,
+      text: `Tiempo de fermentación (horas)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -146,7 +146,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `4.2.3b — Valor habitual de humedad del pergamino seco (%)`,
+      text: `Valor habitual de humedad del pergamino seco (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -156,7 +156,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `4.2.4 ★ — ¿Realiza catación / evaluación sensorial?`,
+      text: `¿Realiza catación / evaluación sensorial?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -165,7 +165,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `4.2.5 — Puntaje promedio en taza (SCA score)`,
+      text: `Puntaje promedio en taza (SCA score)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -181,8 +181,8 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_0e0959cb_7dc1_4a6d_93e4_aac1d60a350f, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
@@ -197,31 +197,31 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     await saveOptions(manager, q_3f74dee2_7c36_4b67_9151_0364e92cee57, [
       { text: `Café cereza` },
       { text: `Café especial` },
-      { text: `Café pergamino húmedo` },
-      { text: `Café pergamino seco` },
       { text: `Café tostado` },
       { text: `Café trillado / excelso` },
+      { text: `Café pergamino seco` },
+      { text: `Café pergamino húmedo` },
     ]);
 
     const q_79b8853a_a154_4125_9861_a06e9e2d3e26 = await saveQuestion(manager, {
-      text: `4.2.8 — ¿Tiene alguna certificación?`,
+      text: `¿Tiene alguna certificación?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_79b8853a_a154_4125_9861_a06e9e2d3e26, [
-      { text: `Denominación de Origen` },
-      { text: `Fair Trade / Comercio Justo` },
       { text: `Ninguna` },
-      { text: `Orgánico NTC/USDA` },
-      { text: `Otro`, isOther: true },
       { text: `Rainforest Alliance` },
+      { text: `Otro`, isOther: true },
       { text: `UTZ` },
+      { text: `Fair Trade / Comercio Justo` },
+      { text: `Orgánico NTC/USDA` },
+      { text: `Denominación de Origen` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.2.9 — Precio promedio de venta (COP / carga pergamino seco)`,
+      text: `Precio promedio de venta (COP / carga pergamino seco)`,
       type: types.numeric,
       isRequired: false,
       order: o++,

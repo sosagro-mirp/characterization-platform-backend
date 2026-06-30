@@ -81,7 +81,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -101,7 +101,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     let o = 1;
 
     const q_7d55deef_8050_4a37_b0fc_6b586e79f7d7 = await saveQuestion(manager, {
-      text: `7C.1 ★ — Fuente principal de agua`,
+      text: `Fuente principal de agua`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -109,19 +109,19 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       section: sec1,
     });
     await saveOptions(manager, q_7d55deef_8050_4a37_b0fc_6b586e79f7d7, [
-      { text: `Acueducto municipal` },
-      { text: `Acueducto veredal` },
-      { text: `Agua lluvia` },
-      { text: `Otro`, isOther: true },
-      { text: `Pozo profundo` },
       { text: `Pozo somero` },
-      { text: `Quebrada` },
-      { text: `Reservorio / Jagüey` },
+      { text: `Otro`, isOther: true },
+      { text: `Agua lluvia` },
       { text: `Río` },
+      { text: `Quebrada` },
+      { text: `Acueducto veredal` },
+      { text: `Reservorio / Jagüey` },
+      { text: `Pozo profundo` },
+      { text: `Acueducto municipal` },
     ]);
 
     const q_6fe0f2fd_80d3_4960_929e_846472ec768e = await saveQuestion(manager, {
-      text: `7C.2 ◆ — ¿Se mezclan diferentes fuentes de agua?`,
+      text: `¿Se mezclan diferentes fuentes de agua?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -129,7 +129,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.2b — ¿Cuáles fuentes se mezclan? (especifique)`,
+      text: `¿Cuáles fuentes se mezclan? (especifique)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -147,17 +147,17 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_8872eb44_a034_4bb4_9cbd_b2e23fed5418 = await saveQuestion(manager, {
-      text: `7C.4 ◆ — Frecuencia de riego`,
+      text: `Frecuencia de riego`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_8872eb44_a034_4bb4_9cbd_b2e23fed5418, [
-      { text: `Cada 2–3 meses` },
-      { text: `Mensual` },
-      { text: `Ocasional / según demanda` },
       { text: `Quincenal` },
+      { text: `Mensual` },
+      { text: `Cada 2–3 meses` },
+      { text: `Ocasional / según demanda` },
       { text: `Semanal o más frecuente` },
     ]);
 
@@ -170,18 +170,18 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       section: sec1,
     });
     await saveOptions(manager, q_2cdcc67d_5870_41a2_84fc_70c9e45a41b3, [
+      { text: `Gravedad` },
       { text: `Aspersión` },
+      { text: `Manual` },
       { text: `DWC (Cultivo en agua profunda)` },
       { text: `Goteo` },
-      { text: `Gravedad` },
-      { text: `Manual` },
       { text: `NFT (Nutrient Film)` },
       { text: `Otro`, isOther: true },
       { text: `Recirculante (hidropónico)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `7C.6 ◆ — ¿Se realiza fertirriego?`,
+      text: `¿Se realiza fertirriego?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -189,7 +189,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.7 ◆ — ¿Se recircula el agua o solución nutritiva?`,
+      text: `¿Se recircula el agua o solución nutritiva?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -197,7 +197,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.8 ★ — ¿Se generan drenajes o lixiviados?`,
+      text: `¿Se generan drenajes o lixiviados?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -206,7 +206,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_8970fb32_ef50_4537_a595_2d7114fa9788 = await saveQuestion(manager, {
-      text: `7C.9 ★ — Destino del drenaje / lixiviado`,
+      text: `Destino del drenaje / lixiviado`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -214,16 +214,16 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       section: sec1,
     });
     await saveOptions(manager, q_8970fb32_ef50_4537_a595_2d7114fa9788, [
+      { text: `Reúso en cultivo` },
       { text: `Alcantarillado` },
       { text: `Cuerpo de agua (quebrada / río)` },
       { text: `Otro`, isOther: true },
-      { text: `Reúso en cultivo` },
       { text: `Suelo sin tratar` },
       { text: `Tanque de almacenamiento` },
     ]);
 
     await saveQuestion(manager, {
-      text: `7C.10 ◆ — ¿Hay obras de construcción cercanas?`,
+      text: `¿Hay obras de construcción cercanas?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -231,7 +231,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.11 ◆ — ¿Qué tipo de actividad económica tienen los predios aledaños?`,
+      text: `¿Qué tipo de actividad económica tienen los predios aledaños?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -245,7 +245,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `7C.12 ★ — ¿Mide la temperatura del agua de riego?`,
+      text: `¿Mide la temperatura del agua de riego?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -263,7 +263,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.13b — Si Sí: indique el valor o rango habitual de pH de entrada`,
+      text: `Si Sí: indique el valor o rango habitual de pH de entrada`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -301,7 +301,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.15b — Si Sí: indique el valor o rango habitual de pH del drenaje`,
+      text: `Si Sí: indique el valor o rango habitual de pH del drenaje`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -311,7 +311,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_ec42a802_37dc_4029_94cf_75f28c8c1eea = await saveQuestion(manager, {
-      text: `7C.16 ★ — ¿Mide la Conductividad Eléctrica (CE) del agua de entrada?`,
+      text: `¿Mide la Conductividad Eléctrica (CE) del agua de entrada?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -358,7 +358,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.18b — Si Sí: indique el valor o rango habitual de CE drenaje (mS/cm)`,
+      text: `Si Sí: indique el valor o rango habitual de CE drenaje (mS/cm)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -368,7 +368,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_7a7da6bd_1529_4760_860c_e0a4dd992a43 = await saveQuestion(manager, {
-      text: `7C.19 ★ — ¿Mide los Sólidos Disueltos Totales (TDS)?`,
+      text: `¿Mide los Sólidos Disueltos Totales (TDS)?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -377,7 +377,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.19b — Si Sí: indique el valor o rango habitual de TDS (ppm)`,
+      text: `Si Sí: indique el valor o rango habitual de TDS (ppm)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -415,7 +415,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.21b — Si Sí: indique el valor o rango habitual de ORP (mV)`,
+      text: `Si Sí: indique el valor o rango habitual de ORP (mV)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -436,9 +436,9 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       { text: `Contaminantes` },
       { text: `Dureza` },
       { text: `Materia orgánica` },
+      { text: `Otro`, isOther: true },
       { text: `Metales pesados` },
       { text: `Nutrientes` },
-      { text: `Otro`, isOther: true },
     ]);
 
   }
@@ -448,7 +448,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     let o = 1;
 
     const q_fd6b4a9c_081e_46cf_87ef_fae0e00307f3 = await saveQuestion(manager, {
-      text: `7C.23 ★ — ¿Se usan plaguicidas o fungicidas en el cultivo?`,
+      text: `¿Se usan plaguicidas o fungicidas en el cultivo?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -457,7 +457,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.23b — Liste los productos utilizados`,
+      text: `Liste los productos utilizados`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -475,7 +475,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_8171cbfb_fad7_41d8_9b82_ea56871efc90 = await saveQuestion(manager, {
-      text: `7C.25 ◆ — ¿Se usan reguladores de crecimiento?`,
+      text: `¿Se usan reguladores de crecimiento?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -493,7 +493,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_b6fd48e1_5e95_4dd9_bc17_b39d385421ea = await saveQuestion(manager, {
-      text: `7C.26 ◆ — ¿Se usan surfactantes o detergentes?`,
+      text: `¿Se usan surfactantes o detergentes?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -501,7 +501,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.26b — Concentración aproximada de surfactantes / detergentes (mg/L)`,
+      text: `Concentración aproximada de surfactantes / detergentes (mg/L)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -526,7 +526,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_9acb43b0_83dd_4593_8182_e8c0b54ba537 = await saveQuestion(manager, {
-      text: `7C.28 ◆ — Tipo de tratamiento que aplica (Aplica si respondió Sí en 7C.27)`,
+      text: `Tipo de tratamiento que aplica`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -535,18 +535,18 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       conditionValue: 'true',
     });
     await saveOptions(manager, q_9acb43b0_83dd_4593_8182_e8c0b54ba537, [
-      { text: `Acidificación / alcalinización` },
-      { text: `Carbón activado` },
-      { text: `Cloración` },
       { text: `Desinfección UV` },
-      { text: `Filtración (arena, grava)` },
       { text: `Otro`, isOther: true },
       { text: `Sin tratamiento` },
+      { text: `Acidificación / alcalinización` },
+      { text: `Cloración` },
       { text: `Ósmosis inversa` },
+      { text: `Carbón activado` },
+      { text: `Filtración (arena, grava)` },
     ]);
 
     const q_c305896e_c25b_42b4_993e_9fbc7b5e56b6 = await saveQuestion(manager, {
-      text: `7C.29 ◆ — ¿Se ajusta el pH antes del riego?`,
+      text: `¿Se ajusta el pH antes del riego?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -564,7 +564,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.30 ◆ — ¿Se ajusta la alcalinidad del agua?`,
+      text: `¿Se ajusta la alcalinidad del agua?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -572,7 +572,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.31 ◆ — ¿Se filtra la solución nutritiva?`,
+      text: `¿Se filtra la solución nutritiva?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -604,7 +604,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `7C.33 ★ — Volumen de agua aplicado por ciclo (Indique valor y unidad: L/planta, L/m² o m³/ha)`,
+      text: `Volumen de agua aplicado por ciclo (Indique valor y unidad: L/planta, L/m² o m³/ha)`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -613,7 +613,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.34 ◆ — Porcentaje de drenaje generado (%)`,
+      text: `Porcentaje de drenaje generado (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -621,7 +621,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_997c9667_207a_4359_9e6e_01d668b9c799 = await saveQuestion(manager, {
-      text: `7C.35 ◆ — ¿Se reutiliza el drenaje?`,
+      text: `¿Se reutiliza el drenaje?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -629,7 +629,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.35b — Porcentaje de drenaje reutilizado (%)`,
+      text: `Porcentaje de drenaje reutilizado (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -661,7 +661,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_67225175_747d_4cf8_a298_916e89fa7d4c = await saveQuestion(manager, {
-      text: `7C.38 ◆ — ¿Cuenta con permiso de vertimiento?`,
+      text: `¿Cuenta con permiso de vertimiento?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -669,8 +669,8 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
     await saveOptions(manager, q_67225175_747d_4cf8_a298_916e89fa7d4c, [
       { text: `En trámite` },
-      { text: `No` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     const q_0a53699f_fe1f_4ebf_982a_6f4d3a1868e5 = await saveQuestion(manager, {
@@ -681,15 +681,15 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       section: sec6,
     });
     await saveOptions(manager, q_0a53699f_fe1f_4ebf_982a_6f4d3a1868e5, [
+      { text: `Semanal o más frecuente` },
+      { text: `Ocasional / según demanda` },
       { text: `Cada 2–3 meses` },
       { text: `Mensual` },
-      { text: `Ocasional / según demanda` },
       { text: `Quincenal` },
-      { text: `Semanal o más frecuente` },
     ]);
 
     await saveQuestion(manager, {
-      text: `7C.40 ◆ — Parámetros exigidos por la autoridad ambiental para el vertimiento`,
+      text: `Parámetros exigidos por la autoridad ambiental para el vertimiento`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -697,7 +697,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.41 ◆ — ¿Se trata el vertimiento antes de la descarga?`,
+      text: `¿Se trata el vertimiento antes de la descarga?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -727,7 +727,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.44 ◆ — ¿Hay presencia de olores, color o turbidez anormal en el agua?`,
+      text: `¿Hay presencia de olores, color o turbidez anormal en el agua?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -743,7 +743,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.45b — Describa el evento`,
+      text: `Describa el evento`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -753,7 +753,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     await saveQuestion(manager, {
-      text: `7C.46 ◆ — Observaciones adicionales del productor sobre el agua`,
+      text: `Observaciones adicionales del productor sobre el agua`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -761,7 +761,7 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
     });
 
     const q_73e3817f_c9d8_44b3_a668_862580584ad9 = await saveQuestion(manager, {
-      text: `7C.47 ★ — ¿Su cultivo de cannabis / cáñamo genera impacto ambiental en las fuentes de agua cercanas?`,
+      text: `¿Su cultivo de cannabis / cáñamo genera impacto ambiental en las fuentes de agua cercanas?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -769,8 +769,8 @@ export async function seedInstrumentoS7cAguaEnCannabisYCanamo(manager: EntityMan
       section: sec7,
     });
     await saveOptions(manager, q_73e3817f_c9d8_44b3_a668_862580584ad9, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 

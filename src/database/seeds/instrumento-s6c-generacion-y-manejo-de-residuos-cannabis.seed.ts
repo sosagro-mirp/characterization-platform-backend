@@ -81,7 +81,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -97,7 +97,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     let o = 1;
 
     const q_d6ce4786_41f4_4a00_b1a6_d210ad70144b = await saveQuestion(manager, {
-      text: `6.1.13 — ¿Genera Tallos y hojas de descarte de cannabis?`,
+      text: `¿Genera Tallos y hojas de descarte de cannabis?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -124,13 +124,13 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_47feaf68_a319_4881_bf1d_e1272aca6e78, [
-      { text: `L` },
       { text: `kg` },
       { text: `t` },
+      { text: `L` },
     ]);
 
     const q_ea41b706_aabe_46f0_be95_37f2423fb953 = await saveQuestion(manager, {
-      text: `6.1.13 — Manejo actual de Tallos y hojas de descarte de cannabis`,
+      text: `Manejo actual de Tallos y hojas de descarte de cannabis`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -139,14 +139,14 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_ea41b706_aabe_46f0_be95_37f2423fb953, [
+      { text: `Venta o donación` },
       { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
+      { text: `Otro` },
+      { text: `Ningún manejo especial` },
       { text: `Aprovechamiento energético` },
       { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
-      { text: `Otro` },
+      { text: `Alimentación animal` },
       { text: `Quema` },
-      { text: `Venta o donación` },
     ]);
 
     await saveQuestion(manager, {
@@ -160,7 +160,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_e738c75f_e975_41e9_bbb1_983a0f1188b0 = await saveQuestion(manager, {
-      text: `6.1.14 — ¿Genera Material vegetal post-extracción (bagazo) de cannabis?`,
+      text: `¿Genera Material vegetal post-extracción (bagazo) de cannabis?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -178,7 +178,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_d941c12d_d932_4981_a43d_71ab73af27f7 = await saveQuestion(manager, {
-      text: `6.1.14 — Unidad de medida para Material vegetal post-extracción (bagazo) de cannabis`,
+      text: `Unidad de medida para Material vegetal post-extracción (bagazo) de cannabis`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -188,12 +188,12 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
     await saveOptions(manager, q_d941c12d_d932_4981_a43d_71ab73af27f7, [
       { text: `L` },
-      { text: `kg` },
       { text: `t` },
+      { text: `kg` },
     ]);
 
     const q_aa3ce8cb_cc0d_448e_9080_4f230ea4c497 = await saveQuestion(manager, {
-      text: `6.1.14 — Manejo actual de Material vegetal post-extracción (bagazo) de cannabis`,
+      text: `Manejo actual de Material vegetal post-extracción (bagazo) de cannabis`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -202,18 +202,18 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_aa3ce8cb_cc0d_448e_9080_4f230ea4c497, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
       { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
+      { text: `Aprovechamiento energético` },
+      { text: `Venta o donación` },
+      { text: `Abandono en campo` },
       { text: `Otro` },
       { text: `Quema` },
-      { text: `Venta o donación` },
+      { text: `Alimentación animal` },
+      { text: `Ningún manejo especial` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.1.14 — Efectos negativos observados de Material vegetal post-extracción (bagazo) de cannabis`,
+      text: `Efectos negativos observados de Material vegetal post-extracción (bagazo) de cannabis`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -223,7 +223,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_b43d080f_ec25_4c0e_8194_104673ccfde1 = await saveQuestion(manager, {
-      text: `6.1.15 — ¿Genera Aguas de limpieza / lixiviados de cannabis?`,
+      text: `¿Genera Aguas de limpieza / lixiviados de cannabis?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -231,7 +231,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `6.1.15 — Cantidad estimada por año de Aguas de limpieza / lixiviados de cannabis`,
+      text: `Cantidad estimada por año de Aguas de limpieza / lixiviados de cannabis`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -250,13 +250,13 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_4d1703e9_fde9_45b2_82bf_93eb1ff81820, [
-      { text: `L` },
       { text: `kg` },
+      { text: `L` },
       { text: `t` },
     ]);
 
     const q_b0c85d48_b6e9_4fc8_a330_caa58a9fa654 = await saveQuestion(manager, {
-      text: `6.1.15 — Manejo actual de Aguas de limpieza / lixiviados de cannabis`,
+      text: `Manejo actual de Aguas de limpieza / lixiviados de cannabis`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -265,18 +265,18 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_b0c85d48_b6e9_4fc8_a330_caa58a9fa654, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
       { text: `Aprovechamiento energético` },
       { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
+      { text: `Alimentación animal` },
+      { text: `Abandono en campo` },
       { text: `Otro` },
-      { text: `Quema` },
       { text: `Venta o donación` },
+      { text: `Quema` },
+      { text: `Ningún manejo especial` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.1.15 — Efectos negativos observados de Aguas de limpieza / lixiviados de cannabis`,
+      text: `Efectos negativos observados de Aguas de limpieza / lixiviados de cannabis`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -286,7 +286,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_f703ce82_0407_4fc2_99e2_b65b5b3af4ba = await saveQuestion(manager, {
-      text: `6.1.16 — ¿Genera Residuos de empaque de cannabis?`,
+      text: `¿Genera Residuos de empaque de cannabis?`,
       type: types.yes_no,
       isRequired: true,
       order: o++,
@@ -294,7 +294,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `6.1.16 — Cantidad estimada por año de Residuos de empaque de cannabis`,
+      text: `Cantidad estimada por año de Residuos de empaque de cannabis`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -304,7 +304,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_99c437bf_305c_46a3_a391_0e6c251bb8b2 = await saveQuestion(manager, {
-      text: `6.1.16 — Unidad de medida para Residuos de empaque de cannabis`,
+      text: `Unidad de medida para Residuos de empaque de cannabis`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -314,12 +314,12 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
     await saveOptions(manager, q_99c437bf_305c_46a3_a391_0e6c251bb8b2, [
       { text: `L` },
-      { text: `kg` },
       { text: `t` },
+      { text: `kg` },
     ]);
 
     const q_c5d96d8d_7cdf_4818_b53c_0e0643f1ba81 = await saveQuestion(manager, {
-      text: `6.1.16 — Manejo actual de Residuos de empaque de cannabis`,
+      text: `Manejo actual de Residuos de empaque de cannabis`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -328,14 +328,14 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_c5d96d8d_7cdf_4818_b53c_0e0643f1ba81, [
-      { text: `Abandono en campo` },
-      { text: `Alimentación animal` },
-      { text: `Aprovechamiento energético` },
-      { text: `Incorporación al suelo / compostaje` },
-      { text: `Ningún manejo especial` },
-      { text: `Otro` },
       { text: `Quema` },
+      { text: `Abandono en campo` },
+      { text: `Ningún manejo especial` },
+      { text: `Aprovechamiento energético` },
+      { text: `Alimentación animal` },
+      { text: `Incorporación al suelo / compostaje` },
       { text: `Venta o donación` },
+      { text: `Otro` },
     ]);
 
     await saveQuestion(manager, {
@@ -355,7 +355,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `6.2.1 ★ — ¿Cuál es la parte del cultivo que constituye el residuo o los residuos más abundantes? (Ej: cáscara de cacao, mucílago de café, tallos de cáñamo)`,
+      text: `¿Cuál es la parte del cultivo que constituye el residuo o los residuos más abundantes? (Ej: cáscara de cacao, mucílago de café, tallos de cáñamo)`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -371,7 +371,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `6.2.3 — ¿Cómo es la forma y tamaño aproximado del residuo?`,
+      text: `¿Cómo es la forma y tamaño aproximado del residuo?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -379,20 +379,20 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_ff70e1e6_b71f_4ae5_af53_7402aa70cc4b = await saveQuestion(manager, {
-      text: `6.2.4 — ¿El material es fibroso o denso?`,
+      text: `¿El material es fibroso o denso?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_ff70e1e6_b71f_4ae5_af53_7402aa70cc4b, [
-      { text: `Denso` },
       { text: `Fibroso` },
+      { text: `Denso` },
       { text: `Mixto` },
     ]);
 
     const q_9493da7b_108c_4b69_8dc7_c9274fe0b89d = await saveQuestion(manager, {
-      text: `6.2.5 ★ — ¿Se ha realizado algún análisis de caracterización al residuo (bromatológico, elemental C/H/O/N/S, u otro)?`,
+      text: `¿Se ha realizado algún análisis de caracterización al residuo (bromatológico, elemental C/H/O/N/S, u otro)?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
@@ -415,8 +415,8 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: opt_01654016_49af_4eb1_9345_ad7233e9d53c,
     });
     await saveOptions(manager, q_48366a48_f11d_46b1_bbe4_32476668f440, [
-      { text: `No` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
@@ -436,18 +436,18 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_816c9efa_c0d9_4980_a8ef_bc4c25fcac64 = await saveQuestion(manager, {
-      text: `6.2.9 — ¿Bajo qué condiciones se almacena actualmente el residuo?`,
+      text: `¿Bajo qué condiciones se almacena actualmente el residuo?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_816c9efa_c0d9_4980_a8ef_bc4c25fcac64, [
+      { text: `En silos` },
+      { text: `En cuarto controlado` },
+      { text: `Contacto directo con suelo` },
       { text: `A la intemperie` },
       { text: `Bajo techo sin control` },
-      { text: `Contacto directo con suelo` },
-      { text: `En cuarto controlado` },
-      { text: `En silos` },
     ]);
 
     const q_287bfa05_3f5c_489c_9ab2_d7a8808d232d = await saveQuestion(manager, {
@@ -458,26 +458,26 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       section: sec2,
     });
     await saveOptions(manager, q_287bfa05_3f5c_489c_9ab2_d7a8808d232d, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
 
     const q_654cda7b_5dd1_468d_bc37_be48dd3aa9a5 = await saveQuestion(manager, {
-      text: `6.2.11 ★ — ¿Sería posible enviar los residuos secos al laboratorio del proyecto?`,
+      text: `¿Sería posible enviar los residuos secos al laboratorio del proyecto?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_654cda7b_5dd1_468d_bc37_be48dd3aa9a5, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
-      text: `¿Se aplican agentes químicos durante el cultivo o poscosecha (pesticidas, fungicidas)? Liste los agentes empleados. (Clave para seguridad en valorización)`,
+      text: `¿Se aplican agentes químicos durante el cultivo o poscosecha (pesticidas, fungicidas)? Liste los agentes empleados.`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -485,7 +485,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `6.2.17 ★ — ¿El residuo se genera de manera constante o solo en meses específicos de cosecha? (Indique los meses si aplica)`,
+      text: `¿El residuo se genera de manera constante o solo en meses específicos de cosecha? (Indique los meses si aplica)`,
       type: types.open_text,
       isRequired: true,
       order: o++,
@@ -501,7 +501,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `6.2.19 — ¿El residuo se recolecta de forma selectiva o se mezcla en un foso común?`,
+      text: `¿El residuo se recolecta de forma selectiva o se mezcla en un foso común?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -509,7 +509,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `6.2.20 — ¿Cuánto tiempo máximo permanece almacenado el residuo antes de ser usado o despachado? (horas / días / semanas)`,
+      text: `¿Cuánto tiempo máximo permanece almacenado el residuo antes de ser usado o despachado? (horas / días / semanas)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -517,20 +517,20 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_f454344c_fa4e_438c_ae80_497621c883e9 = await saveQuestion(manager, {
-      text: `6.2.21 — ¿Se observa lixiviación (pérdida de líquidos) durante el almacenamiento del residuo sólido?`,
+      text: `¿Se observa lixiviación (pérdida de líquidos) durante el almacenamiento del residuo sólido?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_f454344c_fa4e_438c_ae80_497621c883e9, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.2.22 — ¿Cuál es la temperatura promedio del área de almacenamiento? (°C)`,
+      text: `¿Cuál es la temperatura promedio del área de almacenamiento? (°C)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -538,21 +538,21 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_0e4f8de0_b91b_4287_9856_c59e331dc47f = await saveQuestion(manager, {
-      text: `¿Se ha evaluado la presencia de metales pesados (Pb, Cd, As, Hg) en el residuo? (Clave para seguridad en valorización energética y de materiales)`,
+      text: `¿Se ha evaluado la presencia de metales pesados (Pb, Cd, As, Hg) en el residuo?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec2,
     });
     const opts_0e4f8de0_b91b_4287_9856_c59e331dc47f = await saveOptions(manager, q_0e4f8de0_b91b_4287_9856_c59e331dc47f, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
     const opt_b454b752_22b1_4128_9223_8be2c9e0b0fa = opts_0e4f8de0_b91b_4287_9856_c59e331dc47f.get(`Sí`)!;
 
     const q_cb08835e_4937_496e_8977_01abc38104bb = await saveQuestion(manager, {
-      text: `6.2.23b — ¿Puede compartir los resultados de metales pesados con el proyecto? (Aplica solo si respondió Sí en 6.2.23)`,
+      text: `¿Puede compartir los resultados de metales pesados con el proyecto?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -561,8 +561,8 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       conditionValue: opt_b454b752_22b1_4128_9223_8be2c9e0b0fa,
     });
     await saveOptions(manager, q_cb08835e_4937_496e_8977_01abc38104bb, [
-      { text: `No` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
   }
@@ -572,16 +572,16 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     let o = 1;
 
     const q_bf827a5d_112d_49a1_809b_a2f5dde6b87f = await saveQuestion(manager, {
-      text: `6.3.1 ★ — ¿Estaría dispuesto a reutilizar / valorizar sus residuos?`,
+      text: `¿Estaría dispuesto a reutilizar / valorizar sus residuos?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_bf827a5d_112d_49a1_809b_a2f5dde6b87f, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_4affdfe9_56d8_4219_8bf8_39991bc7af2e = await saveQuestion(manager, {
@@ -592,11 +592,11 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       section: sec3,
     });
     await saveOptions(manager, q_4affdfe9_56d8_4219_8bf8_39991bc7af2e, [
-      { text: `Fertilizantes / abonos` },
       { text: `Ingredientes funcionales / cosméticos` },
-      { text: `Materiales / empaques` },
       { text: `Producción de energía (biochar, biogás)` },
+      { text: `Fertilizantes / abonos` },
       { text: `Tratamiento de agua (filtros, carbón activado)` },
+      { text: `Materiales / empaques` },
     ]);
 
     const q_2ffcc8f8_affa_4f22_9b79_ebe852142317 = await saveQuestion(manager, {
@@ -621,16 +621,16 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
 
     const q_ef2d0e6c_2744_4082_af7c_8d32d327662a = await saveQuestion(manager, {
-      text: `4.5.5 ★ — ¿Estaría interesado en tecnologías para generar gas para usar en los procesos requeridos en su unidad productiva?`,
+      text: `¿Estaría interesado en tecnologías para generar gas para usar en los procesos requeridos en su unidad productiva?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_ef2d0e6c_2744_4082_af7c_8d32d327662a, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
@@ -649,8 +649,8 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       section: sec3,
     });
     await saveOptions(manager, q_1db92462_9ad5_4b4a_8eab_edf56a0695e4, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
@@ -662,13 +662,13 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       section: sec3,
     });
     await saveOptions(manager, q_29ae3590_84fb_4620_8f6f_9ca918ede0be, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
     const q_9b85a92a_9f7f_408f_9afd_87e57a19e4ee = await saveQuestion(manager, {
-      text: `6.3.5 ★ — ¿Le interesaría usar sus residuos para tratamiento de aguas?`,
+      text: `¿Le interesaría usar sus residuos para tratamiento de aguas?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
@@ -681,16 +681,16 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     ]);
 
     const q_b1c4c684_59e3_45db_b708_e68a4bb15e37 = await saveQuestion(manager, {
-      text: `6.3.6a — ¿Sus residuos podrían tener potencial para ingredientes funcionales (con beneficio para la salud)?`,
+      text: `¿Sus residuos podrían tener potencial para ingredientes funcionales (con beneficio para la salud)?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_b1c4c684_59e3_45db_b708_e68a4bb15e37, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No` },
     ]);
 
     const q_37644cf3_11a2_4548_91f8_13449b15df2d = await saveQuestion(manager, {
@@ -701,13 +701,13 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       section: sec3,
     });
     await saveOptions(manager, q_37644cf3_11a2_4548_91f8_13449b15df2d, [
-      { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
+      { text: `No` },
     ]);
 
     const q_abf4fea9_799a_45b0_818d_a3cd1ba98eef = await saveQuestion(manager, {
-      text: `6.3.7 ★ — ¿Le interesa utilizar filtros para mejorar la calidad del agua usando residuos de café / cacao / cannabis?`,
+      text: `¿Le interesa utilizar filtros para mejorar la calidad del agua usando residuos de café / cacao / cannabis?`,
       type: types.single_choice,
       isRequired: true,
       order: o++,
@@ -715,8 +715,8 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
     });
     await saveOptions(manager, q_abf4fea9_799a_45b0_818d_a3cd1ba98eef, [
       { text: `No` },
-      { text: `No sabe / No aplica` },
       { text: `Sí` },
+      { text: `No sabe / No aplica` },
     ]);
 
     const q_3607436e_c398_404b_bd34_9f2b147a5374 = await saveQuestion(manager, {
@@ -727,13 +727,13 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(mana
       section: sec3,
     });
     await saveOptions(manager, q_3607436e_c398_404b_bd34_9f2b147a5374, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
-      text: `6.3.9 ★ — ¿Qué factor considera más importante al evaluar una tecnología de valorización de residuos?`,
+      text: `¿Qué factor considera más importante al evaluar una tecnología de valorización de residuos?`,
       type: types.open_text,
       isRequired: true,
       order: o++,

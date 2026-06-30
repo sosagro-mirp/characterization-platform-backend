@@ -81,7 +81,7 @@ export async function seedInstrumentoS25BloqueCafe(manager: EntityManager): Prom
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -113,17 +113,17 @@ export async function seedInstrumentoS25BloqueCafe(manager: EntityManager): Prom
     });
     await saveOptions(manager, q_e64ff5be_c019_47af_ac71_8680b11f5826, [
       { text: `Bourbon` },
-      { text: `Castillo` },
+      { text: `Típica` },
       { text: `Caturra` },
+      { text: `Tabi` },
+      { text: `Geisha / Gesha` },
       { text: `Cenicafé 1` },
       { text: `Colombia` },
-      { text: `Geisha / Gesha` },
       { text: `Otro`, isOther: true },
-      { text: `Sin identificar` },
-      { text: `Tabi` },
-      { text: `Típica` },
-      { text: `Variedad propia` },
       { text: `Wush Wush` },
+      { text: `Variedad propia` },
+      { text: `Sin identificar` },
+      { text: `Castillo` },
     ]);
 
     const q_ee4a8886_7cde_4c0a_86fd_6a68fe12b5f7 = await saveQuestion(manager, {
@@ -178,11 +178,11 @@ export async function seedInstrumentoS25BloqueCafe(manager: EntityManager): Prom
       section: sec1,
     });
     await saveOptions(manager, q_8f1d2a99_1089_4aa9_bf65_6b3abc75f68b, [
+      { text: `Café pergamino seco` },
       { text: `Café cereza` },
       { text: `Café especial` },
-      { text: `Café pergamino húmedo` },
-      { text: `Café pergamino seco` },
       { text: `Café tostado` },
+      { text: `Café pergamino húmedo` },
       { text: `Café trillado / excelso` },
     ]);
 
@@ -213,19 +213,19 @@ export async function seedInstrumentoS25BloqueCafe(manager: EntityManager): Prom
       section: sec1,
     });
     await saveOptions(manager, q_1ab15f2c_5ee8_4187_985d_52e1a8915064, [
-      { text: `Abril` },
+      { text: `Julio` },
+      { text: `Febrero` },
       { text: `Agosto` },
       { text: `Diciembre` },
-      { text: `Enero` },
-      { text: `Febrero` },
-      { text: `Julio` },
-      { text: `Junio` },
-      { text: `Marzo` },
-      { text: `Mayo` },
-      { text: `No aplica` },
       { text: `Noviembre` },
-      { text: `Octubre` },
       { text: `Septiembre` },
+      { text: `Enero` },
+      { text: `Octubre` },
+      { text: `Marzo` },
+      { text: `Abril` },
+      { text: `No aplica` },
+      { text: `Mayo` },
+      { text: `Junio` },
     ]);
 
     const q_56ff5c6e_8631_4309_8297_29788056a7e3 = await saveQuestion(manager, {
@@ -237,18 +237,18 @@ export async function seedInstrumentoS25BloqueCafe(manager: EntityManager): Prom
     });
     await saveOptions(manager, q_56ff5c6e_8631_4309_8297_29788056a7e3, [
       { text: `Abril` },
-      { text: `Agosto` },
       { text: `Diciembre` },
-      { text: `Enero` },
-      { text: `Febrero` },
-      { text: `Julio` },
-      { text: `Junio` },
-      { text: `Marzo` },
-      { text: `Mayo` },
-      { text: `No aplica` },
       { text: `Noviembre` },
       { text: `Octubre` },
       { text: `Septiembre` },
+      { text: `Agosto` },
+      { text: `Marzo` },
+      { text: `Julio` },
+      { text: `Junio` },
+      { text: `Mayo` },
+      { text: `No aplica` },
+      { text: `Enero` },
+      { text: `Febrero` },
     ]);
 
   }
