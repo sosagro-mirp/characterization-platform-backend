@@ -64,11 +64,11 @@ export class Farm {
   internetAccess: boolean | null;
 
   @Column({
-    name: 'has_stability_electricity',
+    name: 'has_electricity_access',
     type: 'boolean',
     nullable: true,
   })
-  hasStabilityElectricity: boolean | null;
+  hasElectricityAccess: boolean | null;
 
   @Column({
     name: 'technical_assistance_access',
@@ -94,6 +94,37 @@ export class Farm {
     nullable: true,
   })
   altitude: number | null;
+
+  @Column({
+    name: 'main_access_type',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  mainAccessType: string | null;
+
+  @Column({
+    name: 'electricity_source_type',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  electricitySourceType: string | null;
+
+  @Column({
+    name: 'water_source_type',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  waterSourceType: string | null;
+
+  @Column({
+    name: 'plot_count',
+    type: 'int',
+    nullable: true,
+  })
+  plotCount: number | null;
 
   @OneToMany(() => Farmer, (farmer) => farmer.farm)
   farmers: Farmer[];

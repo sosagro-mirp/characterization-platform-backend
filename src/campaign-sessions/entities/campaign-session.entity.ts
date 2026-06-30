@@ -56,7 +56,17 @@ export class CampaignSession {
   crop?: TypeOfCrop;
 
   @ManyToMany(() => TypeOfCrop)
-  @JoinTable({ name: 'campaign_sessions_crops' })
+  @JoinTable({
+    name: 'campaign_sessions_crops',
+    joinColumn: {
+      name: 'campaignSessionsSessionId',
+      referencedColumnName: 'sessionId',
+    },
+    inverseJoinColumn: {
+      name: 'typesOfCropsCropId',
+      referencedColumnName: 'cropId',
+    },
+  })
   crops: TypeOfCrop[];
 
   @OneToMany(() => Survey, (survey) => survey.campaignSession)
