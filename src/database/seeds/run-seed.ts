@@ -47,6 +47,7 @@ import { seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas } from '
 import { seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario } from './instrumento-s11-adopcion-tecnologica-perfil-de-inversion-del-propietario.seed';
 import { seedInstrumentoS11AdopcionTecnologicaProductoresYPropietariosResidentes } from './instrumento-s11-adopcion-tecnologica-productores-y-propietarios-residentes.seed';
 import { seedInstrumentoS12AspectosFitosanitariosDiagnostico } from './instrumento-s12-aspectos-fitosanitarios-diagnostico.seed';
+import { seedInstrumentoSDcuDiagnosticoBarrerasAdopcionDigital } from './instrumento-s-dcu-diagnostico-barreras-adopcion-digital.seed';
 import { seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioProductor } from './instrumento-s1a-identificacion-del-encuestado-propietario-productor.seed';
 import { seedInstrumentoS1bIdentificacionDeLaUnidadProductiva } from './instrumento-s1b-identificacion-de-la-unidad-productiva.seed';
 import { seedInstrumentoS24BloqueCacao } from './instrumento-s2-4-bloque-cacao.seed';
@@ -188,6 +189,8 @@ async function run(): Promise<void> {
       await seedInstrumentoS11AdopcionTecnologicaProductoresYPropietariosResidentes(manager);
       // S12 — Fitosanitario
       await seedInstrumentoS12AspectosFitosanitariosDiagnostico(manager);
+      // S_DCU — DCU: Diagnóstico de barreras de adopción digital
+      await seedInstrumentoSDcuDiagnosticoBarrerasAdopcionDigital(manager);
       // Catálogos auxiliares
       await seedMunicipioOptions(manager);
     });
