@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,13 +48,14 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
   return map;
 }
 
-const NAME = `S11. Adopción Tecnológica: Perfil de Inversión del Propietario`;
+const NAME = `S11: Adopción Tecnológica — Perfil de Inversión del Propietario`;
 const VERSION = 1;
 
 export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(manager: EntityManager): Promise<void> {
@@ -99,13 +104,13 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
     });
     await saveOptions(manager, q_adba2b71_8e26_4372_8117_0694203c5985, [
       { text: `No y sin planes actualmente` },
-      { text: `Sí, entre 1–3 años atrás` },
       { text: `No, pero tengo planes` },
       { text: `Sí, en los últimos 12 meses` },
+      { text: `Sí, entre 1–3 años atrás` },
     ]);
 
     const q_5630254a_8540_417c_8a61_1b323d4668ab = await saveQuestion(manager, {
-      text: `PR.3 ★ — ¿Quién toma las decisiones de inversión en nuevas tecnologías para la finca?`,
+      text: `¿Quién toma las decisiones de inversión en nuevas tecnologías para la finca?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -113,10 +118,10 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       section: sec1,
     });
     await saveOptions(manager, q_5630254a_8540_417c_8a61_1b323d4668ab, [
-      { text: `Una junta familiar` },
-      { text: `Propietario y productor en conjunto` },
-      { text: `El propietario exclusivamente` },
       { text: `El productor / administrador` },
+      { text: `El propietario exclusivamente` },
+      { text: `Propietario y productor en conjunto` },
+      { text: `Una junta familiar` },
     ]);
 
     const q_a3996f83_8432_43da_ab02_ee5a041beb7e = await saveQuestion(manager, {
@@ -128,11 +133,11 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       section: sec1,
     });
     await saveOptions(manager, q_a3996f83_8432_43da_ab02_ee5a041beb7e, [
-      { text: `Sí, \$20.001–\$50.000 COP/mes` },
-      { text: `Solo si fuera gratuito` },
-      { text: `Sí, más de \$50.000 COP/mes` },
       { text: `No estoy interesado` },
-      { text: `Sí, pagaría hasta \$20.000 COP/mes` },
+      { text: `Solo si fuera gratuito` },
+      { text: `Sí, $20.001–$50.000 COP/mes` },
+      { text: `Sí, más de $50.000 COP/mes` },
+      { text: `Sí, pagaría hasta $20.000 COP/mes` },
     ]);
 
     const q_a6b07573_f857_4688_99ae_a7422ef79e08 = await saveQuestion(manager, {
@@ -144,10 +149,10 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       section: sec1,
     });
     await saveOptions(manager, q_a6b07573_f857_4688_99ae_a7422ef79e08, [
+      { text: `He intentado pero no me han aprobado` },
+      { text: `No tengo acceso a crédito formal` },
       { text: `Sí, tengo acceso pero sin uso reciente` },
       { text: `Sí, tengo crédito activo` },
-      { text: `No tengo acceso a crédito formal` },
-      { text: `He intentado pero no me han aprobado` },
     ]);
 
   }

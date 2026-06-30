@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     return;
   }
 
-  const typeNames = ["single_choice","numeric","yes_no","multiple_choice"];
+  const typeNames = ["multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -84,7 +89,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
   const [sec1, sec2, sec3] = await Promise.all([
     sectionRepo.save(sectionRepo.create({ name: `8C.1 Estructura de cultivo`, order: 1, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `8C.2 Sistema de riego`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `8C.3 Extracción, secado y poscosecha`, order: 3, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `8C.3 Extracción, secado y poscosecha`, order: 3, instrument }))
   ]);
 
   // ── 8C.1 Estructura de cultivo ──
@@ -99,13 +104,13 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       order: o++,
       section: sec1,
     });
-    const opts_q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954 = await saveOptions(manager, q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954, [
+    const opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954 = await saveOptions(manager, q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954, [
       { text: `Campo abierto` },
+      { text: `Indoor (cuarto de cultivo)` },
       { text: `Invernadero` },
       { text: `Mixto` },
-      { text: `Indoor (cuarto de cultivo)` },
     ]);
-    const opt_9b8673ec_aab3_48d5_9cdf_270ac046a200 = opts_q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954.get(`Invernadero`)!;
+    const opt_9b8673ec_aab3_48d5_9cdf_270ac046a200 = opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954.get(`Invernadero`)!;
 
     const q_dce512a8_ac9e_4449_85e5_24a196d45958 = await saveQuestion(manager, {
       text: `8C.2 ★ — Material de cubierta del invernadero`,
@@ -118,9 +123,9 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       conditionValue: opt_9b8673ec_aab3_48d5_9cdf_270ac046a200,
     });
     await saveOptions(manager, q_dce512a8_ac9e_4449_85e5_24a196d45958, [
-      { text: `Vidrio` },
-      { text: `Policarbonato` },
       { text: `Plástico` },
+      { text: `Policarbonato` },
+      { text: `Vidrio` },
     ]);
 
     await saveQuestion(manager, {
@@ -153,9 +158,9 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       conditionValue: 'true',
     });
     await saveOptions(manager, q_6bdea0e4_486d_4033_a534_9147592594b4, [
-      { text: `Natural` },
       { text: `Forzada (extractores)` },
       { text: `HVAC completo` },
+      { text: `Natural` },
     ]);
 
     await saveQuestion(manager, {
@@ -168,7 +173,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `8C.7a ★ — Temperatura mínima manejada (°C)`,
+      text: `Temperatura mínima manejada (°C)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -195,7 +200,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     await saveQuestion(manager, {
-      text: `8C.8b ★ — Humedad relativa máxima manejada (%)`,
+      text: `Humedad relativa máxima manejada (%)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -204,7 +209,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
 
     const q_05b35b19_b126_4a38_bd51_0a188b6a8c4d = await saveQuestion(manager, {
-      text: `8C.9 ★ — Tipo de iluminación utilizada`,
+      text: `Tipo de iluminación utilizada`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -213,8 +218,8 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     });
     await saveOptions(manager, q_05b35b19_b126_4a38_bd51_0a188b6a8c4d, [
       { text: `CMH` },
-      { text: `LED` },
       { text: `HPS` },
+      { text: `LED` },
       { text: `Mixto` },
       { text: `Natural` },
     ]);
@@ -235,7 +240,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     let o = 1;
 
     const q_22ce2846_3396_4078_9f77_2a1d855e423b = await saveQuestion(manager, {
-      text: `8C.11 ★ — ¿Con cuál de los siguientes sistemas de riego cuenta?`,
+      text: `¿Con cuál de los siguientes sistemas de riego cuenta?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -243,13 +248,13 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       section: sec2,
     });
     await saveOptions(manager, q_22ce2846_3396_4078_9f77_2a1d855e423b, [
-      { text: `Riego por goteo` },
-      { text: `DWC (Cultivo en agua profunda)` },
-      { text: `Riego manual` },
-      { text: `NFT (Nutrient Film Technique)` },
-      { text: `Sistema recirculante` },
-      { text: `Aspersión` },
       { text: `Aeroponía` },
+      { text: `Aspersión` },
+      { text: `DWC (Cultivo en agua profunda)` },
+      { text: `NFT (Nutrient Film Technique)` },
+      { text: `Riego manual` },
+      { text: `Riego por goteo` },
+      { text: `Sistema recirculante` },
     ]);
 
   }
@@ -259,7 +264,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
     let o = 1;
 
     const q_51dee359_13ac_4cee_9794_d4c7a9af8d01 = await saveQuestion(manager, {
-      text: `8C.12 ★ — ¿Con cuál de las siguientes instalaciones de poscosecha cuenta?`,
+      text: `¿Con cuál de las siguientes instalaciones de poscosecha cuenta?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -267,18 +272,18 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       section: sec3,
     });
     await saveOptions(manager, q_51dee359_13ac_4cee_9794_d4c7a9af8d01, [
-      { text: `Equipo de análisis de humedad` },
-      { text: `Báscula de precisión (gramos)` },
-      { text: `Cuarto de secado con control de temperatura y HR` },
       { text: `Bodega de producto terminado` },
-      { text: `Área de trimming / despalillado` },
-      { text: `Área de empaque y etiquetado bajo condiciones controladas` },
-      { text: `Equipo de extracción (prensa, CO₂, etanol, etc.)` },
+      { text: `Báscula de precisión (gramos)` },
       { text: `Cuarto de curado` },
+      { text: `Cuarto de secado con control de temperatura y HR` },
+      { text: `Equipo de análisis de humedad` },
+      { text: `Equipo de extracción (prensa, CO₂, etanol, etc.)` },
+      { text: `Área de empaque y etiquetado bajo condiciones controladas` },
+      { text: `Área de trimming / despalillado` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8C.13 ★ — Capacidad de la cámara / cuarto de secado (m²)`,
+      text: `Capacidad de la cámara / cuarto de secado (m²)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,

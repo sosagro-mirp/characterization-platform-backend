@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     return;
   }
 
-  const typeNames = ["multiple_choice","single_choice","yes_no","numeric"];
+  const typeNames = ["multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -90,24 +95,24 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     let o = 1;
 
     const q_2267bc3f_7a29_497a_a1bc_71c33691aef9 = await saveQuestion(manager, {
-      text: `4.4 — Actividades de poscosecha que realiza en cáñamo`,
+      text: `Actividades de poscosecha que realiza en cáñamo`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_2267bc3f_7a29_497a_a1bc_71c33691aef9, [
-      { text: `Prensado de semilla / aceite` },
+      { text: `Clasificación de fibra` },
+      { text: `Cosecha mecánica / manual` },
       { text: `Desfibrado` },
       { text: `Empaque` },
       { text: `Extracción de CBD` },
-      { text: `Clasificación de fibra` },
-      { text: `Cosecha mecánica / manual` },
+      { text: `Prensado de semilla / aceite` },
       { text: `Secado de fibra / semilla / flor` },
     ]);
 
     const q_63497df5_35dd_4ef4_bd85_3eca40d24fc3 = await saveQuestion(manager, {
-      text: `4.4.1 ★ — Tipo de licencia con que opera`,
+      text: `Tipo de licencia con que opera`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -115,9 +120,9 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
       section: sec1,
     });
     await saveOptions(manager, q_63497df5_35dd_4ef4_bd85_3eca40d24fc3, [
-      { text: `Semillas / Material vegetal (ICA)` },
       { text: `En trámite` },
       { text: `No tiene licencia` },
+      { text: `Semillas / Material vegetal (ICA)` },
       { text: `Uso adulto (ley 2204/2022)` },
       { text: `Uso médico y científico (ley 1787/2016)` },
     ]);
@@ -131,14 +136,14 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
       section: sec1,
     });
     await saveOptions(manager, q_e2952f86_0c05_4795_9a8c_62f0fc5eb618, [
-      { text: `Semilla` },
-      { text: `Múltiple` },
-      { text: `Fibra` },
       { text: `CBD` },
+      { text: `Fibra` },
+      { text: `Múltiple` },
+      { text: `Semilla` },
     ]);
 
     const q_144f9486_6a48_41f2_ab8f_b5c7472b8ef3 = await saveQuestion(manager, {
-      text: `4.4.3 ★ — ¿Mide contenido de CBD en materia seca?`,
+      text: `¿Mide contenido de CBD en materia seca?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -147,7 +152,7 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     });
 
     await saveQuestion(manager, {
-      text: `4.4.3b — Valor habitual de CBD en materia seca (%)`,
+      text: `Valor habitual de CBD en materia seca (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -192,13 +197,13 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
       section: sec1,
     });
     await saveOptions(manager, q_7664ecc9_a891_4311_a7ce_e38973583706, [
-      { text: `UTZ` },
-      { text: `Otro`, isOther: true },
+      { text: `Denominación de Origen` },
+      { text: `Fair Trade / Comercio Justo` },
       { text: `Ninguna` },
       { text: `Orgánico NTC/USDA` },
-      { text: `Fair Trade / Comercio Justo` },
-      { text: `Denominación de Origen` },
+      { text: `Otro`, isOther: true },
       { text: `Rainforest Alliance` },
+      { text: `UTZ` },
     ]);
 
     const q_d063fe28_f736_4ec1_9e01_01d9df8ba097 = await saveQuestion(manager, {
@@ -211,12 +216,12 @@ export async function seedInstrumentoS44PoscosechaCanamo(manager: EntityManager)
     });
     await saveOptions(manager, q_d063fe28_f736_4ec1_9e01_01d9df8ba097, [
       { text: `Comercializador nacional` },
+      { text: `Cooperativa / Asociación` },
+      { text: `Exportación directa` },
+      { text: `Industria / transformador` },
+      { text: `Intermediario / Acopiador` },
       { text: `Otro`, isOther: true },
       { text: `Venta directa local` },
-      { text: `Exportación directa` },
-      { text: `Intermediario / Acopiador` },
-      { text: `Cooperativa / Asociación` },
-      { text: `Industria / transformador` },
     ]);
 
   }

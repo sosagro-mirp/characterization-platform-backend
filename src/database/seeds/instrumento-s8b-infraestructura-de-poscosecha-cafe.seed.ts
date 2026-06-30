@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     return;
   }
 
-  const typeNames = ["multiple_choice","numeric","single_choice","yes_no"];
+  const typeNames = ["multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -90,7 +95,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     let o = 1;
 
     const q_4f2ed018_e8fc_420c_b0bb_fa9a9590ca11 = await saveQuestion(manager, {
-      text: `8B.1 ★ — ¿Con cuál de las siguientes instalaciones para café cuenta en su finca?`,
+      text: `¿Con cuál de las siguientes instalaciones para café cuenta en su finca?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -98,23 +103,23 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
     await saveOptions(manager, q_4f2ed018_e8fc_420c_b0bb_fa9a9590ca11, [
-      { text: `Marquesina para secado` },
+      { text: `Beneficiadero (área completa de beneficio húmedo)` },
+      { text: `Bodega para café pergamino seco` },
+      { text: `Báscula / balanza` },
+      { text: `Canal de correteo` },
       { text: `Despulpadora (cilíndrica o de disco)` },
       { text: `Equipo de catación / cata en taza` },
-      { text: `Báscula / balanza` },
-      { text: `Secador mecánico / guardiola` },
-      { text: `Canal de correteo` },
-      { text: `Bodega para café pergamino seco` },
-      { text: `Pilas de fermentación` },
+      { text: `Marquesina para secado` },
       { text: `Patio de cemento para secado` },
-      { text: `Trilladora` },
-      { text: `Beneficiadero (área completa de beneficio húmedo)` },
-      { text: `Área de empaque y etiquetado` },
+      { text: `Pilas de fermentación` },
+      { text: `Secador mecánico / guardiola` },
       { text: `Tostadora` },
+      { text: `Trilladora` },
+      { text: `Área de empaque y etiquetado` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.2 ★ — Capacidad de la despulpadora (valor numérico)`,
+      text: `Capacidad de la despulpadora (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -189,7 +194,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.6 ★ — ¿La bodega tiene control de humedad?`,
+      text: `¿La bodega tiene control de humedad?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

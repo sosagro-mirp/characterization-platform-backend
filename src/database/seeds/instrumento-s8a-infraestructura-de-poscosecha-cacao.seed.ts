@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     return;
   }
 
-  const typeNames = ["multiple_choice","numeric","single_choice","yes_no"];
+  const typeNames = ["multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -90,7 +95,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     let o = 1;
 
     const q_33de0422_c44d_4bed_bca0_aa94220ffc9f = await saveQuestion(manager, {
-      text: `8A.1 ★ — ¿Con cuál de las siguientes instalaciones para cacao cuenta en su finca?`,
+      text: `¿Con cuál de las siguientes instalaciones para cacao cuenta en su finca?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -98,19 +103,19 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
       section: sec1,
     });
     await saveOptions(manager, q_33de0422_c44d_4bed_bca0_aa94220ffc9f, [
+      { text: `Bodega / almacén para cacao seco` },
       { text: `Báscula o balanza` },
-      { text: `Patio de cemento para secado` },
-      { text: `Marquesina plástica para secado` },
+      { text: `Cajones de fermentación de madera` },
       { text: `Clasificadora / seleccionadora de grano` },
       { text: `Higrómetro (medidor de humedad)` },
-      { text: `Área de empaque y etiquetado` },
-      { text: `Cajones de fermentación de madera` },
-      { text: `Secador mecánico` },
-      { text: `Termómetro (para fermentación y/o secado)` },
+      { text: `Marquesina plástica para secado` },
+      { text: `Patio de cemento para secado` },
       { text: `Sacos / cajas para fermentación` },
-      { text: `Bodega / almacén para cacao seco` },
-      { text: `Área de recepción y clasificación de mazorcas` },
+      { text: `Secador mecánico` },
       { text: `Secador solar tipo domo / carpa` },
+      { text: `Termómetro (para fermentación y/o secado)` },
+      { text: `Área de empaque y etiquetado` },
+      { text: `Área de recepción y clasificación de mazorcas` },
     ]);
 
     await saveQuestion(manager, {
@@ -131,8 +136,8 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
       section: sec1,
     });
     await saveOptions(manager, q_ddff4b78_434f_4945_888e_938274a0ea3f, [
-      { text: `litros` },
       { text: `kg` },
+      { text: `litros` },
     ]);
 
     await saveQuestion(manager, {
@@ -145,7 +150,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.4 — ¿Los cajones tienen tapas / cubiertas para mantener temperatura?`,
+      text: `¿Los cajones tienen tapas / cubiertas para mantener temperatura?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -180,7 +185,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.8 ★ — ¿Tiene tomas eléctricas disponibles en el área de poscosecha?`,
+      text: `¿Tiene tomas eléctricas disponibles en el área de poscosecha?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

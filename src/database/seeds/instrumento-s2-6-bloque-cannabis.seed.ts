@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     return;
   }
 
-  const typeNames = ["single_choice","open_text","yes_no","numeric"];
+  const typeNames = ["numeric", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -98,12 +103,12 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_7a0f5971_c616_4be5_9c90_41349f1aed73, [
+      { text: `Aeroponía` },
       { text: `Hidroponía` },
       { text: `Mixto` },
-      { text: `Sustrato` },
       { text: `Otro`, isOther: true },
-      { text: `Aeroponía` },
       { text: `Suelo` },
+      { text: `Sustrato` },
     ]);
 
     const q_f788867e_032c_4996_a9aa_c1a4c359e3f9 = await saveQuestion(manager, {
@@ -115,9 +120,9 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_f788867e_032c_4996_a9aa_c1a4c359e3f9, [
-      { text: `Invernadero` },
       { text: `Campo abierto` },
       { text: `Indoor (cuarto de cultivo)` },
+      { text: `Invernadero` },
       { text: `Mixto` },
     ]);
 
@@ -148,7 +153,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `2.6.5b — Liste cada variedad con su porcentaje`,
+      text: `Liste cada variedad con su porcentaje`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -166,10 +171,10 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_d1b916a6_a77b_4761_8ef8_49bf905d1090, [
+      { text: `Extractos` },
+      { text: `Flor seca` },
       { text: `Mixto` },
       { text: `Semillas` },
-      { text: `Flor seca` },
-      { text: `Extractos` },
     ]);
 
     await saveQuestion(manager, {
@@ -190,7 +195,7 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
     });
 
     const q_14c73380_825c_42ef_950c_4f821a35b0f7 = await saveQuestion(manager, {
-      text: `2.6.9 ★ — ¿Cuenta con licencia vigente de cannabis? (Adjuntar documento)`,
+      text: `¿Cuenta con licencia vigente de cannabis?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -198,11 +203,11 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_14c73380_825c_42ef_950c_4f821a35b0f7, [
-      { text: `Uso médico y científico (Ley 1787/2016)` },
       { text: `En trámite` },
-      { text: `Uso adulto (Ley 2204/2022)` },
       { text: `No tiene licencia` },
       { text: `Semillas / Material vegetal (ICA)` },
+      { text: `Uso adulto (Ley 2204/2022)` },
+      { text: `Uso médico y científico (Ley 1787/2016)` },
     ]);
 
     const q_d6a3aed1_81b1_428b_b439_8ed98502f259 = await saveQuestion(manager, {
@@ -213,17 +218,17 @@ export async function seedInstrumentoS26BloqueCannabis(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_d6a3aed1_81b1_428b_b439_8ed98502f259, [
-      { text: `Rainforest Alliance` },
-      { text: `Orgánico NTC / USDA` },
       { text: `Denominación de Origen` },
-      { text: `UTZ` },
       { text: `Fair Trade / Comercio Justo` },
       { text: `Ninguna` },
+      { text: `Orgánico NTC / USDA` },
       { text: `Otro`, isOther: true },
+      { text: `Rainforest Alliance` },
+      { text: `UTZ` },
     ]);
 
     await saveQuestion(manager, {
-      text: `2.6.10 ★ — ¿Tiene registros productivos históricos de cannabis?`,
+      text: `¿Tiene registros productivos históricos de cannabis?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

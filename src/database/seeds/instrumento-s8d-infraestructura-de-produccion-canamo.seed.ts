@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     return;
   }
 
-  const typeNames = ["multiple_choice","numeric","yes_no","single_choice"];
+  const typeNames = ["multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -90,7 +95,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     let o = 1;
 
     const q_14cd478f_a3fa_40cd_837f_d3e6a19d5716 = await saveQuestion(manager, {
-      text: `8D.1 ★ — ¿Con cuál de las siguientes instalaciones para cáñamo cuenta?`,
+      text: `¿Con cuál de las siguientes instalaciones para cáñamo cuenta?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -98,17 +103,17 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
       section: sec1,
     });
     await saveOptions(manager, q_14cd478f_a3fa_40cd_837f_d3e6a19d5716, [
-      { text: `Desfibrado manual` },
+      { text: `Bodega de producto terminado` },
       { text: `Báscula` },
+      { text: `Campo abierto (sin estructura)` },
+      { text: `Decorticadora / desfibrado mecánico` },
+      { text: `Desfibrado manual` },
+      { text: `Equipo de extracción de CBD` },
+      { text: `Invernadero` },
+      { text: `Prensa de semilla (para aceite)` },
+      { text: `Sistema de riego tecnificado` },
       { text: `Área de empaque y etiquetado` },
       { text: `Área de secado de fibra / semilla / flor` },
-      { text: `Campo abierto (sin estructura)` },
-      { text: `Equipo de extracción de CBD` },
-      { text: `Bodega de producto terminado` },
-      { text: `Sistema de riego tecnificado` },
-      { text: `Prensa de semilla (para aceite)` },
-      { text: `Invernadero` },
-      { text: `Decorticadora / desfibrado mecánico` },
     ]);
 
     await saveQuestion(manager, {
@@ -121,7 +126,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.3 — Área bajo invernadero (m²)`,
+      text: `Área bajo invernadero (m²)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -147,7 +152,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     const q_3d5ac54a_efe3_4860_897f_cdf8eb783d9d = await saveQuestion(manager, {
-      text: `8D.5b ★ — Unidad de capacidad de procesamiento de fibra`,
+      text: `Unidad de capacidad de procesamiento de fibra`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -155,12 +160,12 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
       section: sec1,
     });
     await saveOptions(manager, q_3d5ac54a_efe3_4860_897f_cdf8eb783d9d, [
-      { text: `t / cosecha` },
       { text: `kg / día` },
+      { text: `t / cosecha` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8D.6 ★ — ¿Tiene área de almacenamiento con control de humedad?`,
+      text: `¿Tiene área de almacenamiento con control de humedad?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

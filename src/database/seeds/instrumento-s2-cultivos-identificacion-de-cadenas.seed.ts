@@ -12,6 +12,7 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
@@ -25,6 +26,7 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
@@ -36,7 +38,7 @@ async function saveQuestion(
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -46,13 +48,14 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
   return map;
 }
 
-const NAME = `S2. Cultivos — Identificación de Cadenas`;
+const NAME = `S2: Cultivos — Identificación de Cadenas`;
 const VERSION = 1;
 
 export async function seedInstrumentoS2CultivosIdentificacionDeCadenas(manager: EntityManager): Promise<void> {
@@ -65,7 +68,7 @@ export async function seedInstrumentoS2CultivosIdentificacionDeCadenas(manager: 
     return;
   }
 
-  const typeNames = ["yes_no","multiple_choice","single_choice"];
+  const typeNames = ["multiple_choice", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -79,7 +82,6 @@ export async function seedInstrumentoS2CultivosIdentificacionDeCadenas(manager: 
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: true,
-      code: 'S2',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -93,73 +95,74 @@ export async function seedInstrumentoS2CultivosIdentificacionDeCadenas(manager: 
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `2.1a ★ — ¿Cultiva actualmente Cacao?`,
+      text: `¿Cultiva actualmente Cacao?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec1,
-      systemField: 'crop.Cacao',
+      systemField: 'crop.cacao',
     });
 
     await saveQuestion(manager, {
-      text: `2.1b ★ — ¿Cultiva actualmente Café?`,
+      text: `¿Cultiva actualmente Café?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec1,
-      systemField: 'crop.Café',
+      systemField: 'crop.cafe',
     });
 
     await saveQuestion(manager, {
-      text: `2.1c ★ — ¿Cultiva actualmente Cannabis?`,
+      text: `¿Cultiva actualmente Cannabis?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec1,
-      systemField: 'crop.Cannabis',
+      systemField: 'crop.cannabis',
     });
 
     await saveQuestion(manager, {
-      text: `2.1d ★ — ¿Cultiva actualmente Cáñamo?`,
+      text: `¿Cultiva actualmente Cáñamo?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec1,
-      systemField: 'crop.Cáñamo',
+      systemField: 'crop.canamo',
     });
 
     const q_bb845c10_5def_41be_aac1_46d7dabcfb05 = await saveQuestion(manager, {
-      text: `2.2 ★ — ¿En qué etapas de la cadena productiva participa? (Marque todas las que apliquen)`,
+      text: `¿En qué etapas de la cadena productiva participa? (Marque todas las que apliquen)`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_bb845c10_5def_41be_aac1_46d7dabcfb05, [
-      { text: `Exportación` },
-      { text: `Cultivo / producción en campo` },
-      { text: `Cosecha` },
-      { text: `Transformación industrial` },
-      { text: `Poscosecha / procesamiento` },
       { text: `Comercialización directa` },
+      { text: `Cosecha` },
+      { text: `Cultivo / producción en campo` },
+      { text: `Exportación` },
+      { text: `Poscosecha / procesamiento` },
+      { text: `Transformación industrial` },
     ]);
 
     const q_b05d66f7_404e_46a6_aac8_5774b5bc777f = await saveQuestion(manager, {
-      text: `2.3 — ¿Procesa materia prima propia, de terceros o ambas?`,
+      text: `¿Procesa materia prima propia, de terceros o ambas?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_b05d66f7_404e_46a6_aac8_5774b5bc777f, [
-      { text: `Propia` },
       { text: `Ambas` },
       { text: `De terceros` },
+      { text: `Propia` },
     ]);
 
   }

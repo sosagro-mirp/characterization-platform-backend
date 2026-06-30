@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
     return;
   }
 
-  const typeNames = ["yes_no","open_text","single_choice","multiple_choice"];
+  const typeNames = ["multiple_choice", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -82,17 +87,17 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `10.1 Socialización del proyecto`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `10.2 Modalidad de participación deseada`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `10.3 Condiciones de participación`, order: 3, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Socialización del proyecto`, order: 1, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Modalidad de participación deseada`, order: 2, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Condiciones de participación`, order: 3, instrument }))
   ]);
 
-  // ── 10.1 Socialización del proyecto ──
+  // ── Socialización del proyecto ──
   {
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `10.1 — Antes de este taller, ¿conocía el proyecto SOS AGRO?`,
+      text: `Antes de este taller, ¿conocía el proyecto SOS AGRO?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -100,7 +105,7 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
     });
 
     await saveQuestion(manager, {
-      text: `10.2 — ¿Cómo se enteró del proyecto?`,
+      text: `¿Cómo se enteró del proyecto?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -108,58 +113,60 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
     });
 
     const q_8e0d7c60_892f_40c0_9728_35a55107e56e = await saveQuestion(manager, {
-      text: `10.3 — Después de la socialización de hoy, ¿el proyecto responde a sus necesidades?`,
+      text: `Después de la socialización de hoy, ¿el proyecto responde a sus necesidades?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_8e0d7c60_892f_40c0_9728_35a55107e56e, [
+      { text: `No` },
       { text: `No sabe / No aplica` },
       { text: `Sí` },
-      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
-      text: `10.4 — ¿Qué aspecto del proyecto le parece más útil para su actividad?`,
+      text: `¿Qué aspecto del proyecto le parece más útil para su actividad?`,
       type: types.open_text,
       isRequired: false,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
 
   }
 
-  // ── 10.2 Modalidad de participación deseada ──
+  // ── Modalidad de participación deseada ──
   {
     let o = 1;
 
     const q_9acaf637_2a45_4529_8788_244c1d18aaff = await saveQuestion(manager, {
-      text: `10.5 ★ — ¿En qué modalidad le interesaría participar en el proyecto?`,
+      text: `¿En qué modalidad le interesaría participar en el proyecto?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_9acaf637_2a45_4529_8788_244c1d18aaff, [
-      { text: `Unidad productiva para análisis de calidad en plataforma SOS AGRO (Objetivo 3)` },
-      { text: `Diagnóstico de la cadena (talleres, encuestas, grupos focales)` },
-      { text: `Unidad productiva para valorización de residuos (Objetivo 2 — energía, materiales, agua)` },
-      { text: `Socialización de resultados y adopción de tecnologías exitosas` },
-      { text: `Unidad productiva para instalación de sensores (Objetivo 1 — tecnología de campo)` },
       { text: `Capacitaciones en uso de la App de conectividad y plataforma digital` },
+      { text: `Diagnóstico de la cadena (talleres, encuestas, grupos focales)` },
       { text: `No tengo interés en participar` },
+      { text: `Socialización de resultados y adopción de tecnologías exitosas` },
+      { text: `Unidad productiva para análisis de calidad en plataforma SOS AGRO (Objetivo 3)` },
+      { text: `Unidad productiva para instalación de sensores (Objetivo 1 — tecnología de campo)` },
+      { text: `Unidad productiva para valorización de residuos (Objetivo 2 — energía, materiales, agua)` },
     ]);
 
   }
 
-  // ── 10.3 Condiciones de participación ──
+  // ── Condiciones de participación ──
   {
     let o = 1;
 
     const q_d3b91476_71a7_46ec_b122_631c1bf36cff = await saveQuestion(manager, {
-      text: `10.6 ★ — Si su finca es seleccionada, ¿permitiría el acceso del equipo investigador para instalar equipos / sensores?`,
+      text: `Si su finca es seleccionada, ¿permitiría el acceso del equipo investigador para instalar equipos / sensores?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -167,13 +174,13 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       section: sec3,
     });
     await saveOptions(manager, q_d3b91476_71a7_46ec_b122_631c1bf36cff, [
-      { text: `Tal vez` },
       { text: `No` },
       { text: `Sí` },
+      { text: `Tal vez` },
     ]);
 
     const q_46736f1f_88a4_47e1_b1ab_0b0b34e987a2 = await saveQuestion(manager, {
-      text: `10.7 ★ — ¿Estaría dispuesto a compartir datos productivos con el equipo de investigación?`,
+      text: `¿Estaría dispuesto a compartir datos productivos con el equipo de investigación?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -182,12 +189,12 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
     });
     await saveOptions(manager, q_46736f1f_88a4_47e1_b1ab_0b0b34e987a2, [
       { text: `No` },
-      { text: `Tal vez` },
       { text: `Sí` },
+      { text: `Tal vez` },
     ]);
 
     const q_ddc5deec_0fbd_47f1_b84e_f6f1a54e2a83 = await saveQuestion(manager, {
-      text: `10.8 ★ — ¿Puede comprometerse con el seguimiento del proyecto durante al menos 2 años?`,
+      text: `¿Puede comprometerse con el seguimiento del proyecto durante al menos 2 años?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -196,12 +203,12 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
     });
     await saveOptions(manager, q_ddc5deec_0fbd_47f1_b84e_f6f1a54e2a83, [
       { text: `No` },
-      { text: `Tal vez` },
       { text: `Sí` },
+      { text: `Tal vez` },
     ]);
 
     await saveQuestion(manager, {
-      text: `10.9 — ¿Tiene alguna limitación o condición especial para participar?`,
+      text: `¿Tiene alguna limitación o condición especial para participar?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -209,7 +216,7 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
     });
 
     await saveQuestion(manager, {
-      text: `10.10 — Comentarios adicionales o preguntas sobre el proyecto`,
+      text: `Comentarios adicionales o preguntas sobre el proyecto`,
       type: types.open_text,
       isRequired: false,
       order: o++,

@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     return;
   }
 
-  const typeNames = ["yes_no","single_choice","numeric","open_text"];
+  const typeNames = ["numeric", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -99,21 +104,22 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     const q_06d20475_624e_4fee_9cc8_c7472a99f41d = await saveQuestion(manager, {
-      text: `7A.2 ★ — Tipo de fuente de agua principal`,
+      text: `Tipo de fuente de agua principal`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec1,
+      systemField: 'farm.waterSourceType',
     });
     await saveOptions(manager, q_06d20475_624e_4fee_9cc8_c7472a99f41d, [
-      { text: `Pozo somero` },
-      { text: `Agua lluvia` },
-      { text: `Quebrada` },
-      { text: `Pozo profundo` },
-      { text: `Acueducto veredal` },
-      { text: `Otro`, isOther: true },
       { text: `Acueducto municipal` },
+      { text: `Acueducto veredal` },
+      { text: `Agua lluvia` },
+      { text: `Otro`, isOther: true },
+      { text: `Pozo profundo` },
+      { text: `Pozo somero` },
+      { text: `Quebrada` },
       { text: `Reservorio / Jagüey` },
       { text: `Río` },
     ]);
@@ -137,7 +143,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     await saveQuestion(manager, {
-      text: `7A.5 ★ — ¿Usa agua en el proceso de beneficio (fermentación, lavado)?`,
+      text: `¿Usa agua en el proceso de beneficio (fermentación, lavado)?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -179,11 +185,11 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_f637adbe_b388_4217_941c_356a704e8995, [
-      { text: `Otro`, isOther: true },
-      { text: `Cuerpo de agua (quebrada / río)` },
       { text: `Alcantarillado` },
-      { text: `Suelo sin tratar` },
+      { text: `Cuerpo de agua (quebrada / río)` },
+      { text: `Otro`, isOther: true },
       { text: `Reúso en cultivo` },
+      { text: `Suelo sin tratar` },
       { text: `Tanque de almacenamiento` },
     ]);
 
@@ -204,9 +210,9 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_b348b69b_49b2_44a3_b5e4_7f900795f2d3, [
-      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
@@ -219,7 +225,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     const q_3d2c78da_31e3_4272_939c_49d0ce5464cf = await saveQuestion(manager, {
-      text: `7A.13 ★ — ¿Ha detectado o sospecha contaminación por metales pesados en el agua?`,
+      text: `¿Ha detectado o sospecha contaminación por metales pesados en el agua?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -228,12 +234,12 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
     await saveOptions(manager, q_3d2c78da_31e3_4272_939c_49d0ce5464cf, [
       { text: `No` },
-      { text: `Sí` },
       { text: `No sabe / No aplica` },
+      { text: `Sí` },
     ]);
 
     const q_214b9b62_f1f3_4bb8_82d0_ed8069dc0775 = await saveQuestion(manager, {
-      text: `7A.14 ★ — ¿Ha detectado o sospecha contaminación por pesticidas o agroquímicos?`,
+      text: `¿Ha detectado o sospecha contaminación por pesticidas o agroquímicos?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -242,8 +248,8 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
     await saveOptions(manager, q_214b9b62_f1f3_4bb8_82d0_ed8069dc0775, [
       { text: `No` },
-      { text: `Sí` },
       { text: `No sabe / No aplica` },
+      { text: `Sí` },
     ]);
 
     const q_b5cf7ddc_3c69_4e66_9e46_33906c794850 = await saveQuestion(manager, {
@@ -265,13 +271,13 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       conditionValue: 'true',
     });
     await saveOptions(manager, q_da3f3c42_0c26_4c1f_8d45_d32a4e8bc00c, [
-      { text: `Carbón activado` },
-      { text: `Sin tratamiento` },
-      { text: `Desinfección UV` },
-      { text: `Cloración` },
-      { text: `Filtración (arena, grava)` },
       { text: `Acidificación / alcalinización` },
+      { text: `Carbón activado` },
+      { text: `Cloración` },
+      { text: `Desinfección UV` },
+      { text: `Filtración (arena, grava)` },
       { text: `Otro`, isOther: true },
+      { text: `Sin tratamiento` },
       { text: `Ósmosis inversa` },
     ]);
 
@@ -284,11 +290,11 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_a43bec8f_2edb_4c23_879a_70fcfead7b0a, [
-      { text: `Cuerpo de agua (quebrada / río)` },
-      { text: `Suelo sin tratar` },
-      { text: `Reúso en cultivo` },
       { text: `Alcantarillado` },
+      { text: `Cuerpo de agua (quebrada / río)` },
       { text: `Otro`, isOther: true },
+      { text: `Reúso en cultivo` },
+      { text: `Suelo sin tratar` },
       { text: `Tanque de almacenamiento` },
     ]);
 
@@ -302,7 +308,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     });
 
     const q_11e82432_6066_40c3_99d0_40cd57c512a8 = await saveQuestion(manager, {
-      text: `7A.19 ★ — ¿Estaría interesado en instalar un sistema de tratamiento de aguas en su finca?`,
+      text: `¿Estaría interesado en instalar un sistema de tratamiento de aguas en su finca?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -316,7 +322,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
     ]);
 
     const q_08ada2ea_4ff0_4f58_80f4_7e329100dffe = await saveQuestion(manager, {
-      text: `7A.20 ★ — ¿Su proceso genera impacto ambiental en las aguas cercanas?`,
+      text: `¿Su proceso genera impacto ambiental en las aguas cercanas?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -324,9 +330,9 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(manager: EntityMa
       section: sec1,
     });
     await saveOptions(manager, q_08ada2ea_4ff0_4f58_80f4_7e329100dffe, [
-      { text: `Sí` },
-      { text: `No sabe / No aplica` },
       { text: `No` },
+      { text: `No sabe / No aplica` },
+      { text: `Sí` },
     ]);
 
   }

@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,13 +48,14 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
   return map;
 }
 
-const NAME = `S11. Adopción Tecnológica: Diagnóstico Extensionistas`;
+const NAME = `S11: Adopción Tecnológica — Diagnóstico Extensionistas`;
 const VERSION = 1;
 
 export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas(manager: EntityManager): Promise<void> {
@@ -63,7 +68,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
     return;
   }
 
-  const typeNames = ["numeric","single_choice","yes_no","multiple_choice"];
+  const typeNames = ["multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -90,7 +95,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `EX.1 ★ — ¿Cuántas unidades productivas atiende actualmente en su zona?`,
+      text: `¿Cuántas unidades productivas atiende actualmente en su zona?`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -99,79 +104,86 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
     });
 
     const q_108c6d4d_8023_4ed0_895e_7b695a3f04bb = await saveQuestion(manager, {
-      text: `EX.2 ★ — ¿Cuál es el principal obstáculo para que los productores adopten tecnología digital?`,
+      text: `¿Cuál es el principal obstáculo para que los productores adopten tecnología digital?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_108c6d4d_8023_4ed0_895e_7b695a3f04bb, [
       { text: `Baja percepción de utilidad` },
-      { text: `Mala calidad o ausencia de señal móvil` },
-      { text: `Falta de conocimiento / alfabetización digital del productor` },
-      { text: `Falta de acompañamiento técnico continuo` },
-      { text: `Resistencia al cambio` },
       { text: `Costo elevado de dispositivos o internet` },
       { text: `Desconfianza del productor en la tecnología` },
+      { text: `Falta de acompañamiento técnico continuo` },
+      { text: `Falta de conocimiento / alfabetización digital del productor` },
+      { text: `Mala calidad o ausencia de señal móvil` },
+      { text: `Resistencia al cambio` },
     ]);
 
     await saveQuestion(manager, {
-      text: `EX.3a ★ — ¿Usted mismo usa herramientas digitales para gestionar o reportar su trabajo?`,
+      text: `¿Usted mismo usa herramientas digitales para gestionar o reportar su trabajo?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
 
     const q_5a8bd830_db75_48c0_85fd_20ba19efd142 = await saveQuestion(manager, {
-      text: `EX.3b ★ — ¿Cuáles herramientas digitales usa para gestionar o reportar su trabajo?`,
+      text: `¿Cuáles herramientas digitales usa para gestionar o reportar su trabajo?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_5a8bd830_db75_48c0_85fd_20ba19efd142, [
-      { text: `Hojas de cálculo (Excel / Sheets)` },
-      { text: `Formularios digitales (KoBoToolbox / Survey123)` },
       { text: `Apps agropecuarias especializadas` },
+      { text: `Formularios digitales (KoBoToolbox / Survey123)` },
       { text: `Google Maps / georreferenciación` },
+      { text: `Hojas de cálculo (Excel / Sheets)` },
       { text: `Ninguna` },
-      { text: `WhatsApp / Telegram` },
+      { text: `Otros`, isOther: true },
       { text: `Registro fotográfico` },
+      { text: `WhatsApp / Telegram` },
     ]);
 
     await saveQuestion(manager, {
-      text: `EX.4 ★ — ¿Ha recibido formación en uso de tecnologías digitales aplicadas al sector agrícola?`,
+      text: `¿Ha recibido formación en uso de tecnologías digitales aplicadas al sector agrícola?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
 
     const q_897849da_07cb_4f67_bc73_d6693043e369 = await saveQuestion(manager, {
-      text: `EX.5 ★ — ¿Qué tipo de tecnología ha generado más interés o adopción efectiva entre sus productores?`,
+      text: `¿Qué tipo de tecnología ha generado más interés o adopción efectiva entre sus productores?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_897849da_07cb_4f67_bc73_d6693043e369, [
-      { text: `WhatsApp para alertas` },
-      { text: `Registro fotográfico y envío de imágenes` },
-      { text: `Apps móviles de consulta (clima/precios)` },
-      { text: `Sensores / IoT` },
-      { text: `Plataformas de comercialización` },
       { text: `Apps de gestión de finca` },
+      { text: `Apps móviles de consulta (clima/precios)` },
       { text: `Ninguna` },
+      { text: `Otros`, isOther: true },
+      { text: `Plataformas de comercialización` },
+      { text: `Registro fotográfico y envío de imágenes` },
+      { text: `Sensores / IoT` },
+      { text: `WhatsApp para alertas` },
     ]);
 
     const q_d0563cb2_373f_47d0_b7ce_63c1f988776c = await saveQuestion(manager, {
-      text: `EX.6 ★ — ¿Con qué frecuencia visita cada unidad productiva bajo su acompañamiento?`,
+      text: `¿Con qué frecuencia visita cada unidad productiva bajo su acompañamiento?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -179,29 +191,30 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       section: sec1,
     });
     await saveOptions(manager, q_d0563cb2_373f_47d0_b7ce_63c1f988776c, [
-      { text: `Mensual` },
-      { text: `Semanal o más frecuente` },
       { text: `Cada 2–3 meses` },
-      { text: `Quincenal` },
+      { text: `Mensual` },
       { text: `Ocasional / según demanda` },
+      { text: `Quincenal` },
+      { text: `Semanal o más frecuente` },
     ]);
 
     const q_5f459f2c_9351_4395_8e0d_36befbb6833c = await saveQuestion(manager, {
-      text: `EX.7 ★ — ¿Qué canales o medios usa para comunicarse con los productores?`,
+      text: `¿Qué canales o medios usa para comunicarse con los productores?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
+      isKeyQuestion: true,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_5f459f2c_9351_4395_8e0d_36befbb6833c, [
-      { text: `Visita presencial en campo` },
-      { text: `Llamada telefónica` },
-      { text: `Radio comunitaria` },
-      { text: `Plataforma institucional` },
-      { text: `WhatsApp` },
       { text: `Grupos comunitarios / asambleas` },
+      { text: `Llamada telefónica` },
+      { text: `Plataforma institucional` },
+      { text: `Radio comunitaria` },
       { text: `SMS` },
+      { text: `Visita presencial en campo` },
+      { text: `WhatsApp` },
     ]);
 
   }

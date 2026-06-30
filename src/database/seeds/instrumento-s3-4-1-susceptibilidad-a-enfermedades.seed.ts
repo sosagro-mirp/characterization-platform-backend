@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     return;
   }
 
-  const typeNames = ["open_text","single_choice"];
+  const typeNames = ["open_text", "single_choice"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -90,7 +95,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `3.21b — Susceptibilidad a cuál enfermedad o plaga — ¿Cuál?`,
+      text: `Susceptibilidad a cuál enfermedad o plaga — ¿Cuál?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -98,7 +103,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     });
 
     const q_19d5fb5a_3ac9_4d49_a200_57618b5dda6a = await saveQuestion(manager, {
-      text: `3.19 ★ — Susceptibilidad a Fitóftora / Monilia`,
+      text: `Susceptibilidad a Fitóftora / Monilia`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -107,51 +112,51 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     });
     await saveOptions(manager, q_19d5fb5a_3ac9_4d49_a200_57618b5dda6a, [
       { text: `MR (Moderadamente resistente)` },
+      { text: `MS (Muy susceptible)` },
       { text: `R (Resistente)` },
       { text: `S (Susceptible)` },
-      { text: `MS (Muy susceptible)` },
     ]);
 
     const q_3fe8f7dd_201a_4580_baa8_bfd957a53b65 = await saveQuestion(manager, {
-      text: `3.18 — Susceptibilidad a Escoba de Bruja`,
+      text: `Susceptibilidad a Escoba de Bruja`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_3fe8f7dd_201a_4580_baa8_bfd957a53b65, [
-      { text: `S (Susceptible)` },
+      { text: `MR (Moderadamente resistente)` },
       { text: `MS (Muy susceptible)` },
       { text: `R (Resistente)` },
-      { text: `MR (Moderadamente resistente)` },
+      { text: `S (Susceptible)` },
     ]);
 
     const q_55c9d143_7a24_4967_9529_10da3df29401 = await saveQuestion(manager, {
-      text: `3.20 — Reacción a Monilia`,
+      text: `Reacción a Monilia`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_55c9d143_7a24_4967_9529_10da3df29401, [
-      { text: `R (Resistente)` },
-      { text: `S (Susceptible)` },
       { text: `MR (Moderadamente resistente)` },
       { text: `MS (Muy susceptible)` },
+      { text: `R (Resistente)` },
+      { text: `S (Susceptible)` },
     ]);
 
     const q_bf6689c1_3517_4817_a5c7_1b3aaa9680cf = await saveQuestion(manager, {
-      text: `3.21 — Susceptibilidad a Mal Rosado`,
+      text: `Susceptibilidad a Mal Rosado`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_bf6689c1_3517_4817_a5c7_1b3aaa9680cf, [
-      { text: `R (Resistente)` },
-      { text: `MS (Muy susceptible)` },
-      { text: `S (Susceptible)` },
       { text: `MR (Moderadamente resistente)` },
+      { text: `MS (Muy susceptible)` },
+      { text: `R (Resistente)` },
+      { text: `S (Susceptible)` },
     ]);
 
   }

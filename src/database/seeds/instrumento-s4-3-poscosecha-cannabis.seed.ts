@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     return;
   }
 
-  const typeNames = ["multiple_choice","single_choice","yes_no","numeric","open_text"];
+  const typeNames = ["multiple_choice", "numeric", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -97,17 +102,17 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       section: sec1,
     });
     await saveOptions(manager, q_efb262d9_545d_4f3b_8a30_6f85e6d6a3b1, [
-      { text: `Extracción (aceites, resinas, etc.)` },
+      { text: `Clasificación` },
+      { text: `Cosecha (corte de planta)` },
       { text: `Curado` },
       { text: `Despalillado / Trimming` },
-      { text: `Clasificación` },
-      { text: `Secado` },
       { text: `Empaque y embalaje` },
-      { text: `Cosecha (corte de planta)` },
+      { text: `Extracción (aceites, resinas, etc.)` },
+      { text: `Secado` },
     ]);
 
     const q_57edabc6_5022_43e5_a13b_32d8cf6c37ba = await saveQuestion(manager, {
-      text: `4.3.1 ★ — Tipo de licencia con que opera`,
+      text: `Tipo de licencia con que opera`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -115,10 +120,10 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       section: sec1,
     });
     await saveOptions(manager, q_57edabc6_5022_43e5_a13b_32d8cf6c37ba, [
+      { text: `En trámite` },
       { text: `No tiene licencia` },
       { text: `Semillas / Material vegetal (ICA)` },
       { text: `Uso adulto (ley 2204/2022)` },
-      { text: `En trámite` },
       { text: `Uso médico y científico (ley 1787/2016)` },
     ]);
 
@@ -142,7 +147,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.3 ★ — ¿Mide el contenido de CBD y/o THC con análisis de laboratorio?`,
+      text: `¿Mide el contenido de CBD y/o THC con análisis de laboratorio?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -160,7 +165,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.5 ★ — ¿Realiza pruebas de pesticidas y metales pesados?`,
+      text: `¿Realiza pruebas de pesticidas y metales pesados?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -169,7 +174,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     const q_14638379_14fc_4048_9045_239cfa9f60c9 = await saveQuestion(manager, {
-      text: `4.3.6 ★ — ¿Cuenta con Buenas Prácticas de Manufactura certificadas (INVIMA)?`,
+      text: `¿Cuenta con Buenas Prácticas de Manufactura certificadas (INVIMA)?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -177,13 +182,13 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       section: sec1,
     });
     await saveOptions(manager, q_14638379_14fc_4048_9045_239cfa9f60c9, [
-      { text: `Sí` },
-      { text: `No` },
       { text: `En trámite` },
+      { text: `No` },
+      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.3.7 — ¿Tiene alguna certificación de calidad?`,
+      text: `¿Tiene alguna certificación de calidad?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -199,12 +204,12 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       section: sec1,
     });
     await saveOptions(manager, q_66114bae_41ec_48e4_ba7e_5a4a601e6681, [
-      { text: `Otro`, isOther: true },
-      { text: `Exportación directa` },
-      { text: `Intermediario / Acopiador` },
-      { text: `Industria / transformador` },
-      { text: `Cooperativa / Asociación` },
       { text: `Comercializador nacional` },
+      { text: `Cooperativa / Asociación` },
+      { text: `Exportación directa` },
+      { text: `Industria / transformador` },
+      { text: `Intermediario / Acopiador` },
+      { text: `Otro`, isOther: true },
       { text: `Venta directa local` },
     ]);
 

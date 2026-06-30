@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     return;
   }
 
-  const typeNames = ["multiple_choice","open_text","single_choice","yes_no","numeric"];
+  const typeNames = ["multiple_choice", "numeric", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -85,7 +90,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     sectionRepo.save(sectionRepo.create({ name: `5.1 Barreras principales`, order: 1, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `5.2 Tipo de apoyo necesario`, order: 2, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `5.3 Reconocimiento por alta calidad`, order: 3, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `5.4 Impacto económico del incumplimiento`, order: 4, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `5.4 Impacto económico del incumplimiento`, order: 4, instrument }))
   ]);
 
   // ── 5.1 Barreras principales ──
@@ -101,27 +106,27 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec1,
     });
     await saveOptions(manager, q_f5de0b7b_545d_4378_833f_935e5e1f4863, [
-      { text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)` },
-      { text: `Falta de financiamiento para mejorar procesos` },
-      { text: `Poca información sobre las normas técnicas aplicables` },
-      { text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)` },
-      { text: `Dificultades de transporte del producto al punto de venta` },
-      { text: `Falta de conocimiento / apoyo institucional` },
       { text: `Acceso limitado a insumos de calidad (semillas certificadas, fertilizantes)` },
-      { text: `Falta de laboratorios de análisis de calidad accesibles o económicos` },
-      { text: `Contaminación por residuos de pesticidas o metales pesados` },
-      { text: `Exigencias de certificaciones que no puede costear` },
-      { text: `Problemas de plagas y enfermedades que afectan la calidad` },
       { text: `Agua de mala calidad para los procesos de beneficio` },
+      { text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)` },
+      { text: `Contaminación por residuos de pesticidas o metales pesados` },
+      { text: `Dificultades de transporte del producto al punto de venta` },
+      { text: `Dificultades en el proceso de fermentación (duración, temperatura, volteo)` },
+      { text: `Dificultades en el secado (tiempo, temperatura, uniformidad)` },
+      { text: `Exigencias de certificaciones que no puede costear` },
+      { text: `Falta de conocimiento / apoyo institucional` },
+      { text: `Falta de conocimiento técnico sobre procesos de poscosecha` },
+      { text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)` },
+      { text: `Falta de financiamiento para mejorar procesos` },
+      { text: `Falta de laboratorios de análisis de calidad accesibles o económicos` },
       { text: `Infraestructura deficiente (marquesinas, cajones de fermentación, bodegas)` },
       { text: `Otro`, isOther: true },
-      { text: `Dificultades en el secado (tiempo, temperatura, uniformidad)` },
-      { text: `Falta de conocimiento técnico sobre procesos de poscosecha` },
-      { text: `Dificultades en el proceso de fermentación (duración, temperatura, volteo)` },
+      { text: `Poca información sobre las normas técnicas aplicables` },
+      { text: `Problemas de plagas y enfermedades que afectan la calidad` },
     ]);
 
     await saveQuestion(manager, {
-      text: `5.1a — Otra dificultad importante (especifique)`,
+      text: `Otra dificultad importante (especifique)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -143,12 +148,12 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec2,
     });
     await saveOptions(manager, q_bff4d6a1_8f14_4127_aeb7_943bc16b0fa5, [
-      { text: `Acompañamiento técnico continuo` },
-      { text: `Normas y certificaciones` },
-      { text: `Financiamiento / crédito` },
       { text: `Acceso a mercados` },
-      { text: `Equipos / tecnología` },
+      { text: `Acompañamiento técnico continuo` },
       { text: `Capacitación técnica` },
+      { text: `Equipos / tecnología` },
+      { text: `Financiamiento / crédito` },
+      { text: `Normas y certificaciones` },
     ]);
 
   }
@@ -201,7 +206,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `5.3 ★ — ¿Ha tenido rechazo de producto por incumplimiento de calidad en el último año?`,
+      text: `¿Ha tenido rechazo de producto por incumplimiento de calidad en el último año?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -219,9 +224,9 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
     await saveOptions(manager, q_fc5c8a53_ca6d_4b7e_b41f_d093f59b42b1, [
       { text: `Frecuentemente (> 30%)` },
+      { text: `Nunca` },
       { text: `Ocasionalmente (10–30%)` },
       { text: `Raramente (< 10% de la producción)` },
-      { text: `Nunca` },
     ]);
 
     await saveQuestion(manager, {
@@ -256,15 +261,15 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       order: o++,
       section: sec4,
     });
-    const opts_q_e8655701_d850_4636_97ac_730421590eb1 = await saveOptions(manager, q_e8655701_d850_4636_97ac_730421590eb1, [
-      { text: `Sí` },
-      { text: `No sabe / No aplica` },
+    const opts_e8655701_d850_4636_97ac_730421590eb1 = await saveOptions(manager, q_e8655701_d850_4636_97ac_730421590eb1, [
       { text: `No` },
+      { text: `No sabe / No aplica` },
+      { text: `Sí` },
     ]);
-    const opt_218dc095_2f36_49e3_8cfa_4032a58ab752 = opts_q_e8655701_d850_4636_97ac_730421590eb1.get(`Sí`)!;
+    const opt_218dc095_2f36_49e3_8cfa_4032a58ab752 = opts_e8655701_d850_4636_97ac_730421590eb1.get(`Sí`)!;
 
     await saveQuestion(manager, {
-      text: `5.7b — Valor aproximado o rango del precio diferencial (COP / kg o carga)`,
+      text: `Valor aproximado o rango del precio diferencial (COP / kg o carga)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
