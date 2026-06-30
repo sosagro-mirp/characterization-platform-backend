@@ -31,8 +31,11 @@ export class CampaignSessionsController {
   @Post()
   @ApiOperation({ summary: 'Iniciar sesión de campaña' })
   @ApiResponse({ status: 201, description: 'Sesión creada.' })
-  create(@Body() dto: CreateCampaignSessionDto) {
-    return this.sessionsService.create(dto);
+  create(
+    @Body() dto: CreateCampaignSessionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionsService.create({ ...dto, userId: user.userId });
   }
 
   @Get('last-farmer')
