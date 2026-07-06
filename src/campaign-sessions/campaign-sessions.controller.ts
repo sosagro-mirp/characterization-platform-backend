@@ -31,8 +31,11 @@ export class CampaignSessionsController {
   @Post()
   @ApiOperation({ summary: 'Iniciar sesión de campaña' })
   @ApiResponse({ status: 201, description: 'Sesión creada.' })
-  create(@Body() dto: CreateCampaignSessionDto) {
-    return this.sessionsService.create(dto);
+  create(
+    @Body() dto: CreateCampaignSessionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.sessionsService.create({ ...dto, userId: user.userId });
   }
 
   @Get('last-farmer')
@@ -41,7 +44,7 @@ export class CampaignSessionsController {
     description:
       'Retorna el farmer vinculado a la sesión más reciente del usuario que tenga farmer asignado, o null si no existe.',
   })
-  @ApiResponse({ status: 200, description: '{ farmerId, name, lastName, farm? } | null' })
+  @ApiResponse({ status: 200, description: '{ farmerId, name, farm? } | null' })
   async getLastFarmer(@CurrentUser() user: AuthenticatedUser) {
     return this.sessionsService.getLastFarmer(user.userId);
   }

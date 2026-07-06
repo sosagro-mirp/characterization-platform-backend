@@ -37,21 +37,22 @@ export class CampaignSessionsService {
   async getLastFarmer(userId: string): Promise<{
     farmerId: string;
     name: string;
-    lastName: string | null;
     farm?: { name: string };
   } | null> {
-    const session = await this.sessionsRepository.findOne({
-      where: { user: { userId } },
-      relations: ['farmer', 'farmer.farm'],
-      order: { createdAt: 'DESC' },
-    });
+    const session = await this.sessionsRepository
+      .createQueryBuilder('session')
+      .leftJoinAndSelect('session.farmer', 'farmer')
+      .leftJoinAndSelect('farmer.farm', 'farm')
+      .where('session.user_id = :userId', { userId })
+      .andWhere('session.farmer_id IS NOT NULL')
+      .orderBy('session.created_at', 'DESC')
+      .getOne();
 
     if (!session?.farmer) return null;
 
     return {
       farmerId: session.farmer.id,
       name: session.farmer.name,
-      lastName: session.farmer.lastName,
       farm: session.farmer.farm ? { name: session.farmer.farm.name } : undefined,
     };
   }

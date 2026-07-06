@@ -6,6 +6,7 @@ import { Department } from 'src/departments/entities/department.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
+import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -26,6 +27,7 @@ import { SurveysService } from './surveys.service';
       Town,
       TypeOfCrop,
       CampaignSession,
+      Response,
     ]),
   ],
   controllers: [SurveysController],

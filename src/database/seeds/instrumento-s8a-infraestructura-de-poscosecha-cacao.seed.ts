@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     return;
   }
 
-  const typeNames = ["multiple_choice","numeric","single_choice","yes_no"];
+  const typeNames = ["likert", "multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,7 +95,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     let o = 1;
 
     const q_33de0422_c44d_4bed_bca0_aa94220ffc9f = await saveQuestion(manager, {
-      text: `8A.1 ★ — ¿Con cuál de las siguientes instalaciones para cacao cuenta en su finca?`,
+      text: `¿Con cuál de las siguientes instalaciones para cacao cuenta en su finca?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -98,23 +103,23 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
       section: sec1,
     });
     await saveOptions(manager, q_33de0422_c44d_4bed_bca0_aa94220ffc9f, [
-      { text: `Báscula o balanza` },
-      { text: `Patio de cemento para secado` },
-      { text: `Marquesina plástica para secado` },
       { text: `Clasificadora / seleccionadora de grano` },
-      { text: `Higrómetro (medidor de humedad)` },
-      { text: `Área de empaque y etiquetado` },
-      { text: `Cajones de fermentación de madera` },
-      { text: `Secador mecánico` },
-      { text: `Termómetro (para fermentación y/o secado)` },
-      { text: `Sacos / cajas para fermentación` },
-      { text: `Bodega / almacén para cacao seco` },
-      { text: `Área de recepción y clasificación de mazorcas` },
+      { text: `Patio de cemento para secado` },
       { text: `Secador solar tipo domo / carpa` },
+      { text: `Secador mecánico` },
+      { text: `Bodega / almacén para cacao seco` },
+      { text: `Higrómetro (medidor de humedad)` },
+      { text: `Báscula o balanza` },
+      { text: `Marquesina plástica para secado` },
+      { text: `Termómetro (para fermentación y/o secado)` },
+      { text: `Área de recepción y clasificación de mazorcas` },
+      { text: `Cajones de fermentación de madera` },
+      { text: `Sacos / cajas para fermentación` },
+      { text: `Área de empaque y etiquetado` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8A.2 ★ — Capacidad de los cajones de fermentación (valor numérico)`,
+      text: `Capacidad de los cajones de fermentación (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -123,7 +128,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     const q_ddff4b78_434f_4945_888e_938274a0ea3f = await saveQuestion(manager, {
-      text: `8A.2b ★ — Unidad de capacidad de los cajones`,
+      text: `Unidad de capacidad de los cajones`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -131,12 +136,12 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
       section: sec1,
     });
     await saveOptions(manager, q_ddff4b78_434f_4945_888e_938274a0ea3f, [
-      { text: `litros` },
       { text: `kg` },
+      { text: `litros` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8A.3 ★ — Número de cajones de fermentación disponibles`,
+      text: `Número de cajones de fermentación disponibles`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -145,7 +150,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.4 — ¿Los cajones tienen tapas / cubiertas para mantener temperatura?`,
+      text: `¿Los cajones tienen tapas / cubiertas para mantener temperatura?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -153,7 +158,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.5 ★ — Área de secado disponible (m²)`,
+      text: `Área de secado disponible (m²)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -162,7 +167,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.6 ★ — Capacidad de almacenamiento de cacao seco (kg)`,
+      text: `Capacidad de almacenamiento de cacao seco (kg)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -171,7 +176,7 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.7 ★ — ¿La bodega tiene control de humedad y temperatura?`,
+      text: `¿La bodega tiene control de humedad y temperatura?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -180,15 +185,83 @@ export async function seedInstrumentoS8aInfraestructuraDePoscosechaCacao(manager
     });
 
     await saveQuestion(manager, {
-      text: `8A.8 ★ — ¿Tiene tomas eléctricas disponibles en el área de poscosecha?`,
+      text: `¿Tiene tomas eléctricas disponibles en el área de poscosecha?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec1,
     });
+
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil contar con un inventario digital de mi infraestructura de poscosecha de cacao (cajones, marquesinas, secadores, básculas), al que pueda acceder desde el celular para gestionar apoyos de mejora.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría recibir alertas de mantenimiento de mis equipos de poscosecha de cacao según el ciclo de uso que yo mismo registre.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una guía digital que me indicara las especificaciones técnicas ideales de infraestructura de poscosecha de cacao para cumplir estándares NTC 1252.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me sería útil que una app me calculara cuánto cacao puedo procesar por ciclo con mi infraestructura actual, para planear mejor la cosecha.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
 
   }
 
-  console.log(`[seed] "${NAME}" insertado (9 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (13 preguntas).`);
 }

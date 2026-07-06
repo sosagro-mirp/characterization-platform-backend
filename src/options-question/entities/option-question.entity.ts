@@ -50,6 +50,15 @@ export class OptionQuestion {
   })
   isOther: boolean;
 
+  @Column({
+    name: 'metadata_id',
+    type: 'varchar',
+    length: 36,
+    nullable: true,
+    default: null,
+  })
+  metadataId: string | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',

@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     return;
   }
 
-  const typeNames = ["multiple_choice","numeric","single_choice","yes_no"];
+  const typeNames = ["likert", "multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,7 +95,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     let o = 1;
 
     const q_4f2ed018_e8fc_420c_b0bb_fa9a9590ca11 = await saveQuestion(manager, {
-      text: `8B.1 ★ — ¿Con cuál de las siguientes instalaciones para café cuenta en su finca?`,
+      text: `¿Con cuál de las siguientes instalaciones para café cuenta en su finca?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -98,23 +103,23 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
     await saveOptions(manager, q_4f2ed018_e8fc_420c_b0bb_fa9a9590ca11, [
-      { text: `Marquesina para secado` },
-      { text: `Despulpadora (cilíndrica o de disco)` },
-      { text: `Equipo de catación / cata en taza` },
       { text: `Báscula / balanza` },
-      { text: `Secador mecánico / guardiola` },
-      { text: `Canal de correteo` },
-      { text: `Bodega para café pergamino seco` },
-      { text: `Pilas de fermentación` },
-      { text: `Patio de cemento para secado` },
-      { text: `Trilladora` },
-      { text: `Beneficiadero (área completa de beneficio húmedo)` },
       { text: `Área de empaque y etiquetado` },
+      { text: `Equipo de catación / cata en taza` },
+      { text: `Bodega para café pergamino seco` },
       { text: `Tostadora` },
+      { text: `Trilladora` },
+      { text: `Secador mecánico / guardiola` },
+      { text: `Patio de cemento para secado` },
+      { text: `Marquesina para secado` },
+      { text: `Canal de correteo` },
+      { text: `Pilas de fermentación` },
+      { text: `Despulpadora (cilíndrica o de disco)` },
+      { text: `Beneficiadero (área completa de beneficio húmedo)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.2 ★ — Capacidad de la despulpadora (valor numérico)`,
+      text: `Capacidad de la despulpadora (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -123,7 +128,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     const q_a7cfb090_9da0_4f3f_a602_4f6d339d63ba = await saveQuestion(manager, {
-      text: `8B.2b ★ — Unidad de capacidad de la despulpadora`,
+      text: `Unidad de capacidad de la despulpadora`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -131,12 +136,12 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
     await saveOptions(manager, q_a7cfb090_9da0_4f3f_a602_4f6d339d63ba, [
-      { text: `cargas / día` },
       { text: `kg / hora` },
+      { text: `cargas / día` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.3 ★ — Capacidad de las pilas de fermentación (valor numérico)`,
+      text: `Capacidad de las pilas de fermentación (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -145,7 +150,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     const q_8a0a36a1_fe54_4b10_b544_4265f0b1578b = await saveQuestion(manager, {
-      text: `8B.3b ★ — Unidad de capacidad de las pilas de fermentación`,
+      text: `Unidad de capacidad de las pilas de fermentación`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -158,7 +163,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.4 ★ — Área de secado disponible (m²)`,
+      text: `Área de secado disponible (m²)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -167,7 +172,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     await saveQuestion(manager, {
-      text: `8B.5 ★ — Capacidad de almacenamiento de café pergamino seco (valor numérico)`,
+      text: `Capacidad de almacenamiento de café pergamino seco (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -176,7 +181,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     const q_caff962f_d16d_4228_91e4_d9ecbc0b096d = await saveQuestion(manager, {
-      text: `8B.5b ★ — Unidad de capacidad de almacenamiento`,
+      text: `Unidad de capacidad de almacenamiento`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -184,12 +189,12 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
     await saveOptions(manager, q_caff962f_d16d_4228_91e4_d9ecbc0b096d, [
-      { text: `cargas` },
       { text: `kg` },
+      { text: `cargas` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8B.6 ★ — ¿La bodega tiene control de humedad?`,
+      text: `¿La bodega tiene control de humedad?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -198,7 +203,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
     });
 
     await saveQuestion(manager, {
-      text: `8B.7 ★ — ¿Tiene tomas eléctricas disponibles en el área de beneficio?`,
+      text: `¿Tiene tomas eléctricas disponibles en el área de beneficio?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -206,7 +211,75 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(manager:
       section: sec1,
     });
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil contar con un inventario digital de mi infraestructura de beneficio de café (beneficiadero, despulpadora, marquesinas, bodega), al que pueda acceder desde el celular para gestionar apoyos de mejora.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría recibir alertas de mantenimiento de mis equipos de beneficio de café según el ciclo de uso que yo mismo registre.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una guía digital que me indicara las especificaciones técnicas ideales de infraestructura de beneficio de café para cumplir estándares NTC 2090.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me sería útil que una app me calculara cuánto café puedo beneficiar por ciclo con mi infraestructura actual, para planear mejor la cosecha.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (10 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (14 preguntas).`);
 }

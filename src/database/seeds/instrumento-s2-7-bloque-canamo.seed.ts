@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     return;
   }
 
-  const typeNames = ["single_choice","numeric","open_text","yes_no"];
+  const typeNames = ["numeric", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,7 +95,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     let o = 1;
 
     const q_b7a83883_6cdb_4741_9259_39566983e0af = await saveQuestion(manager, {
-      text: `2.7.1 ★ — Sistema de cultivo de cáñamo`,
+      text: `Sistema de cultivo de cáñamo`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -98,16 +103,16 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       section: sec1,
     });
     await saveOptions(manager, q_b7a83883_6cdb_4741_9259_39566983e0af, [
-      { text: `Otro`, isOther: true },
-      { text: `Aeroponía` },
-      { text: `Suelo` },
-      { text: `Sustrato` },
       { text: `Hidroponía` },
       { text: `Mixto` },
+      { text: `Suelo` },
+      { text: `Otro`, isOther: true },
+      { text: `Sustrato` },
+      { text: `Aeroponía` },
     ]);
 
     const q_b90f538b_adfc_41a4_ad76_5865ac994c1d = await saveQuestion(manager, {
-      text: `2.7.2 ★ — Condición de cultivo de cáñamo`,
+      text: `Condición de cultivo de cáñamo`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -116,13 +121,13 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
     await saveOptions(manager, q_b90f538b_adfc_41a4_ad76_5865ac994c1d, [
       { text: `Mixto` },
+      { text: `Campo abierto` },
       { text: `Invernadero` },
       { text: `Indoor (cuarto de cultivo)` },
-      { text: `Campo abierto` },
     ]);
 
     await saveQuestion(manager, {
-      text: `2.7.3 ★ — Área cultivada en cáñamo (ha)`,
+      text: `Área cultivada en cáñamo (ha)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -131,7 +136,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
 
     await saveQuestion(manager, {
-      text: `2.7.4 ★ — Variedad / material genético de cáñamo`,
+      text: `Variedad / material genético de cáñamo`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -140,7 +145,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
 
     const q_80779c39_1cb6_4bd3_a0ec_174c06dbdd6b = await saveQuestion(manager, {
-      text: `2.7.5 — ¿Tiene más de una variedad de cáñamo?`,
+      text: `¿Tiene más de una variedad de cáñamo?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -148,7 +153,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
 
     await saveQuestion(manager, {
-      text: `2.7.5b — Liste cada variedad con su porcentaje`,
+      text: `Liste cada variedad con su porcentaje`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -158,7 +163,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
 
     const q_2a190c64_0a32_40dd_b5e5_8220de02406b = await saveQuestion(manager, {
-      text: `2.7.6 ★ — Producto principal del cultivo de cáñamo`,
+      text: `Producto principal del cultivo de cáñamo`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -166,14 +171,14 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       section: sec1,
     });
     await saveOptions(manager, q_2a190c64_0a32_40dd_b5e5_8220de02406b, [
-      { text: `Fibra` },
-      { text: `Semilla` },
       { text: `Múltiple` },
       { text: `CBD` },
+      { text: `Semilla` },
+      { text: `Fibra` },
     ]);
 
     await saveQuestion(manager, {
-      text: `2.7.7 — Ciclos de producción de cáñamo por año`,
+      text: `Ciclos de producción de cáñamo por año`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -181,7 +186,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
 
     await saveQuestion(manager, {
-      text: `2.7.8 ★ — Producción promedio de cáñamo (kg / ha / año)`,
+      text: `Producción promedio de cáñamo (kg / ha / año)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -190,7 +195,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
 
     const q_f3623856_df19_4a46_8135_713efc476f7d = await saveQuestion(manager, {
-      text: `2.7.9 ★ — ¿Cuenta con licencia vigente de cáñamo? (Adjuntar documento)`,
+      text: `¿Cuenta con licencia vigente de cáñamo?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -198,15 +203,15 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
       section: sec1,
     });
     await saveOptions(manager, q_f3623856_df19_4a46_8135_713efc476f7d, [
-      { text: `En trámite` },
-      { text: `No tiene licencia` },
       { text: `Uso adulto (Ley 2204/2022)` },
-      { text: `Semillas / Material vegetal (ICA)` },
+      { text: `No tiene licencia` },
+      { text: `Semillas / material vegetal (ICA)` },
+      { text: `En trámite` },
       { text: `Uso médico y científico (Ley 1787/2016)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `2.7.10 ★ — ¿Verifica que el contenido de THC sea ≤ 1%? (Requisito legal)`,
+      text: `¿Verifica que el contenido de THC sea ≤ 1%?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -215,7 +220,7 @@ export async function seedInstrumentoS27BloqueCanamo(manager: EntityManager): Pr
     });
 
     await saveQuestion(manager, {
-      text: `2.7.11 ★ — ¿Tiene registros productivos de cáñamo?`,
+      text: `¿Tiene registros productivos de cáñamo?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,

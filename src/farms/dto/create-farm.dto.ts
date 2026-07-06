@@ -53,6 +53,20 @@ export class CreateFarmDto {
   @IsBoolean()
   technicalAssistanceAccess: boolean;
 
+  /** Vereda o sector donde se ubica la finca */
+  @ApiPropertyOptional({ example: 'Vereda El Manzanillo', maxLength: 100 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  vereda?: string;
+
+  /** Altitud de la finca en metros sobre el nivel del mar */
+  @ApiPropertyOptional({ example: 1200 })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  altitude?: number;
+
   /** UUID del municipio donde se ubica la finca */
   @ApiPropertyOptional({
     format: 'uuid',

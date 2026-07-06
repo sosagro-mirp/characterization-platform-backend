@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     return;
   }
 
-  const typeNames = ["yes_no","open_text","single_choice"];
+  const typeNames = ["likert", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,14 +81,14 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2] = await Promise.all([
     sectionRepo.save(sectionRepo.create({ name: `9.1 Pertenencia a organizaciones`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `9.2 Canales de comercialización`, order: 2, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `9.2 Canales de comercialización`, order: 2, instrument }))
   ]);
 
   // ── 9.1 Pertenencia a organizaciones ──
@@ -91,7 +96,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     let o = 1;
 
     const q_cf543d94_bb34_4644_b0c5_c23602088454 = await saveQuestion(manager, {
-      text: `9.1 ★ — ¿Pertenece a alguna federación, asociación, cooperativa o gremio?`,
+      text: `¿Pertenece a alguna federación, asociación, cooperativa o gremio?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -100,7 +105,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     await saveQuestion(manager, {
-      text: `9.2 — Nombre de la organización`,
+      text: `Nombre de la organización`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -110,7 +115,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     await saveQuestion(manager, {
-      text: `9.3 — Rol dentro de la organización`,
+      text: `Rol dentro de la organización`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -120,7 +125,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     await saveQuestion(manager, {
-      text: `9.4 — ¿Recibe beneficios por pertenecer a esa organización?`,
+      text: `¿Recibe beneficios por pertenecer a esa organización?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -130,7 +135,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     await saveQuestion(manager, {
-      text: `9.5 — ¿Qué beneficios recibe de la organización?`,
+      text: `¿Qué beneficios recibe de la organización?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -140,7 +145,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     const q_3790b26b_b6d9_40be_923d_cfc3c100331d = await saveQuestion(manager, {
-      text: `9.6 ★ — ¿Recibe actualmente asistencia técnica o extensión agrícola?`,
+      text: `¿Recibe actualmente asistencia técnica o extensión agrícola?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -149,7 +154,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     await saveQuestion(manager, {
-      text: `9.7 — Fuente de asistencia técnica`,
+      text: `Fuente de asistencia técnica`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -159,7 +164,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     await saveQuestion(manager, {
-      text: `9.8 — ¿Ha participado en capacitaciones o talleres en los últimos 2 años?`,
+      text: `¿Ha participado en capacitaciones o talleres en los últimos 2 años?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -173,7 +178,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     let o = 1;
 
     const q_263796a1_3f8c_430d_8aad_b4957f189868 = await saveQuestion(manager, {
-      text: `9.9 ★ — Canal de comercialización principal que usa actualmente`,
+      text: `Canal de comercialización principal que usa actualmente`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -181,17 +186,17 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       section: sec2,
     });
     await saveOptions(manager, q_263796a1_3f8c_430d_8aad_b4957f189868, [
-      { text: `Cooperativa / Asociación` },
-      { text: `Comercializador nacional` },
-      { text: `Exportación directa` },
+      { text: `Industria / Transformador` },
       { text: `Intermediario / Acopiador` },
-      { text: `Otro`, isOther: true },
+      { text: `Cooperativa / Asociación` },
       { text: `Venta directa local` },
-      { text: `Industria / transformador` },
+      { text: `Exportación directa` },
+      { text: `Comercializador nacional` },
+      { text: `Otro`, isOther: true },
     ]);
 
     const q_07dbbc53_9764_4297_b7d9_6dc5218a986a = await saveQuestion(manager, {
-      text: `9.10 ★ — ¿Conoce el precio de mercado actualizado de su producto?`,
+      text: `¿Conoce el precio de mercado actualizado de su producto?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -199,13 +204,13 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       section: sec2,
     });
     await saveOptions(manager, q_07dbbc53_9764_4297_b7d9_6dc5218a986a, [
+      { text: `Sí` },
       { text: `No` },
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
-      text: `9.11 — ¿Exporta o ha exportado alguna vez?`,
+      text: `¿Exporta o ha exportado alguna vez?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -213,7 +218,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     const q_9f8e1f96_aecc_4690_8258_dd15d1ba488c = await saveQuestion(manager, {
-      text: `9.12 ★ — ¿Estaría interesado en acceder a mercados de mayor valor (especialidades, exportación)?`,
+      text: `¿Estaría interesado en acceder a mercados de mayor valor (especialidades, exportación)?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -221,13 +226,13 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       section: sec2,
     });
     await saveOptions(manager, q_9f8e1f96_aecc_4690_8258_dd15d1ba488c, [
-      { text: `Sí` },
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
+      { text: `Sí` },
     ]);
 
     await saveQuestion(manager, {
-      text: `9.13 — ¿Qué le falta para acceder a esos mercados de mayor valor?`,
+      text: `¿Qué le falta para acceder a esos mercados de mayor valor?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -235,7 +240,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
     });
 
     const q_bd8de6a2_7a88_48c0_96f0_90935b1f4b9c = await saveQuestion(manager, {
-      text: `9.14 ★ — ¿Estaría interesado en conectarse con compradores a través de una plataforma digital?`,
+      text: `¿Estaría interesado en conectarse con compradores a través de una plataforma digital?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -243,12 +248,80 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(m
       section: sec2,
     });
     await saveOptions(manager, q_bd8de6a2_7a88_48c0_96f0_90935b1f4b9c, [
-      { text: `Sí` },
       { text: `No` },
+      { text: `Sí` },
       { text: `No sabe / No aplica` },
+    ]);
+
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil recibir en mi celular el precio de mercado actualizado de mi producto (por tipo y calidad) al menos una vez por semana, para negociar mejor con intermediarios o asociaciones.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría que una plataforma digital me mostrara los requisitos que debo cumplir para vender directamente a compradores de mayor valor (exportadores, industria, tiendas especializadas).`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una función que me permitiera comunicarme con otros productores de mi cultivo y zona para coordinar volúmenes de venta conjunta o acceder a mejores precios.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Actualizaría frecuentemente en una plataforma digital la información sobre mi producción disponible para la venta, si eso me conecta con mejores compradores.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
   }
 
-  console.log(`[seed] "${NAME}" insertado (14 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (18 preguntas).`);
 }

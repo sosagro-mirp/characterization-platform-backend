@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     return;
   }
 
-  const typeNames = ["multiple_choice","single_choice","yes_no","numeric","open_text"];
+  const typeNames = ["likert", "multiple_choice", "numeric", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,24 +95,24 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     let o = 1;
 
     const q_efb262d9_545d_4f3b_8a30_6f85e6d6a3b1 = await saveQuestion(manager, {
-      text: `4.3 — Actividades de poscosecha que realiza en cannabis`,
+      text: `Actividades de poscosecha que realiza en cannabis`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_efb262d9_545d_4f3b_8a30_6f85e6d6a3b1, [
-      { text: `Extracción (aceites, resinas, etc.)` },
-      { text: `Curado` },
-      { text: `Despalillado / Trimming` },
       { text: `Clasificación` },
-      { text: `Secado` },
       { text: `Empaque y embalaje` },
       { text: `Cosecha (corte de planta)` },
+      { text: `Secado` },
+      { text: `Curado` },
+      { text: `Despalillado / Trimming` },
+      { text: `Extracción (aceites, resinas, etc.)` },
     ]);
 
     const q_57edabc6_5022_43e5_a13b_32d8cf6c37ba = await saveQuestion(manager, {
-      text: `4.3.1 ★ — Tipo de licencia con que opera`,
+      text: `¿Tipo de licencia con que opera?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -116,14 +121,14 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
     await saveOptions(manager, q_57edabc6_5022_43e5_a13b_32d8cf6c37ba, [
       { text: `No tiene licencia` },
-      { text: `Semillas / Material vegetal (ICA)` },
+      { text: `Semillas / material vegetal (ICA)` },
       { text: `Uso adulto (ley 2204/2022)` },
-      { text: `En trámite` },
       { text: `Uso médico y científico (ley 1787/2016)` },
+      { text: `En trámite` },
     ]);
 
     const q_be0ddfa6_d202_47dc_89be_72f7ebc7454e = await saveQuestion(manager, {
-      text: `4.3.2 ★ — ¿Controla el porcentaje de humedad en flor seca?`,
+      text: `¿Controla el porcentaje de humedad en flor seca?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -132,7 +137,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.2b — Valor habitual de humedad en flor seca (%)`,
+      text: `Valor habitual de humedad en flor seca (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -142,7 +147,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.3 ★ — ¿Mide el contenido de CBD y/o THC con análisis de laboratorio?`,
+      text: `¿Mide el contenido de CBD y/o THC con análisis de laboratorio?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -151,7 +156,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.4 ★ — ¿Tiene análisis microbiológicos de sus productos?`,
+      text: `¿Tiene análisis microbiológicos de sus productos?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -160,7 +165,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     await saveQuestion(manager, {
-      text: `4.3.5 ★ — ¿Realiza pruebas de pesticidas y metales pesados?`,
+      text: `¿Realiza pruebas de pesticidas y metales pesados?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -169,7 +174,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     const q_14638379_14fc_4048_9045_239cfa9f60c9 = await saveQuestion(manager, {
-      text: `4.3.6 ★ — ¿Cuenta con Buenas Prácticas de Manufactura certificadas (INVIMA)?`,
+      text: `¿Cuenta con Buenas Prácticas de Manufactura certificadas (INVIMA)?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -178,12 +183,12 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
     await saveOptions(manager, q_14638379_14fc_4048_9045_239cfa9f60c9, [
       { text: `Sí` },
-      { text: `No` },
       { text: `En trámite` },
+      { text: `No` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.3.7 — ¿Tiene alguna certificación de calidad?`,
+      text: `¿Tiene alguna certificación de calidad?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -191,7 +196,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
     });
 
     const q_66114bae_41ec_48e4_ba7e_5a4a601e6681 = await saveQuestion(manager, {
-      text: `4.3.8 ★ — Destino principal del producto`,
+      text: `Destino principal del producto`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -199,16 +204,101 @@ export async function seedInstrumentoS43PoscosechaCannabis(manager: EntityManage
       section: sec1,
     });
     await saveOptions(manager, q_66114bae_41ec_48e4_ba7e_5a4a601e6681, [
-      { text: `Otro`, isOther: true },
-      { text: `Exportación directa` },
-      { text: `Intermediario / Acopiador` },
-      { text: `Industria / transformador` },
-      { text: `Cooperativa / Asociación` },
       { text: `Comercializador nacional` },
+      { text: `Industria / Transformador` },
       { text: `Venta directa local` },
+      { text: `Intermediario / Acopiador` },
+      { text: `Cooperativa / Asociación` },
+      { text: `Exportación directa` },
+      { text: `Otro`, isOther: true },
+    ]);
+
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil recibir en mi celular una alerta cuando el tiempo de curado del cannabis configurado haya terminado, para evitar sobre-procesamiento de la flor.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría registrar en una app los parámetros de secado de cannabis (temperatura, humedad relativa, días) de cada lote, para mejorar ciclo a ciclo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil tener en una aplicación tablas de referencia de humedad óptima de la flor seca y buenas prácticas INVIMA para la poscosecha de cannabis.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me sería útil que la app me mostrara el precio de mercado actualizado de la flor seca de cannabis para negociar mejor con los compradores.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_5 = await saveQuestion(manager, {
+      text: `Me gustaría llevar un registro digital de cada venta de cannabis realizada (cantidad, precio, comprador) para consultar mi historial de comercialización.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_5, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
   }
 
-  console.log(`[seed] "${NAME}" insertado (10 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (15 preguntas).`);
 }

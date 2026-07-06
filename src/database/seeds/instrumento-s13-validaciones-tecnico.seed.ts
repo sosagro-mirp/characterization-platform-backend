@@ -2,7 +2,6 @@ import { EntityManager } from 'typeorm';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { Question } from 'src/questions/entities/question.entity';
-import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
 
 async function saveQuestion(
@@ -12,10 +11,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,36 +25,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
-async function saveOptions(
-  manager: EntityManager,
-  question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
-): Promise<Map<string, string>> {
-  const repo = manager.getRepository(OptionQuestion);
-  const map = new Map<string, string>();
-  for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-    }));
-    map.set(opt.text, saved.optionId);
-  }
-  return map;
-}
-
-const NAME = `S11a: Tipo de actor`;
+const NAME = `S13: Validaciones técnico`;
 const VERSION = 1;
 
-export async function seedInstrumentoS11aTipoDeActor(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS13ValidacionesTecnico(manager: EntityManager): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
@@ -63,47 +47,54 @@ export async function seedInstrumentoS11aTipoDeActor(manager: EntityManager): Pr
     return;
   }
 
-  const typeNames = ["single_choice"];
-  const types: Record<string, TypeOfQuestion> = {};
-  for (const n of typeNames) {
-    const t = await typeRepo.findOne({ where: { name: n } });
-    if (!t) throw new Error(`[seed] TypeOfQuestion "${n}" no encontrado.`);
-    types[n] = t;
-  }
+  const numeric = await typeRepo.findOne({ where: { name: 'numeric' } });
+  if (!numeric) throw new Error(`[seed] TypeOfQuestion "numeric" no encontrado.`);
 
   const instrument = await instrumentRepo.save(
     instrumentRepo.create({
       name: NAME,
       version: VERSION,
-      publishDate: '2026-06-10',
+      publishDate: '2026-07-06',
       isActive: true,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const sec1 = await sectionRepo.save(
-    sectionRepo.create({ name: `Tipo de actor`, order: 1, instrument }),
+    sectionRepo.create({ name: `Validación GPS de la unidad productiva`, order: 1, instrument }),
   );
 
-  // ── Tipo de actor ──
+  // ── Validación GPS de la unidad productiva ──
   {
     let o = 1;
 
-    const q_38233b00_8696_4370_9fb5_bb4ff71ec09f = await saveQuestion(manager, {
-      text: `Seleccione el perfil que mejor se adapte al perfil del encuestado`,
-      type: types.single_choice,
+    await saveQuestion(manager, {
+      text: `Latitud GPS`,
+      type: numeric,
       isRequired: true,
+      systemField: 'farm.latitude',
       order: o++,
       section: sec1,
     });
-    await saveOptions(manager, q_38233b00_8696_4370_9fb5_bb4ff71ec09f, [
-      { text: `Extensionista` },
-      { text: `Productor` },
-      { text: `Propietario` },
-      { text: `Otros`, isOther: true },
-    ]);
 
+    await saveQuestion(manager, {
+      text: `Longitud GPS`,
+      type: numeric,
+      isRequired: true,
+      systemField: 'farm.longitude',
+      order: o++,
+      section: sec1,
+    });
+
+    await saveQuestion(manager, {
+      text: `Altitud (msnm)`,
+      type: numeric,
+      isRequired: false,
+      systemField: 'farm.altitude',
+      order: o++,
+      section: sec1,
+    });
   }
 
-  console.log(`[seed] "${NAME}" insertado (1 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (3 preguntas).`);
 }

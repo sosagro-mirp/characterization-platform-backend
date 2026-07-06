@@ -71,7 +71,7 @@ export class CampaignsController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   findOneForRender(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.campaignsService.findOne(id);
+    return this.campaignsService.findOneForRender(id);
   }
 
   @Get(':id/sessions-summary')

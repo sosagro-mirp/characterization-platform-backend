@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     return;
   }
 
-  const typeNames = ["open_text","single_choice"];
+  const typeNames = ["likert", "open_text", "single_choice"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,7 +95,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `3.21b — Susceptibilidad a cuál enfermedad o plaga — ¿Cuál?`,
+      text: `Susceptibilidad a enfermedad o plaga — ¿Cuál?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -98,7 +103,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     });
 
     const q_19d5fb5a_3ac9_4d49_a200_57618b5dda6a = await saveQuestion(manager, {
-      text: `3.19 ★ — Susceptibilidad a Fitóftora / Monilia`,
+      text: `Susceptibilidad a Fitóftora / Monilia`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -106,14 +111,14 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
       section: sec1,
     });
     await saveOptions(manager, q_19d5fb5a_3ac9_4d49_a200_57618b5dda6a, [
-      { text: `MR (Moderadamente resistente)` },
-      { text: `R (Resistente)` },
-      { text: `S (Susceptible)` },
       { text: `MS (Muy susceptible)` },
+      { text: `MR (Moderadamente resistente)` },
+      { text: `S (Susceptible)` },
+      { text: `R (Resistente)` },
     ]);
 
     const q_3fe8f7dd_201a_4580_baa8_bfd957a53b65 = await saveQuestion(manager, {
-      text: `3.18 — Susceptibilidad a Escoba de Bruja`,
+      text: `Susceptibilidad a Escoba de Bruja`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -122,39 +127,107 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(manager: E
     await saveOptions(manager, q_3fe8f7dd_201a_4580_baa8_bfd957a53b65, [
       { text: `S (Susceptible)` },
       { text: `MS (Muy susceptible)` },
-      { text: `R (Resistente)` },
       { text: `MR (Moderadamente resistente)` },
+      { text: `R (Resistente)` },
     ]);
 
     const q_55c9d143_7a24_4967_9529_10da3df29401 = await saveQuestion(manager, {
-      text: `3.20 — Reacción a Monilia`,
+      text: `Susceptibilidad a Monilia`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_55c9d143_7a24_4967_9529_10da3df29401, [
-      { text: `R (Resistente)` },
-      { text: `S (Susceptible)` },
       { text: `MR (Moderadamente resistente)` },
       { text: `MS (Muy susceptible)` },
+      { text: `S (Susceptible)` },
+      { text: `R (Resistente)` },
     ]);
 
     const q_bf6689c1_3517_4817_a5c7_1b3aaa9680cf = await saveQuestion(manager, {
-      text: `3.21 — Susceptibilidad a Mal Rosado`,
+      text: `Susceptibilidad a Mal Rosado`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_bf6689c1_3517_4817_a5c7_1b3aaa9680cf, [
-      { text: `R (Resistente)` },
-      { text: `MS (Muy susceptible)` },
       { text: `S (Susceptible)` },
+      { text: `MS (Muy susceptible)` },
       { text: `MR (Moderadamente resistente)` },
+      { text: `R (Resistente)` },
+    ]);
+
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil contar con una guía digital con fotografías y criterios visuales para identificar en campo el nivel de susceptibilidad a enfermedades de cada clon de cacao que evalúe.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría acceder desde mi celular a una base de datos de clones de cacao con sus perfiles de resistencia documentados, para comparar con lo que observo en campo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una app que registrara automáticamente las evaluaciones de susceptibilidad por árbol y generara un reporte del estado sanitario del lote al finalizar el recorrido.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Consultaría información técnica sobre resistencia varietal de cacao en una plataforma digital durante mis visitas de campo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
   }
 
-  console.log(`[seed] "${NAME}" insertado (5 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (9 preguntas).`);
 }

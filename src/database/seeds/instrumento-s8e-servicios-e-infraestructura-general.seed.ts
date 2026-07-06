@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     return;
   }
 
-  const typeNames = ["yes_no","single_choice","open_text","multiple_choice"];
+  const typeNames = ["likert", "multiple_choice", "open_text", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,14 +81,14 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2] = await Promise.all([
     sectionRepo.save(sectionRepo.create({ name: `8E.1 Energía eléctrica`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `8E.2 Conectividad e internet`, order: 2, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `8E.2 Conectividad e internet`, order: 2, instrument }))
   ]);
 
   // ── 8E.1 Energía eléctrica ──
@@ -91,16 +96,17 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     let o = 1;
 
     const q_5ab0f31d_d4cd_4adf_b643_168e7c3d8b13 = await saveQuestion(manager, {
-      text: `8E.1 ★ — ¿Tiene acceso a energía eléctrica en la finca?`,
+      text: `¿Tiene acceso a energía eléctrica en la finca?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec1,
+      systemField: 'farm.hasElectricityAccess',
     });
 
     const q_12d58e69_0f25_4b73_8041_b6c816f60d76 = await saveQuestion(manager, {
-      text: `8E.2 ★ — Tipo de fuente eléctrica`,
+      text: `Tipo de fuente eléctrica`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -108,19 +114,20 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec1,
       conditionQuestion: q_5ab0f31d_d4cd_4adf_b643_168e7c3d8b13,
       conditionValue: 'true',
+      systemField: 'farm.electricitySourceType',
     });
     await saveOptions(manager, q_12d58e69_0f25_4b73_8041_b6c816f60d76, [
-      { text: `Generador a combustible` },
-      { text: `Mixto` },
+      { text: `Panel solar` },
       { text: `Solo algunas horas al día` },
-      { text: `No tiene acceso` },
       { text: `Red pública con interrupciones frecuentes` },
       { text: `Red pública 24/7 sin interrupciones` },
-      { text: `Panel solar` },
+      { text: `Mixto` },
+      { text: `No tiene acceso` },
+      { text: `Generador a combustible` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8E.3 ★ — ¿El servicio eléctrico es estable? ¿Con qué frecuencia hay cortes?`,
+      text: `¿El servicio eléctrico es estable? ¿Con qué frecuencia hay cortes?`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -131,7 +138,7 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     });
 
     await saveQuestion(manager, {
-      text: `8E.4 — ¿Tiene acceso a agua potable en la vivienda de la finca?`,
+      text: `¿Tiene acceso a agua potable en la vivienda de la finca?`,
       type: types.yes_no,
       isRequired: false,
       order: o++,
@@ -145,16 +152,17 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     let o = 1;
 
     const q_156f61bf_a5a6_43e9_b255_25c59c94a502 = await saveQuestion(manager, {
-      text: `8E.5 ★ — ¿Tiene acceso a internet en la finca?`,
+      text: `¿Tiene acceso a internet en la finca?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
       order: o++,
       section: sec2,
+      systemField: 'farm.internetAccess',
     });
 
     const q_cc4da8b8_7d5c_4418_a4cf_3706b6ee7f2f = await saveQuestion(manager, {
-      text: `8E.6 ★ — Tipo de conectividad disponible`,
+      text: `Tipo de conectividad disponible`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -164,15 +172,15 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       conditionValue: 'true',
     });
     await saveOptions(manager, q_cc4da8b8_7d5c_4418_a4cf_3706b6ee7f2f, [
-      { text: `WiFi satelital` },
+      { text: `Datos móviles (plan celular)` },
       { text: `WiFi fijo en finca` },
       { text: `Solo fuera de la finca` },
-      { text: `Datos móviles (plan celular)` },
+      { text: `WiFi satelital` },
       { text: `No tiene acceso` },
     ]);
 
     const q_6a2ab2fa_8b81_41b7_a8b3_8d39126cd3b5 = await saveQuestion(manager, {
-      text: `8E.7 ★ — ¿Cómo describiría la calidad de la señal móvil en la finca?`,
+      text: `¿Cómo describiría la calidad de la señal móvil en la finca?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -180,15 +188,15 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec2,
     });
     await saveOptions(manager, q_6a2ab2fa_8b81_41b7_a8b3_8d39126cd3b5, [
-      { text: `Señal mala (llama pero no navega)` },
-      { text: `No usa celular` },
       { text: `Sin señal` },
-      { text: `Señal regular (navega lento)` },
+      { text: `Señal mala (llama pero no navega)` },
       { text: `Señal buena` },
+      { text: `Señal regular (navega lento)` },
+      { text: `No usa celular` },
     ]);
 
     const q_b4572df6_c3bd_4eae_b26d_cb5857e15cec = await saveQuestion(manager, {
-      text: `8E.8 — Si no tiene internet, ¿cuál es la razón principal?`,
+      text: `Si no tiene internet, ¿cuál es la razón principal?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -198,15 +206,15 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     });
     await saveOptions(manager, q_b4572df6_c3bd_4eae_b26d_cb5857e15cec, [
       { text: `Cobertura deficiente aunque existe` },
-      { text: `No lo considera necesario` },
-      { text: `No hay cobertura en la zona` },
-      { text: `No sabe cómo usarlo` },
-      { text: `Es muy costoso` },
       { text: `No tiene dispositivo` },
+      { text: `Es muy costoso` },
+      { text: `No hay cobertura en la zona` },
+      { text: `No lo considera necesario` },
+      { text: `No sabe cómo usarlo` },
     ]);
 
     const q_3c180788_ed85_47ba_ab68_6a69872ceeec = await saveQuestion(manager, {
-      text: `8E.9 ★ — ¿Qué dispositivos utiliza actualmente?`,
+      text: `¿Qué dispositivos utiliza actualmente?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -214,16 +222,25 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec2,
     });
     await saveOptions(manager, q_3c180788_ed85_47ba_ab68_6a69872ceeec, [
-      { text: `Tableta` },
-      { text: `Ninguno de estos` },
       { text: `Computador portátil` },
-      { text: `Computador de escritorio` },
       { text: `Smartphone (teléfono inteligente)` },
       { text: `Teléfono convencional (no smartphone)` },
+      { text: `Tableta` },
+      { text: `Computador de escritorio` },
+      { text: `Ninguno de estos` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8E.10 ★ — ¿Tiene y usa un smartphone (teléfono inteligente)?`,
+      text: `¿Tiene y usa un smartphone (teléfono inteligente)?`,
+      type: types.yes_no,
+      isRequired: true,
+      isSelectionCriteria: true,
+      order: o++,
+      section: sec2,
+    });
+
+    await saveQuestion(manager, {
+      text: `¿Tiene y usa un teléfono celular?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -232,7 +249,7 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
     });
 
     const q_3d9c5f7b_8c8b_4b8e_ab39_2096a5e4c3c0 = await saveQuestion(manager, {
-      text: `8E.11 ★ — ¿Con qué frecuencia utiliza internet?`,
+      text: `¿Con qué frecuencia utiliza internet?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -240,15 +257,15 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec2,
     });
     await saveOptions(manager, q_3d9c5f7b_8c8b_4b8e_ab39_2096a5e4c3c0, [
-      { text: `Ocasionalmente` },
-      { text: `No utiliza` },
-      { text: `Al menos una vez al mes` },
       { text: `Al menos una vez por semana` },
       { text: `Todos los días` },
+      { text: `Al menos una vez al mes` },
+      { text: `Ocasionalmente` },
+      { text: `No utiliza` },
     ]);
 
     const q_6abf8a02_9a07_4f24_82c9_afcf601ce412 = await saveQuestion(manager, {
-      text: `8E.12 ★ — ¿Con qué frecuencia usa su teléfono celular?`,
+      text: `¿Con qué frecuencia usa su teléfono celular?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -256,14 +273,99 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(manager
       section: sec2,
     });
     await saveOptions(manager, q_6abf8a02_9a07_4f24_82c9_afcf601ce412, [
-      { text: `Al menos una vez por semana` },
       { text: `Al menos una vez al mes` },
-      { text: `Ocasionalmente` },
-      { text: `Todos los días` },
       { text: `No utiliza` },
+      { text: `Todos los días` },
+      { text: `Al menos una vez por semana` },
+      { text: `Ocasionalmente` },
+    ]);
+
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Si existiera una aplicación gratuita diseñada específicamente para agricultores de mi cultivo, la descargaría y la usaría activamente.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Estaría dispuesto(a) a dedicarle entre 5 y 15 minutos diarios a una app de gestión de finca si eso me ayuda a mejorar mi producción o mis ingresos.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me gustaría que la app pudiera usarse sin internet y sincronizara la información cuando recuperara señal, para no perder datos en zonas sin cobertura.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Preferiría una app que funcione tanto en celular como en computador o tablet, para usarla donde sea más cómodo para mí.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_5 = await saveQuestion(manager, {
+      text: `Confiaría en una app de gestión de finca si la recomienda mi extensionista o si la usan otros productores de mi zona que conozco.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec2,
+    });
+    await saveOptions(manager, q_strat_5, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
   }
 
-  console.log(`[seed] "${NAME}" insertado (12 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (18 preguntas).`);
 }

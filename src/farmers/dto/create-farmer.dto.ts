@@ -17,11 +17,6 @@ export class CreateFarmerDto {
   @MaxLength(255)
   name: string;
 
-  @ApiProperty({ maxLength: 255 })
-  @IsString()
-  @MaxLength(255)
-  lastName: string;
-
   @ApiProperty({ maxLength: 50 })
   @IsString()
   @MaxLength(50)

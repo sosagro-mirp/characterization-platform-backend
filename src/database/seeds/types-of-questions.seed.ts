@@ -9,6 +9,10 @@ const TYPES_OF_QUESTIONS: string[] = [
   'multiple_choice',
   'likert',
   'compliance',
+  'image',
+  'voice_recording',
+  'document',
+  'video',
 ];
 
 export async function seedTypesOfQuestions(

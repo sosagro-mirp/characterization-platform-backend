@@ -6,6 +6,7 @@ import { Department } from 'src/departments/entities/department.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
+import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -48,6 +49,8 @@ export class SurveysService {
     private readonly typesOfCropsRepository: Repository<TypeOfCrop>,
     @InjectRepository(CampaignSession)
     private readonly campaignSessionsRepository: Repository<CampaignSession>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
   ) {}
 
   async create(createSurveyDto: CreateSurveyDto, userId?: string): Promise<Survey> {
@@ -224,19 +227,36 @@ export class SurveysService {
   async extractFarmer(surveyId: string): Promise<{ farmer: Farmer; existed: boolean }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: ['responses', 'responses.question', 'campaignSession'],
+      relations: ['responses', 'responses.question', 'responses.option', 'campaignSession'],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
 
-    // Build systemField → value map from all responses that have systemField set
+    // Build systemField → value map from all responses that have systemField set.
+    // farm.town is excluded: it resolves via option.metadataId, not a scalar value.
     const fieldMap: Record<string, string | number | boolean> = {};
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
-      if (!sf) continue;
+      if (!sf || sf === 'farm.town') continue;
       const value = response.textValue ?? response.numericValue ?? response.booleanValue;
       if (value !== undefined && value !== null) {
         fieldMap[sf] = value;
+      }
+    }
+
+    // Resolve farm.town from the selected option's metadataId (townId)
+    let resolvedTown: Town | null = null;
+    const townResponse = (survey.responses ?? []).find(
+      (r) => r.question?.systemField === 'farm.town',
+    );
+    if (townResponse?.option?.metadataId) {
+      resolvedTown = await this.townsRepository.findOne({
+        where: { townId: townResponse.option.metadataId },
+      });
+      if (!resolvedTown) {
+        console.warn(
+          `[extractFarmer] Town not found for metadataId=${townResponse.option.metadataId} — farm.town left null`,
+        );
       }
     }
 
@@ -261,6 +281,14 @@ export class SurveysService {
       farmerPhone = fieldMap['farmer.producerPhone'] as string | undefined;
       farmerEmail = fieldMap['farmer.producerEmail'] as string | undefined;
       farmerDocumentId = fieldMap['farmer.producerDocumentId'] as string | undefined;
+
+      // Fallback: if producer name/documentId unknown, use respondent's as provisional
+      if (!farmerName) {
+        farmerName = fieldMap['farmer.name'] as string | undefined;
+      }
+      if (!farmerDocumentId) {
+        farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
+      }
 
       await this.surveysRepository.update(surveyId, {
         respondentName: (fieldMap['farmer.name'] as string | undefined) || undefined,
@@ -301,10 +329,19 @@ export class SurveysService {
           this.farmsRepository.create({
             name: farmName,
             location: null,
-            vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
-            latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
-            longitude: (fieldMap['farm.longitude'] as number | undefined) ?? null,
-            altitude: (fieldMap['farm.altitude'] as number | undefined) ?? null,
+            vereda:                (fieldMap['farm.vereda']                as string  | undefined) ?? null,
+            latitude:              (fieldMap['farm.latitude']              as number  | undefined) ?? null,
+            longitude:             (fieldMap['farm.longitude']             as number  | undefined) ?? null,
+            altitude:              (fieldMap['farm.altitude']              as number  | undefined) ?? null,
+            area:                  (fieldMap['farm.area']                  as number  | undefined) ?? null,
+            waterAccess:           (fieldMap['farm.waterAccess']           as boolean | undefined) ?? null,
+            internetAccess:        (fieldMap['farm.internetAccess']        as boolean | undefined) ?? null,
+            hasElectricityAccess:  (fieldMap['farm.hasElectricityAccess']  as boolean | undefined) ?? null,
+            mainAccessType:        (fieldMap['farm.mainAccessType']        as string  | undefined) ?? null,
+            electricitySourceType: (fieldMap['farm.electricitySourceType'] as string  | undefined) ?? null,
+            waterSourceType:       (fieldMap['farm.waterSourceType']       as string  | undefined) ?? null,
+            plotCount:             (fieldMap['farm.plotCount']             as number  | undefined) ?? null,
+            town:                  resolvedTown ?? undefined,
           }),
         );
       }
@@ -312,10 +349,14 @@ export class SurveysService {
       farmer = await this.farmersRepository.save(
         this.farmersRepository.create({
           name: farmerName,
-          lastName: null,
-          documentId: farmerDocumentId ?? null,
-          phone: farmerPhone ?? null,
-          email: farmerEmail ?? null,
+          documentId:      farmerDocumentId ?? null,
+          phone:           farmerPhone ?? null,
+          email:           farmerEmail ?? null,
+          gender:          (fieldMap['farmer.gender']          as string  | undefined) ?? null,
+          age:             (fieldMap['farmer.age']             as number  | undefined) ?? null,
+          experienceYears: (fieldMap['farmer.experienceYears'] as number  | undefined) ?? null,
+          isMainIncome:    (fieldMap['farmer.isMainIncome']    as boolean | undefined) ?? null,
+          educationLevel:  (fieldMap['farmer.educationLevel']  as string  | undefined) ?? null,
           farm: farm ?? undefined,
         }),
       );
@@ -419,6 +460,52 @@ export class SurveysService {
     return { surveyId: saved.surveyId };
   }
 
+  async findSurveyResponses(surveyId: string) {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+      relations: { instruments: true },
+    });
+
+    if (!survey) {
+      throw new NotFoundException('Survey not found');
+    }
+
+    const responses = await this.responsesRepository
+      .createQueryBuilder('response')
+      .innerJoinAndSelect('response.question', 'question')
+      .innerJoinAndSelect('question.type', 'type')
+      .innerJoinAndSelect('question.section', 'section')
+      .leftJoinAndSelect('response.option', 'option')
+      .leftJoinAndSelect('response.attachments', 'attachment')
+      .where('response.survey = :surveyId', { surveyId })
+      .orderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC')
+      .getMany();
+
+    return {
+      surveyId: survey.surveyId,
+      instrumentName: survey.instruments?.[0]?.name ?? null,
+      syncedAt: survey.updatedAt.toISOString(),
+      responses: responses.map((r) => {
+        const attachment = r.attachments?.[0] ?? null;
+        return {
+          responseId: r.responseId,
+          questionId: r.question.questionId,
+          questionText: r.question.text,
+          questionType: r.question.type.name,
+          sectionTitle: r.question.section.name,
+          textValue: r.textValue ?? null,
+          numericValue: r.numericValue ?? null,
+          booleanValue: r.booleanValue ?? null,
+          optionText: r.option?.text ?? null,
+          publicUrl: attachment?.publicUrl ?? null,
+          mimeType: attachment?.mimeType ?? null,
+          originalFilename: attachment?.originalFilename ?? null,
+        };
+      }),
+    };
+  }
+
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
@@ -427,13 +514,32 @@ export class SurveysService {
 
     if (!survey) throw new NotFoundException('Survey not found');
 
+    // Maps ASCII camelCase systemField keys to TypeOfCrop display names in DB
+    const CROP_FIELD_MAP: Record<string, string> = {
+      cacao:    'Cacao',
+      cafe:     'Café',
+      cannabis: 'Cannabis',
+      canamo:   'Cáñamo',
+    };
+
     // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
+    // Also collect farm.* fields to create/update Farm if the instrument includes them
     const cropNames: string[] = [];
+    const farmFieldMap: Record<string, string | number | boolean> = {};
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
-      if (!sf?.startsWith('crop.')) continue;
-      if (response.booleanValue === true) {
-        cropNames.push(sf.split('.')[1]);
+      if (!sf) continue;
+      if (sf.startsWith('crop.')) {
+        if (response.booleanValue === true) {
+          const key = sf.split('.')[1];
+          const resolved = CROP_FIELD_MAP[key] ?? key;
+          cropNames.push(resolved);
+        }
+      } else if (sf.startsWith('farm.')) {
+        const value = response.textValue ?? response.numericValue ?? response.booleanValue;
+        if (value !== undefined && value !== null) {
+          farmFieldMap[sf] = value;
+        }
       }
     }
 
@@ -447,11 +553,86 @@ export class SurveysService {
     if (survey.campaignSession) {
       const session = await this.campaignSessionsRepository.findOne({
         where: { sessionId: survey.campaignSession.sessionId },
-        relations: ['crops'],
+        relations: ['crops', 'farmer', 'farmer.farm'],
       });
       if (session) {
         session.crops = crops;
         await this.campaignSessionsRepository.save(session);
+
+        // Create or update Farm from farm.* fields present in this survey (e.g. S1b)
+        const farmName = farmFieldMap['farm.name'] as string | undefined;
+        if (farmName && session.farmer) {
+          // Resolve farm.town from ANY survey in this session (may live in a different instrument)
+          let resolvedTown: Town | null = null;
+          const townResponse = await this.responsesRepository
+            .createQueryBuilder('r')
+            .innerJoin('r.survey', 's')
+            .innerJoin('r.question', 'q')
+            .leftJoinAndSelect('r.option', 'o')
+            .where('s.campaignSession = :sessionId', { sessionId: session.sessionId })
+            .andWhere('q.systemField = :sf', { sf: 'farm.town' })
+            .andWhere('o.metadataId IS NOT NULL')
+            .getOne();
+          if (townResponse?.option?.metadataId) {
+            resolvedTown = await this.townsRepository.findOne({
+              where: { townId: townResponse.option.metadataId },
+            });
+          }
+
+          let farm: Farm | null = session.farmer.farm ?? null;
+          const farmFields = {
+            name:                  farmName,
+            town:                  resolvedTown ?? undefined,
+            area:                  (farmFieldMap['farm.area']                  as number  | undefined) ?? undefined,
+            vereda:                (farmFieldMap['farm.vereda']                as string  | undefined) ?? undefined,
+            latitude:              (farmFieldMap['farm.latitude']              as number  | undefined) ?? undefined,
+            longitude:             (farmFieldMap['farm.longitude']             as number  | undefined) ?? undefined,
+            altitude:              (farmFieldMap['farm.altitude']              as number  | undefined) ?? undefined,
+            waterAccess:           (farmFieldMap['farm.waterAccess']           as boolean | undefined) ?? undefined,
+            internetAccess:        (farmFieldMap['farm.internetAccess']        as boolean | undefined) ?? undefined,
+            hasElectricityAccess:  (farmFieldMap['farm.hasElectricityAccess']  as boolean | undefined) ?? undefined,
+            mainAccessType:        (farmFieldMap['farm.mainAccessType']        as string  | undefined) ?? undefined,
+            electricitySourceType: (farmFieldMap['farm.electricitySourceType'] as string  | undefined) ?? undefined,
+            waterSourceType:       (farmFieldMap['farm.waterSourceType']       as string  | undefined) ?? undefined,
+            plotCount:             (farmFieldMap['farm.plotCount']             as number  | undefined) ?? undefined,
+          };
+          if (farm?.farmId) {
+            // Update existing farm (farmsRepository.update doesn't handle relations; use save)
+            Object.assign(farm, farmFields);
+            await this.farmsRepository.save(farm);
+            farm = await this.farmsRepository.findOne({
+              where: { farmId: farm.farmId },
+              relations: ['crops'],
+            });
+          } else {
+            // Create new farm and link to farmer
+            farm = await this.farmsRepository.save(
+              this.farmsRepository.create({ ...farmFields, location: null }),
+            );
+            await this.farmersRepository.update(session.farmer.id, { farm });
+          }
+          // Propagate crops to farm
+          if (farm) {
+            const farmWithCrops = await this.farmsRepository.findOne({
+              where: { farmId: farm.farmId },
+              relations: ['crops'],
+            });
+            if (farmWithCrops) {
+              farmWithCrops.crops = crops;
+              await this.farmsRepository.save(farmWithCrops);
+            }
+          }
+        } else if (session.farmer?.farm?.farmId) {
+          // No farm.* fields in this survey but farm already exists — just propagate crops
+          const farm = await this.farmsRepository.findOne({
+            where: { farmId: session.farmer.farm.farmId },
+            relations: ['crops'],
+          });
+          if (farm) {
+            farm.crops = crops;
+            await this.farmsRepository.save(farm);
+          }
+        }
       }
     }
 
