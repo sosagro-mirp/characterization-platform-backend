@@ -349,7 +349,6 @@ export class SurveysService {
       farmer = await this.farmersRepository.save(
         this.farmersRepository.create({
           name: farmerName,
-          lastName: null,
           documentId:      farmerDocumentId ?? null,
           phone:           farmerPhone ?? null,
           email:           farmerEmail ?? null,

@@ -46,7 +46,6 @@ export class FarmersService {
     const farmer = await this.farmersRepository.save(
       this.farmersRepository.create({
         name: dto.name,
-        lastName: dto.lastName,
         documentId: dto.documentId,
         phone: dto.phone ?? null,
         email: dto.email ?? null,
@@ -69,7 +68,6 @@ export class FarmersService {
       select: {
         id: true,
         name: true,
-        lastName: true,
         documentId: true,
         phone: true,
         farm: { farmId: true, name: true, town: { townId: true, name: true } },
@@ -77,7 +75,6 @@ export class FarmersService {
       relations: ['farm', 'farm.town'],
       where: [
         { name: ILike(`%${query}%`) },
-        { lastName: ILike(`%${query}%`) },
         { documentId: ILike(`%${query}%`) },
       ],
       take: 10,
