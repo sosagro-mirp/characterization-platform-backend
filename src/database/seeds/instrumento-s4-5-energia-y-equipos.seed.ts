@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS45EnergiaYEquipos(manager: EntityManager):
     return;
   }
 
-  const typeNames = ["multiple_choice"];
+  const typeNames = ["multiple_choice", "likert"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS45EnergiaYEquipos(manager: EntityManager):
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,38 +95,106 @@ export async function seedInstrumentoS45EnergiaYEquipos(manager: EntityManager):
     let o = 1;
 
     const q_14f4a76c_9bfe_43ef_a64d_4dfd004e01c0 = await saveQuestion(manager, {
-      text: `4.5.1 — ¿Qué equipos utiliza en sus procesos?`,
+      text: `¿Qué equipos utiliza en sus procesos?`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_14f4a76c_9bfe_43ef_a64d_4dfd004e01c0, [
-      { text: `Tostadores` },
-      { text: `Hornos` },
-      { text: `Calderas` },
-      { text: `Secadores` },
       { text: `Ninguno` },
       { text: `Otro`, isOther: true },
+      { text: `Calderas` },
+      { text: `Tostadores` },
+      { text: `Hornos` },
+      { text: `Secadores` },
     ]);
 
     const q_3977b8d0_cc99_423f_9e69_078f09b219da = await saveQuestion(manager, {
-      text: `4.5.2 — ¿Qué combustibles utiliza en los procesos?`,
+      text: `¿Qué combustibles utiliza en los procesos?`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_3977b8d0_cc99_423f_9e69_078f09b219da, [
-      { text: `Leña` },
-      { text: `Electricidad` },
       { text: `Gas natural / propano` },
-      { text: `Carbón` },
-      { text: `Biogás / biocombustible` },
       { text: `Otro`, isOther: true },
+      { text: `Biogás / biocombustible` },
+      { text: `Carbón` },
+      { text: `Electricidad` },
+      { text: `Leña` },
+    ]);
+
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me gustaría llevar en una app un inventario de mis equipos productivos (nombre, año de compra, estado) para tener un registro organizado y saber cuándo programar mantenimiento.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me sería útil recibir alertas de mantenimiento preventivo de mis equipos (secadoras, calderas) a través de mi celular, según el ciclo de uso que yo defina.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una herramienta que me calculara el costo energético estimado de cada ciclo de procesamiento por tipo de combustible, para identificar dónde puedo ahorrar.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me interesaría recibir información sobre equipos más eficientes disponibles en el mercado colombiano a través de una plataforma digital.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
   }
 
-  console.log(`[seed] "${NAME}" insertado (2 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (6 preguntas).`);
 }

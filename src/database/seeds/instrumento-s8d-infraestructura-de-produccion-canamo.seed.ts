@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     return;
   }
 
-  const typeNames = ["multiple_choice","numeric","yes_no","single_choice"];
+  const typeNames = ["likert", "multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,7 +95,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     let o = 1;
 
     const q_14cd478f_a3fa_40cd_837f_d3e6a19d5716 = await saveQuestion(manager, {
-      text: `8D.1 ★ — ¿Con cuál de las siguientes instalaciones para cáñamo cuenta?`,
+      text: `¿Con cuál de las siguientes instalaciones para cáñamo cuenta?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -98,21 +103,21 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
       section: sec1,
     });
     await saveOptions(manager, q_14cd478f_a3fa_40cd_837f_d3e6a19d5716, [
-      { text: `Desfibrado manual` },
-      { text: `Báscula` },
-      { text: `Área de empaque y etiquetado` },
-      { text: `Área de secado de fibra / semilla / flor` },
-      { text: `Campo abierto (sin estructura)` },
-      { text: `Equipo de extracción de CBD` },
       { text: `Bodega de producto terminado` },
-      { text: `Sistema de riego tecnificado` },
-      { text: `Prensa de semilla (para aceite)` },
+      { text: `Área de empaque y etiquetado` },
+      { text: `Campo abierto (sin estructura)` },
       { text: `Invernadero` },
+      { text: `Báscula` },
+      { text: `Sistema de riego tecnificado` },
       { text: `Decorticadora / desfibrado mecánico` },
+      { text: `Desfibrado manual` },
+      { text: `Área de secado de fibra / semilla / flor` },
+      { text: `Prensa de semilla (para aceite)` },
+      { text: `Equipo de extracción de CBD` },
     ]);
 
     await saveQuestion(manager, {
-      text: `8D.2 ★ — Área de cultivo a campo abierto (ha)`,
+      text: `Área de cultivo a campo abierto (ha)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -121,7 +126,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.3 — Área bajo invernadero (m²)`,
+      text: `Área bajo invernadero (m²)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -129,7 +134,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.4 ★ — ¿Tiene maquinaria de cosecha (cosechadora, segadora)?`,
+      text: `¿Tiene maquinaria de cosecha (cosechadora, segadora)?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -138,7 +143,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.5 ★ — Capacidad de procesamiento de fibra (valor numérico)`,
+      text: `Capacidad de procesamiento de fibra (valor numérico)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -147,7 +152,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     const q_3d5ac54a_efe3_4860_897f_cdf8eb783d9d = await saveQuestion(manager, {
-      text: `8D.5b ★ — Unidad de capacidad de procesamiento de fibra`,
+      text: `Unidad de capacidad de procesamiento de fibra`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -160,7 +165,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     ]);
 
     await saveQuestion(manager, {
-      text: `8D.6 ★ — ¿Tiene área de almacenamiento con control de humedad?`,
+      text: `¿Tiene área de almacenamiento con control de humedad?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -169,7 +174,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
     });
 
     await saveQuestion(manager, {
-      text: `8D.7 ★ — ¿Tiene tomas eléctricas disponibles para instalación de sensores?`,
+      text: `¿Tiene tomas eléctricas disponibles para instalación de sensores?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -177,7 +182,75 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(manage
       section: sec1,
     });
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil una app que monitoree en tiempo real las condiciones de almacenamiento de mi cáñamo (temperatura, humedad) y me envíe alertas cuando estén fuera del rango configurado.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría llevar un registro digital de los parámetros de secado de fibra, semilla o flor de cáñamo por lote, para mejorar el proceso ciclo a ciclo.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una herramienta digital que me ayudara a calcular la capacidad de procesamiento de mi decorticadora o equipo de extracción de CBD, para planear mejor la cosecha.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me interesaría recibir recomendaciones digitales sobre cómo optimizar el procesamiento de cáñamo según los parámetros de mi infraestructura actual.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (8 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (12 preguntas).`);
 }

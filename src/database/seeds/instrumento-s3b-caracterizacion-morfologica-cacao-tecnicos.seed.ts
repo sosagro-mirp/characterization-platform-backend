@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     return;
   }
 
-  const typeNames = ["single_choice","open_text","numeric"];
+  const typeNames = ["likert", "numeric", "open_text", "single_choice"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,39 +81,39 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3, sec4, sec5] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `3b.1 Árbol`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `3b.2 Hoja`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `3b.3 Fruto`, order: 3, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `3b.4 Semilla`, order: 4, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `3b.5 Flor`, order: 5, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Árbol`, order: 1, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Hoja`, order: 2, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Fruto`, order: 3, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Semilla`, order: 4, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `Flor`, order: 5, instrument }))
   ]);
 
-  // ── 3b.1 Árbol ──
+  // ── Árbol ──
   {
     let o = 1;
 
     const q_eadd2e65_1de6_4183_bb5f_b9edb6460850 = await saveQuestion(manager, {
-      text: `3b.1.1 — Variedad (Pedigrí)`,
+      text: `Variedad (Pedigrí)`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_eadd2e65_1de6_4183_bb5f_b9edb6460850, [
-      { text: `Trinitario x Criollo` },
-      { text: `Criollo` },
       { text: `Trinitario` },
       { text: `Híbrido por trinitario` },
+      { text: `Criollo` },
+      { text: `Trinitario x Criollo` },
     ]);
 
     await saveQuestion(manager, {
-      text: `3b.1.2 — Clon`,
+      text: `Clon`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -116,7 +121,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.1.3 — Altura del árbol (m)`,
+      text: `Altura del árbol (m)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -124,7 +129,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.1.4 — Diámetro de copa del árbol (m)`,
+      text: `Diámetro de copa del árbol (m)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -132,7 +137,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.1.5 — Edad del árbol (años)`,
+      text: `Edad del árbol (años)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -140,7 +145,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.1.6 — Perímetro del tronco DAP (cm)`,
+      text: `Perímetro del tronco DAP (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -148,7 +153,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     const q_dd4d9ba8_9a33_45bc_8e43_a72c7bc362f9 = await saveQuestion(manager, {
-      text: `3b.1.7 — Hábito del árbol`,
+      text: `Hábito del árbol`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -160,7 +165,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     ]);
 
     const q_9b6839d3_64ef_4aa6_80a7_c9631da6347a = await saveQuestion(manager, {
-      text: `3b.1.8 — Vigor del árbol`,
+      text: `Vigor del árbol`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -173,7 +178,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     ]);
 
     const q_3ba6a9d8_9298_4f45_9d41_5d10031f7d95 = await saveQuestion(manager, {
-      text: `3b.1.9 — Follaje sin poda`,
+      text: `Follaje sin poda`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -185,7 +190,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     ]);
 
     await saveQuestion(manager, {
-      text: `3b.1.10 — Frecuencia de poda`,
+      text: `Frecuencia de poda`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -194,12 +199,12 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
 
   }
 
-  // ── 3b.2 Hoja ──
+  // ── Hoja ──
   {
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `3b.2.1 — Color hojas jóvenes (código Pantone o descripción)`,
+      text: `Color hojas jóvenes (código Pantone o descripción)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -207,7 +212,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.2.2 — Longitud de la hoja (cm)`,
+      text: `Longitud de la hoja (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -215,7 +220,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.2.3 — Ancho de la hoja (cm)`,
+      text: `Ancho de la hoja (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -223,7 +228,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.2.4 — Longitud de la base al punto más ancho (cm)`,
+      text: `Longitud de la base al punto más ancho (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -231,36 +236,36 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     const q_b7d51b7e_cf21_4e0f_b13e_403901bfc3b5 = await saveQuestion(manager, {
-      text: `3b.2.5 — Forma de la hoja`,
+      text: `Forma de la hoja`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_b7d51b7e_cf21_4e0f_b13e_403901bfc3b5, [
-      { text: `Acuñada` },
-      { text: `Ovoide` },
       { text: `Elíptica` },
-      { text: `Acorazonada` },
       { text: `Ovada` },
       { text: `Obovada` },
+      { text: `Acuñada` },
+      { text: `Acorazonada` },
+      { text: `Ovoide` },
     ]);
 
     const q_40bfff67_312b_471e_af77_412be7c830b7 = await saveQuestion(manager, {
-      text: `3b.2.6 — Forma del ápice de la hoja`,
+      text: `Forma del ápice de la hoja`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_40bfff67_312b_471e_af77_412be7c830b7, [
+      { text: `Agudo` },
       { text: `Acuminado largo` },
       { text: `Acuminado corto` },
-      { text: `Agudo` },
     ]);
 
     const q_33414693_4fda_4c4e_80bc_8d6dc2dcc723 = await saveQuestion(manager, {
-      text: `3b.2.7 — Forma de la base de la hoja`,
+      text: `Forma de la base de la hoja`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -273,41 +278,41 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     ]);
 
     const q_7c2212ff_b357_4441_8d1a_49fdf459bb6f = await saveQuestion(manager, {
-      text: `3b.2.8 — Color del brote terminal de la hoja`,
+      text: `Color del brote terminal de la hoja`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec2,
     });
     await saveOptions(manager, q_7c2212ff_b357_4441_8d1a_49fdf459bb6f, [
-      { text: `Rojo oscuro` },
-      { text: `Rojo intermedio` },
       { text: `Rojo claro` },
       { text: `Rojo brillante` },
+      { text: `Rojo oscuro` },
+      { text: `Rojo intermedio` },
     ]);
 
   }
 
-  // ── 3b.3 Fruto ──
+  // ── Fruto ──
   {
     let o = 1;
 
     const q_cf072469_76f1_4fa1_a87a_f56d71f38198 = await saveQuestion(manager, {
-      text: `3b.3.1 — Constricción basal del fruto`,
+      text: `Constricción basal del fruto`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_cf072469_76f1_4fa1_a87a_f56d71f38198, [
-      { text: `Pronunciada` },
-      { text: `Ausente` },
       { text: `Intermedia` },
+      { text: `Ausente` },
+      { text: `Pronunciada` },
       { text: `Ligera` },
     ]);
 
     await saveQuestion(manager, {
-      text: `3b.3.2 — Grosor del lomo del fruto (mm)`,
+      text: `Grosor del lomo del fruto (mm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -315,7 +320,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.3 — Profundidad surco primario (mm)`,
+      text: `Profundidad surco primario (mm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -323,7 +328,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.4 — Profundidad surco secundario (mm)`,
+      text: `Profundidad surco secundario (mm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -331,7 +336,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.5 — Grosor de cáscara (mm)`,
+      text: `Grosor de cáscara (mm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -339,7 +344,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.6 — Frutos de un árbol por año`,
+      text: `Frutos de un árbol por año`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -347,7 +352,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     const q_0892aaf4_917d_4427_9594_cf8bd4db015f = await saveQuestion(manager, {
-      text: `3b.3.7 — Color fruto inmaduro`,
+      text: `Color fruto inmaduro`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -355,66 +360,66 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
     await saveOptions(manager, q_0892aaf4_917d_4427_9594_cf8bd4db015f, [
       { text: `Morado` },
-      { text: `Verde` },
       { text: `Rojo` },
+      { text: `Verde` },
     ]);
 
     const q_53eed3dc_9c2c_44cf_83af_2716e1eaeae1 = await saveQuestion(manager, {
-      text: `3b.3.8 — Color fruto maduro`,
+      text: `Color fruto maduro`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_53eed3dc_9c2c_44cf_83af_2716e1eaeae1, [
-      { text: `Amarillo` },
-      { text: `Rojo` },
       { text: `Naranja` },
+      { text: `Rojo` },
+      { text: `Amarillo` },
     ]);
 
     const q_eb56a02a_43e5_4110_9aa4_2586a750e76c = await saveQuestion(manager, {
-      text: `3b.3.9 — Forma del fruto`,
+      text: `Forma del fruto`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_eb56a02a_43e5_4110_9aa4_2586a750e76c, [
-      { text: `Angoleta` },
       { text: `Calabacillo` },
       { text: `Amelonado` },
+      { text: `Angoleta` },
       { text: `Cundeamor` },
     ]);
 
     const q_92ba1769_1d87_42ac_b918_293ce199ae31 = await saveQuestion(manager, {
-      text: `3b.3.10 — Forma del ápice del fruto`,
+      text: `Forma del ápice del fruto`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_92ba1769_1d87_42ac_b918_293ce199ae31, [
-      { text: `Agudo` },
-      { text: `Obtuso` },
       { text: `Atenuado` },
+      { text: `Obtuso` },
       { text: `Mamiforme` },
+      { text: `Agudo` },
     ]);
 
     const q_99ad5f44_aecb_4659_85b2_3c849c497646 = await saveQuestion(manager, {
-      text: `3b.3.11 — Rugosidad del fruto`,
+      text: `Rugosidad del fruto`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec3,
     });
     await saveOptions(manager, q_99ad5f44_aecb_4659_85b2_3c849c497646, [
-      { text: `Intermedia` },
       { text: `Intensa` },
       { text: `Ligera` },
+      { text: `Intermedia` },
     ]);
 
     await saveQuestion(manager, {
-      text: `3b.3.12 — Longitud del fruto (cm)`,
+      text: `Longitud del fruto (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -422,7 +427,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.13 — Diámetro del fruto (cm)`,
+      text: `Diámetro del fruto (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -430,7 +435,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.14 — Rendimiento (kg/ha/año)`,
+      text: `Rendimiento (kg/ha/año)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -438,7 +443,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.15a — Clon de referencia para tamaño de mazorca`,
+      text: `Clon de referencia para tamaño de mazorca`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -446,7 +451,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.15b — Tamaño promedio de mazorca por clon (cm)`,
+      text: `Tamaño promedio de mazorca por clon (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -454,7 +459,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.16a — Clon de referencia para número de mazorcas sanas`,
+      text: `Clon de referencia para número de mazorcas sanas`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -462,7 +467,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.16b — Número de mazorcas sanas promedio por clon`,
+      text: `Número de mazorcas sanas promedio por clon`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -470,7 +475,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.17a — Clon de referencia para peso de mazorca`,
+      text: `Clon de referencia para peso de mazorca`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -478,7 +483,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.17b — Peso de mazorca promedio por clon (g)`,
+      text: `Peso de mazorca promedio por clon (g)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -486,7 +491,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.18a — Clon de referencia para Índice de Mazorca (IM)`,
+      text: `Clon de referencia para Índice de Mazorca (IM)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -494,7 +499,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.3.18b — Índice de Mazorca (IM) promedio por clon`,
+      text: `Índice de Mazorca (IM) promedio por clon`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -503,25 +508,25 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
 
   }
 
-  // ── 3b.4 Semilla ──
+  // ── Semilla ──
   {
     let o = 1;
 
     const q_56a54c92_ab34_4152_b52c_4079975bc6f0 = await saveQuestion(manager, {
-      text: `3b.4.1 — Color de la semilla`,
+      text: `Color de la semilla`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec4,
     });
     await saveOptions(manager, q_56a54c92_ab34_4152_b52c_4079975bc6f0, [
-      { text: `Morado` },
       { text: `Blanco` },
+      { text: `Morado` },
       { text: `Violeta` },
     ]);
 
     await saveQuestion(manager, {
-      text: `3b.4.2 — Peso húmedo de la semilla (g)`,
+      text: `Peso húmedo de la semilla (g)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -529,7 +534,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.4.3 — Longitud de la semilla (cm)`,
+      text: `Longitud de la semilla (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -537,7 +542,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.4.4 — Diámetro de la semilla (cm)`,
+      text: `Diámetro de la semilla (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -545,7 +550,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.4.5 — Grosor de la semilla (cm)`,
+      text: `Grosor de la semilla (cm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -553,7 +558,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.4.6 — Porcentaje de cascarilla (%)`,
+      text: `Porcentaje de cascarilla (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -561,7 +566,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.4.7 — Tamaño del grano (pequeño / mediano / grande)`,
+      text: `Tamaño del grano (pequeño / mediano / grande)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -569,7 +574,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.4.8a — Clon de referencia para Índice de Grano (IG)`,
+      text: `Clon de referencia para Índice de Grano (IG)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -577,7 +582,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.4.8b — Índice de Grano (IG) promedio por clon`,
+      text: `Índice de Grano (IG) promedio por clon`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -586,12 +591,12 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
 
   }
 
-  // ── 3b.5 Flor ──
+  // ── Flor ──
   {
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `3b.5.1 — Longitud del estaminodio (mm)`,
+      text: `Longitud del estaminodio (mm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -599,7 +604,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.5.2 — Longitud del ovario de la flor (mm)`,
+      text: `Longitud del ovario de la flor (mm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -607,7 +612,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.5.3 — Longitud del estilo de la flor (mm)`,
+      text: `Longitud del estilo de la flor (mm)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -615,7 +620,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     await saveQuestion(manager, {
-      text: `3b.5.4 — Número de óvulos por ovario`,
+      text: `Número de óvulos por ovario`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -623,21 +628,21 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
 
     const q_6f84a19f_f9e5_420c_bdb9_506ce326578a = await saveQuestion(manager, {
-      text: `3b.5.5 — Color de la flor`,
+      text: `Color de la flor`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec5,
     });
     await saveOptions(manager, q_6f84a19f_f9e5_420c_bdb9_506ce326578a, [
-      { text: `Rosado` },
       { text: `Rojo` },
-      { text: `Blanco` },
+      { text: `Rosado` },
       { text: `Verde ligero` },
+      { text: `Blanco` },
     ]);
 
     const q_4bb31f10_df6c_4356_863d_346b380ef30a = await saveQuestion(manager, {
-      text: `3b.5.6 — Antocianina en sépalos`,
+      text: `Antocianina en sépalos`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
@@ -645,49 +650,117 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
     });
     await saveOptions(manager, q_4bb31f10_df6c_4356_863d_346b380ef30a, [
       { text: `Intensa` },
+      { text: `Ausente` },
       { text: `Ligera` },
       { text: `Intermedia` },
-      { text: `Ausente` },
     ]);
 
     const q_b1a12947_eb3a_417c_87b2_0c464105be53 = await saveQuestion(manager, {
-      text: `3b.5.7 — Color del pedúnculo de la flor`,
+      text: `Color del pedúnculo de la flor`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec5,
     });
     await saveOptions(manager, q_b1a12947_eb3a_417c_87b2_0c464105be53, [
+      { text: `Rojizo` },
       { text: `Verde` },
       { text: `Verde rojizo` },
-      { text: `Rojizo` },
     ]);
 
     const q_a9e5cbda_5334_46b1_92fe_4ab9be2ccb96 = await saveQuestion(manager, {
-      text: `3b.5.8 — Antocianina en el limbo del pétalo`,
+      text: `Antocianina en el limbo del pétalo`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec5,
     });
     await saveOptions(manager, q_a9e5cbda_5334_46b1_92fe_4ab9be2ccb96, [
-      { text: `Presente` },
       { text: `Ausente` },
+      { text: `Presente` },
     ]);
 
     const q_873e7bda_b87e_44ec_89e3_32a4075b638a = await saveQuestion(manager, {
-      text: `3b.5.9 — Tipo de floración`,
+      text: `Tipo de floración`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec5,
     });
     await saveOptions(manager, q_873e7bda_b87e_44ec_89e3_32a4075b638a, [
-      { text: `Discontinua` },
       { text: `Continua` },
+      { text: `Discontinua` },
+    ]);
+
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil contar con una app que me guiara paso a paso por las mediciones morfológicas del árbol de cacao con campos de captura directamente en el celular, sin necesidad de papel.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec5,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría que la app me permitiera tomar fotografías de cada parte del árbol y las asociara automáticamente al árbol evaluado, con georreferencia y número de árbol.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec5,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil una función que, al ingresar las mediciones morfológicas, comparara el árbol con el perfil típico de un clon de referencia y estimara su identidad varietal.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec5,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me sería útil que la plataforma generara un informe de caracterización morfológica por finca de forma automática al terminar de evaluar todos los árboles del lote.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec5,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
 
   }
 
-  console.log(`[seed] "${NAME}" insertado (58 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (62 preguntas).`);
 }

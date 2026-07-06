@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     return;
   }
 
-  const typeNames = ["multiple_choice","single_choice","numeric","yes_no"];
+  const typeNames = ["likert", "multiple_choice", "numeric", "single_choice", "yes_no"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -90,25 +95,25 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     let o = 1;
 
     const q_239c01e6_b68e_4622_8645_546db8d58046 = await saveQuestion(manager, {
-      text: `4.2 — Actividades de poscosecha que realiza en café`,
+      text: `Actividades de poscosecha que realiza en café`,
       type: types.multiple_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_239c01e6_b68e_4622_8645_546db8d58046, [
-      { text: `Trillado` },
-      { text: `Fermentación (vía húmeda)` },
-      { text: `Recolección selectiva (solo cerezas maduras)` },
-      { text: `Despulpado` },
-      { text: `Tostión` },
       { text: `Lavado` },
       { text: `Secado` },
+      { text: `Recolección selectiva (solo cerezas maduras)` },
+      { text: `Trillado` },
+      { text: `Tostión` },
       { text: `Clasificación de grano` },
+      { text: `Despulpado` },
+      { text: `Fermentación (vía húmeda)` },
     ]);
 
     const q_cbc03f25_3c19_4836_8178_eb8c5d03d909 = await saveQuestion(manager, {
-      text: `4.2.1 ★ — Método de beneficio predominante`,
+      text: `Método de beneficio predominante`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -116,14 +121,14 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_cbc03f25_3c19_4836_8178_eb8c5d03d909, [
-      { text: `Vía húmeda (fermentación + lavado)` },
       { text: `Mixto` },
+      { text: `Vía húmeda (fermentación + lavado)` },
       { text: `Vía seca (natural / honey)` },
       { text: `Semi-húmedo (honey)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.2.2 ★ — Tiempo de fermentación (horas)`,
+      text: `Tiempo de fermentación (horas)`,
       type: types.numeric,
       isRequired: true,
       isSelectionCriteria: true,
@@ -132,7 +137,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     const q_639c6e23_d846_4bd9_91f7_adba59827e98 = await saveQuestion(manager, {
-      text: `4.2.3 ★ — ¿Controla la humedad del café pergamino seco?`,
+      text: `¿Controla la humedad del café pergamino seco?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -141,7 +146,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `4.2.3b — Valor habitual de humedad del pergamino seco (%)`,
+      text: `Valor habitual de humedad del pergamino seco (%)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -151,7 +156,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `4.2.4 ★ — ¿Realiza catación / evaluación sensorial?`,
+      text: `¿Realiza catación / evaluación sensorial?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -160,7 +165,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     await saveQuestion(manager, {
-      text: `4.2.5 — Puntaje promedio en taza (SCA score)`,
+      text: `Puntaje promedio en taza (SCA score)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -168,7 +173,7 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
 
     const q_0e0959cb_7dc1_4a6d_93e4_aac1d60a350f = await saveQuestion(manager, {
-      text: `4.2.6 ★ — ¿Conoce la Norma de Calidad de la FNC / NTC 2090?`,
+      text: `¿Conoce la Norma de Calidad de la FNC / NTC 2090?`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -177,12 +182,12 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
     });
     await saveOptions(manager, q_0e0959cb_7dc1_4a6d_93e4_aac1d60a350f, [
       { text: `No sabe / No aplica` },
-      { text: `Sí` },
       { text: `No` },
+      { text: `Sí` },
     ]);
 
     const q_3f74dee2_7c36_4b67_9151_0364e92cee57 = await saveQuestion(manager, {
-      text: `4.2.7 ★ — Tipo de café que comercializa actualmente`,
+      text: `Tipo de café que comercializa actualmente`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -190,40 +195,125 @@ export async function seedInstrumentoS42PoscosechaCafe(manager: EntityManager): 
       section: sec1,
     });
     await saveOptions(manager, q_3f74dee2_7c36_4b67_9151_0364e92cee57, [
-      { text: `Café tostado` },
       { text: `Café cereza` },
-      { text: `Café pergamino húmedo` },
       { text: `Café especial` },
+      { text: `Café tostado` },
       { text: `Café trillado / excelso` },
       { text: `Café pergamino seco` },
+      { text: `Café pergamino húmedo` },
     ]);
 
     const q_79b8853a_a154_4125_9861_a06e9e2d3e26 = await saveQuestion(manager, {
-      text: `4.2.8 — ¿Tiene alguna certificación?`,
+      text: `¿Tiene alguna certificación?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec1,
     });
     await saveOptions(manager, q_79b8853a_a154_4125_9861_a06e9e2d3e26, [
-      { text: `UTZ` },
-      { text: `Orgánico NTC/USDA` },
-      { text: `Fair Trade / Comercio Justo` },
-      { text: `Otro`, isOther: true },
-      { text: `Denominación de Origen` },
-      { text: `Rainforest Alliance` },
       { text: `Ninguna` },
+      { text: `Rainforest Alliance` },
+      { text: `Otro`, isOther: true },
+      { text: `UTZ` },
+      { text: `Fair Trade / Comercio Justo` },
+      { text: `Orgánico NTC/USDA` },
+      { text: `Denominación de Origen` },
     ]);
 
     await saveQuestion(manager, {
-      text: `4.2.9 — Precio promedio de venta (COP / carga pergamino seco)`,
+      text: `Precio promedio de venta (COP / carga pergamino seco)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
       section: sec1,
     });
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil recibir en mi celular una alerta cuando el tiempo de beneficio o fermentación del café configurado haya terminado, para evitar sobre-fermentación.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me gustaría registrar en una app los parámetros de secado del café (temperatura, tiempo, humedad final del pergamino) de cada lote, para mejorar proceso a proceso.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me sería útil tener en una aplicación tablas de referencia de humedad óptima del café pergamino seco y tutoriales de buenas prácticas de beneficio.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me sería útil que la app me mostrara el precio de referencia del café pergamino seco actualizado para negociar mejor con compradores o intermediarios.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_5 = await saveQuestion(manager, {
+      text: `Me gustaría llevar un registro digital de cada venta de café realizada (cantidad, precio, comprador) para consultar mi historial de comercialización sin depender de anotaciones en papel.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec1,
+    });
+    await saveOptions(manager, q_strat_5, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (11 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (16 preguntas).`);
 }

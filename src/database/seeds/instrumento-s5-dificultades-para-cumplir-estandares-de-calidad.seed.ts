@@ -12,10 +12,12 @@ async function saveQuestion(
     type: TypeOfQuestion;
     isRequired: boolean;
     isSelectionCriteria?: boolean;
+    isKeyQuestion?: boolean;
     order: number;
     section: Section;
     conditionQuestion?: Question;
     conditionValue?: string;
+    systemField?: string;
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
@@ -24,17 +26,19 @@ async function saveQuestion(
     type: def.type,
     isRequired: def.isRequired,
     isSelectionCriteria: def.isSelectionCriteria ?? false,
+    isKeyQuestion: def.isKeyQuestion ?? false,
     order: def.order,
     section: def.section,
     conditionQuestion: def.conditionQuestion,
     conditionValue: def.conditionValue,
+    systemField: def.systemField,
   }));
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean }[],
+  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
@@ -44,6 +48,7 @@ async function saveOptions(
       text: opt.text,
       value: opt.value,
       isOther: opt.isOther ?? false,
+      metadataId: opt.metadataId,
     }));
     map.set(opt.text, saved.optionId);
   }
@@ -63,7 +68,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     return;
   }
 
-  const typeNames = ["multiple_choice","open_text","single_choice","yes_no","numeric"];
+  const typeNames = ["multiple_choice", "numeric", "open_text", "single_choice", "yes_no", "likert"];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -76,7 +81,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       name: NAME,
       version: VERSION,
       publishDate: '2025-05-13',
-      isActive: true,
+      isActive: false,
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
@@ -85,7 +90,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     sectionRepo.save(sectionRepo.create({ name: `5.1 Barreras principales`, order: 1, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `5.2 Tipo de apoyo necesario`, order: 2, instrument })),
     sectionRepo.save(sectionRepo.create({ name: `5.3 Reconocimiento por alta calidad`, order: 3, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `5.4 Impacto económico del incumplimiento`, order: 4, instrument })),
+    sectionRepo.save(sectionRepo.create({ name: `5.4 Impacto económico del incumplimiento`, order: 4, instrument }))
   ]);
 
   // ── 5.1 Barreras principales ──
@@ -93,7 +98,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     let o = 1;
 
     const q_f5de0b7b_545d_4378_833f_935e5e1f4863 = await saveQuestion(manager, {
-      text: `5.1 ★ — ¿Cuáles son sus principales dificultades para cumplir los estándares de calidad?`,
+      text: `¿Cuáles son sus principales dificultades para cumplir los estándares de calidad?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -101,27 +106,27 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec1,
     });
     await saveOptions(manager, q_f5de0b7b_545d_4378_833f_935e5e1f4863, [
-      { text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)` },
-      { text: `Falta de financiamiento para mejorar procesos` },
-      { text: `Poca información sobre las normas técnicas aplicables` },
-      { text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)` },
       { text: `Dificultades de transporte del producto al punto de venta` },
       { text: `Falta de conocimiento / apoyo institucional` },
-      { text: `Acceso limitado a insumos de calidad (semillas certificadas, fertilizantes)` },
-      { text: `Falta de laboratorios de análisis de calidad accesibles o económicos` },
-      { text: `Contaminación por residuos de pesticidas o metales pesados` },
-      { text: `Exigencias de certificaciones que no puede costear` },
-      { text: `Problemas de plagas y enfermedades que afectan la calidad` },
-      { text: `Agua de mala calidad para los procesos de beneficio` },
-      { text: `Infraestructura deficiente (marquesinas, cajones de fermentación, bodegas)` },
       { text: `Otro`, isOther: true },
-      { text: `Dificultades en el secado (tiempo, temperatura, uniformidad)` },
+      { text: `Agua de mala calidad para los procesos de beneficio` },
+      { text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)` },
       { text: `Falta de conocimiento técnico sobre procesos de poscosecha` },
+      { text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)` },
+      { text: `Infraestructura deficiente (marquesinas, cajones de fermentación, bodegas)` },
+      { text: `Acceso limitado a insumos de calidad (semillas certificadas, fertilizantes)` },
       { text: `Dificultades en el proceso de fermentación (duración, temperatura, volteo)` },
+      { text: `Dificultades en el secado (tiempo, temperatura, uniformidad)` },
+      { text: `Problemas de plagas y enfermedades que afectan la calidad` },
+      { text: `Contaminación por residuos de pesticidas o metales pesados` },
+      { text: `Poca información sobre las normas técnicas aplicables` },
+      { text: `Exigencias de certificaciones que no puede costear` },
+      { text: `Falta de laboratorios de análisis de calidad accesibles o económicos` },
+      { text: `Falta de financiamiento para mejorar procesos` },
     ]);
 
     await saveQuestion(manager, {
-      text: `5.1a — Otra dificultad importante (especifique)`,
+      text: `Otra dificultad importante (especifique)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -135,7 +140,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     let o = 1;
 
     const q_bff4d6a1_8f14_4127_aeb7_943bc16b0fa5 = await saveQuestion(manager, {
-      text: `5.2 ★ — ¿Qué tipo de apoyo necesitaría principalmente para superar esas dificultades?`,
+      text: `¿Qué tipo de apoyo necesitaría principalmente para superar esas dificultades?`,
       type: types.multiple_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -143,11 +148,11 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec2,
     });
     await saveOptions(manager, q_bff4d6a1_8f14_4127_aeb7_943bc16b0fa5, [
+      { text: `Financiamiento / crédito` },
+      { text: `Equipos / tecnología` },
       { text: `Acompañamiento técnico continuo` },
       { text: `Normas y certificaciones` },
-      { text: `Financiamiento / crédito` },
       { text: `Acceso a mercados` },
-      { text: `Equipos / tecnología` },
       { text: `Capacitación técnica` },
     ]);
 
@@ -189,8 +194,8 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       section: sec3,
     });
     await saveOptions(manager, q_2e08c74a_2c56_4999_b458_c3f07113dab5, [
-      { text: `No` },
       { text: `No sabe / No aplica` },
+      { text: `No` },
       { text: `Sí` },
     ]);
 
@@ -201,7 +206,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     let o = 1;
 
     await saveQuestion(manager, {
-      text: `5.3 ★ — ¿Ha tenido rechazo de producto por incumplimiento de calidad en el último año?`,
+      text: `¿Ha tenido rechazo de producto por incumplimiento de calidad en el último año?`,
       type: types.yes_no,
       isRequired: true,
       isSelectionCriteria: true,
@@ -210,7 +215,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     const q_fc5c8a53_ca6d_4b7e_b41f_d093f59b42b1 = await saveQuestion(manager, {
-      text: `5.4 ★ — Frecuencia de rechazo de producto por calidad`,
+      text: `Frecuencia de rechazo de producto por calidad`,
       type: types.single_choice,
       isRequired: true,
       isSelectionCriteria: true,
@@ -219,13 +224,13 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
     await saveOptions(manager, q_fc5c8a53_ca6d_4b7e_b41f_d093f59b42b1, [
       { text: `Frecuentemente (> 30%)` },
-      { text: `Ocasionalmente (10–30%)` },
-      { text: `Raramente (< 10% de la producción)` },
       { text: `Nunca` },
+      { text: `Raramente (< 10% de la producción)` },
+      { text: `Ocasionalmente (10–30%)` },
     ]);
 
     await saveQuestion(manager, {
-      text: `5.5 ★ — ¿Qué hace con el producto rechazado?`,
+      text: `¿Qué hace con el producto rechazado?`,
       type: types.open_text,
       isRequired: true,
       isSelectionCriteria: true,
@@ -234,7 +239,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     await saveQuestion(manager, {
-      text: `5.5a — ¿Cuál variedad / clon le han rechazado?`,
+      text: `¿Cuál variedad / clon le han rechazado?`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -242,7 +247,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     await saveQuestion(manager, {
-      text: `5.6 — Estimación de pérdidas económicas por calidad (COP / año)`,
+      text: `Estimación de pérdidas económicas por calidad (COP / año)`,
       type: types.numeric,
       isRequired: false,
       order: o++,
@@ -250,21 +255,21 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
     });
 
     const q_e8655701_d850_4636_97ac_730421590eb1 = await saveQuestion(manager, {
-      text: `5.7 — ¿Conoce el precio diferencial que pagarían por producto de mejor calidad?`,
+      text: `¿Conoce el precio diferencial que pagarían por producto de mejor calidad?`,
       type: types.single_choice,
       isRequired: false,
       order: o++,
       section: sec4,
     });
-    const opts_q_e8655701_d850_4636_97ac_730421590eb1 = await saveOptions(manager, q_e8655701_d850_4636_97ac_730421590eb1, [
-      { text: `Sí` },
+    const opts_e8655701_d850_4636_97ac_730421590eb1 = await saveOptions(manager, q_e8655701_d850_4636_97ac_730421590eb1, [
       { text: `No sabe / No aplica` },
+      { text: `Sí` },
       { text: `No` },
     ]);
-    const opt_218dc095_2f36_49e3_8cfa_4032a58ab752 = opts_q_e8655701_d850_4636_97ac_730421590eb1.get(`Sí`)!;
+    const opt_218dc095_2f36_49e3_8cfa_4032a58ab752 = opts_e8655701_d850_4636_97ac_730421590eb1.get(`Sí`)!;
 
     await saveQuestion(manager, {
-      text: `5.7b — Valor aproximado o rango del precio diferencial (COP / kg o carga)`,
+      text: `Valor aproximado o rango del precio diferencial (COP / kg o carga)`,
       type: types.open_text,
       isRequired: false,
       order: o++,
@@ -273,7 +278,92 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       conditionValue: opt_218dc095_2f36_49e3_8cfa_4032a58ab752,
     });
 
+    const q_strat_1 = await saveQuestion(manager, {
+      text: `Me sería útil contar con una guía digital en mi celular que me explicara de forma sencilla las normas de calidad aplicables a mi cultivo, con ejemplos prácticos.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec4,
+    });
+    await saveOptions(manager, q_strat_1, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_2 = await saveQuestion(manager, {
+      text: `Me sería útil una app que me ayudara a comparar los parámetros de calidad de mi producción con los estándares requeridos por los compradores, para saber cuánto me falta.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec4,
+    });
+    await saveOptions(manager, q_strat_2, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_3 = await saveQuestion(manager, {
+      text: `Me gustaría que una herramienta digital me conectara con laboratorios de análisis de calidad cercanos a mi zona, con sus tarifas y tiempos de respuesta.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec4,
+    });
+    await saveOptions(manager, q_strat_3, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_4 = await saveQuestion(manager, {
+      text: `Me sería útil recibir una alerta digital si el precio diferencial por calidad en mi mercado cambia significativamente, para decidir si vale la pena invertir en mejorar mi proceso.`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec4,
+    });
+    await saveOptions(manager, q_strat_4, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
+    const q_strat_5 = await saveQuestion(manager, {
+      text: `Consultaría frecuentemente una herramienta digital para hacer seguimiento a los requisitos de certificaciones que me interesan (Rainforest Alliance, Fair Trade, orgánico).`,
+      type: types.likert,
+      isRequired: true,
+      isKeyQuestion: true,
+      systemField: 'Pregunta estratégica de caracterización tecnológica',
+      order: o++,
+      section: sec4,
+    });
+    await saveOptions(manager, q_strat_5, [
+      { text: `Totalmente de acuerdo`, value: 5 },
+      { text: `De acuerdo`, value: 4 },
+      { text: `Ni de acuerdo ni en desacuerdo`, value: 3 },
+      { text: `En desacuerdo`, value: 2 },
+      { text: `Totalmente en desacuerdo`, value: 1 },
+    ]);
+
   }
 
-  console.log(`[seed] "${NAME}" insertado (14 preguntas).`);
+  console.log(`[seed] "${NAME}" insertado (19 preguntas).`);
 }
