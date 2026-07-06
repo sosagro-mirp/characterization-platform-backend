@@ -37,7 +37,6 @@ export class CampaignSessionsService {
   async getLastFarmer(userId: string): Promise<{
     farmerId: string;
     name: string;
-    lastName: string | null;
     farm?: { name: string };
   } | null> {
     const session = await this.sessionsRepository
@@ -54,7 +53,6 @@ export class CampaignSessionsService {
     return {
       farmerId: session.farmer.id,
       name: session.farmer.name,
-      lastName: session.farmer.lastName,
       farm: session.farmer.farm ? { name: session.farmer.farm.name } : undefined,
     };
   }

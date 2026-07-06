@@ -31,14 +31,6 @@ export class Farmer {
 
   @Column({
     type: 'varchar',
-    name: 'last_name',
-    length: 255,
-    nullable: true,
-  })
-  lastName: string | null;
-
-  @Column({
-    type: 'varchar',
     name: 'document_id',
     length: 50,
     nullable: true,
