@@ -18,7 +18,7 @@ export class CreateQuestionDto {
   @MaxLength(255)
   text: string;
 
-  /** UUID del tipo de pregunta (open_text, numeric, yes_no, single_choice, multiple_choice, likert, compliance) */
+  /** UUID del tipo de pregunta (open_text, numeric, numeric_with_unit, yes_no, single_choice, multiple_choice, likert, compliance) */
   @ApiProperty({
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440000',
