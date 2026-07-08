@@ -102,6 +102,7 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S5',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

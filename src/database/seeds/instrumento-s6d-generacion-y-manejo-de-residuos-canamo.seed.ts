@@ -102,6 +102,7 @@ export async function seedInstrumentoS6dGeneracionYManejoDeResiduosCanamo(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S6D',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

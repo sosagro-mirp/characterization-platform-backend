@@ -6,6 +6,7 @@ import { DashboardFiltersDto } from './dto/dashboard-filters.dto';
 import { DashboardResponseDto } from './dto/dashboard-response.dto';
 import { DashboardDepartmentCountDto } from './dto/dashboard-department-count.dto';
 import { DashboardOverviewDto } from './dto/dashboard-overview.dto';
+import { DashboardCategoryDto } from './dto/dashboard-category.dto';
 
 @ApiTags('Dashboard')
 @Public()
@@ -60,6 +61,18 @@ export class DashboardController {
     @Query() filters: DashboardFiltersDto,
   ): Promise<DashboardDepartmentCountDto[]> {
     return this.dashboardService.getDepartmentCounts(filters);
+  }
+
+  @Get('categories')
+  @Header('Cache-Control', 'public, max-age=3600')
+  @ApiOperation({
+    summary: 'Catálogo de categorías temáticas del dashboard (C1–C15)',
+    description:
+      'Categorías estáticas (spec 43, dashboard.md §2) con sus instrumentos activos y el conteo de preguntas visualizables. Catálogo estático, cache de una hora.',
+  })
+  @ApiResponse({ status: 200, type: [DashboardCategoryDto] })
+  getCategories(): Promise<DashboardCategoryDto[]> {
+    return this.dashboardService.getCategories();
   }
 
   @Get('overview')

@@ -101,6 +101,7 @@ export async function seedInstrumentoS44PoscosechaCanamo(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S4.4',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

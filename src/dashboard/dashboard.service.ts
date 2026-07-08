@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Question } from 'src/questions/entities/question.entity';
@@ -24,6 +24,8 @@ import {
   DashboardQuestionDto,
   DashboardResponseDto,
 } from './dto/dashboard-response.dto';
+import { DashboardCategoryDto } from './dto/dashboard-category.dto';
+import { DASHBOARD_CATEGORIES } from './dashboard-categories.config';
 
 const MIN_SAMPLE_THRESHOLD = 5;
 
@@ -388,11 +390,18 @@ export class DashboardService {
     return qb;
   }
 
-  /** D6: exclusión por tipo no visualizable + denylist explícita de systemField (no un blanket "farm.*"). */
+  /**
+   * D6: exclusión por tipo no visualizable + denylist explícita de
+   * systemField (no un blanket "farm.*"). `sectionNames` (spec 43, D1)
+   * restringe la agregación a ciertas secciones del instrumento — necesario
+   * para instrumentos que aportan a más de una categoría (ver S1a → C1/C2 en
+   * `dashboard-categories.config.ts`).
+   */
   private async getEligibleQuestions(
     instrumentId: string,
+    sectionNames?: string[],
   ): Promise<Question[]> {
-    return this.questionRepo
+    const qb = this.questionRepo
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.section', 'section')
       .innerJoin(
@@ -409,10 +418,63 @@ export class DashboardService {
       .andWhere(
         '(question.systemField IS NULL OR question.systemField NOT IN (:...deniedFields))',
         { deniedFields: DENIED_SYSTEM_FIELDS },
-      )
+      );
+
+    if (sectionNames?.length) {
+      qb.andWhere('section.name IN (:...sectionNames)', { sectionNames });
+    }
+
+    return qb
       .orderBy('section.order', 'ASC')
       .addOrderBy('question.order', 'ASC')
       .getMany();
+  }
+
+  /**
+   * Fase 1 (Spec 43): catálogo de categorías con instrumentos activos y
+   * conteo de preguntas visualizables. D1: catálogo estático → instrumentos
+   * activos → secciones → preguntas, reutilizando `getEligibleQuestions`.
+   */
+  async getCategories(): Promise<DashboardCategoryDto[]> {
+    const results: DashboardCategoryDto[] = [];
+
+    for (const category of DASHBOARD_CATEGORIES) {
+      const instrumentCodes = category.instruments.map(
+        (mapping) => mapping.instrumentCode,
+      );
+      const mappingByCode = new Map(
+        category.instruments.map((mapping) => [
+          mapping.instrumentCode,
+          mapping,
+        ]),
+      );
+
+      const activeInstruments = await this.instrumentRepo.find({
+        where: { code: In(instrumentCodes), isActive: true },
+      });
+
+      let questionCount = 0;
+      for (const instrument of activeInstruments) {
+        const mapping = instrument.code
+          ? mappingByCode.get(instrument.code)
+          : undefined;
+        const questions = await this.getEligibleQuestions(
+          instrument.instrumentId,
+          mapping?.sectionNames,
+        );
+        questionCount += questions.length;
+      }
+
+      results.push({
+        id: category.id,
+        code: category.code,
+        name: category.name,
+        instrumentCount: activeInstruments.length,
+        questionCount,
+      });
+    }
+
+    return results;
   }
 
   private async aggregateQuestion(

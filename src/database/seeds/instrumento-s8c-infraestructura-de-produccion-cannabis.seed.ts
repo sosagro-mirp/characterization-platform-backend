@@ -101,6 +101,7 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S8C',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

@@ -95,6 +95,7 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S3B',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

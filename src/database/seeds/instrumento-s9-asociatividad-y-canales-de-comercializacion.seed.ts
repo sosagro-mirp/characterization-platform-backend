@@ -95,6 +95,7 @@ export async function seedInstrumentoS9AsociatividadYCanalesDeComercializacion(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S9',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
