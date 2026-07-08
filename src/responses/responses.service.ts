@@ -115,10 +115,20 @@ export class ResponsesService {
 
     const question = await manager.getRepository(Question).findOne({
       where: { questionId },
+      relations: { type: true },
     });
 
     if (!question) {
       throw new NotFoundException('Question not found');
+    }
+
+    if (
+      question.type?.name === 'numeric_with_unit' &&
+      (numericValue === undefined || numericValue === null || !optionId)
+    ) {
+      throw new BadRequestException(
+        'numeric_with_unit questions require both numericValue and optionId',
+      );
     }
 
     let option: OptionQuestion | null = null;
