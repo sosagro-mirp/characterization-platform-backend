@@ -106,6 +106,18 @@ export class InstrumentsController {
     return this.instrumentsService.findOneForRender(id);
   }
 
+  @Public()
+  @Get('public')
+  @ApiOperation({
+    summary: 'Listar instrumentos activos (público)',
+    description:
+      'Ruta pública para el selector de instrumentos del dashboard. Solo instrumentos con isActive=true. No requiere autenticación.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de instrumentos activos (instrumentId, name, code).' })
+  findAllPublic() {
+    return this.instrumentsService.findAllPublic();
+  }
+
   @Get(':id')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)

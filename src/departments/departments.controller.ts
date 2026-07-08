@@ -11,6 +11,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
+import { Public } from '../auth/decorators/public.decorator';
 import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
@@ -34,6 +35,17 @@ export class DepartmentsController {
   @ApiOperation({ summary: 'Listar departamentos' })
   @ApiResponse({ status: 200, description: 'Lista de departamentos.' })
   findAll() {
+    return this.departmentsService.findAll();
+  }
+
+  @Public()
+  @Get('public')
+  @ApiOperation({
+    summary: 'Listar departamentos (público)',
+    description: 'Ruta pública para el selector de filtros del dashboard. No requiere autenticación.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de departamentos.' })
+  findAllPublic() {
     return this.departmentsService.findAll();
   }
 
