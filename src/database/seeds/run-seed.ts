@@ -43,6 +43,7 @@ import { seedRoles } from './roles.seed';
 import { seedAdminUser } from './admin-user.seed';
 import { seedInstrumentoS10InteresEnParticiparEnElProyecto } from './instrumento-s10-interes-en-participar-en-el-proyecto.seed';
 import { seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras } from './instrumento-s11-adopcion-tecnologica-diagnostico-de-barreras.seed';
+import { seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas } from './instrumento-s11-adopcion-tecnologica-diagnostico-extensionistas.seed';
 import { seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario } from './instrumento-s11-adopcion-tecnologica-perfil-de-inversion-del-propietario.seed';
 import { seedInstrumentoS12AspectosFitosanitariosDiagnostico } from './instrumento-s12-aspectos-fitosanitarios-diagnostico.seed';
 import { seedInstrumentoS13ValidacionesTecnico } from './instrumento-s13-validaciones-tecnico.seed';
@@ -55,6 +56,7 @@ import { seedInstrumentoS26BloqueCannabis } from './instrumento-s2-6-bloque-cann
 import { seedInstrumentoS27BloqueCanamo } from './instrumento-s2-7-bloque-canamo.seed';
 import { seedInstrumentoS2CultivosIdentificacionDeCadenas } from './instrumento-s2-cultivos-identificacion-de-cadenas.seed';
 import { seedInstrumentoS341SusceptibilidadAEnfermedades } from './instrumento-s3-4-1-susceptibilidad-a-enfermedades.seed';
+import { seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbientales } from './instrumento-s3-manejo-del-cultivo-suelo-y-condiciones-ambientales.seed';
 import { seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos } from './instrumento-s3b-caracterizacion-morfologica-cacao-tecnicos.seed';
 import { seedInstrumentoS41PoscosechaCacao } from './instrumento-s4-1-poscosecha-cacao.seed';
 import { seedInstrumentoS42PoscosechaCafe } from './instrumento-s4-2-poscosecha-cafe.seed';
@@ -151,6 +153,7 @@ async function run(): Promise<void> {
       await seedInstrumentoS27BloqueCanamo(manager);
       // S3 — Manejo del cultivo
       await seedInstrumentoS341SusceptibilidadAEnfermedades(manager);
+      await seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbientales(manager);
       await seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(manager);
       // S4 — Poscosecha
       await seedInstrumentoS41PoscosechaCacao(manager);
@@ -180,6 +183,7 @@ async function run(): Promise<void> {
       // S10 — Participación
       await seedInstrumentoS10InteresEnParticiparEnElProyecto(manager);
       // S11 — Adopción tecnológica
+      await seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas(manager);
       await seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras(manager);
       await seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(manager);
       // S12 — Fitosanitario
