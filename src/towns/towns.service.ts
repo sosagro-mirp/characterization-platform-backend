@@ -41,6 +41,14 @@ export class TownsService {
     });
   }
 
+  async findAllPublic(departmentId?: string): Promise<Town[]> {
+    return await this.townsRepository.find({
+      where: departmentId ? { department: { departmentId } } : undefined,
+      relations: { department: true },
+      order: { name: 'ASC' },
+    });
+  }
+
   async findOne(id: string): Promise<Town> {
     const town = await this.townsRepository.findOne({
       where: { townId: id },

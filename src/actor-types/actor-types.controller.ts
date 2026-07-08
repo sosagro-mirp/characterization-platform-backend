@@ -11,6 +11,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
+import { Public } from '../auth/decorators/public.decorator';
 import { ActorTypesService } from './actor-types.service';
 import { CreateActorTypeDto } from './dto/create-actor-type.dto';
 import { UpdateActorTypeDto } from './dto/update-actor-type.dto';
@@ -35,6 +36,17 @@ export class ActorTypesController {
   @ApiOperation({ summary: 'Listar tipos de actor' })
   @ApiResponse({ status: 200, description: 'Lista de tipos de actor.' })
   findAll() {
+    return this.actorTypesService.findAll();
+  }
+
+  @Public()
+  @Get('public')
+  @ApiOperation({
+    summary: 'Listar tipos de actor (público)',
+    description: 'Ruta pública para el selector de filtros del dashboard. No requiere autenticación.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de tipos de actor.' })
+  findAllPublic() {
     return this.actorTypesService.findAll();
   }
 
