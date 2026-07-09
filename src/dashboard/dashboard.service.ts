@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Survey } from 'src/surveys/entities/survey.entity';
@@ -25,7 +29,10 @@ import {
   DashboardResponseDto,
 } from './dto/dashboard-response.dto';
 import { DashboardCategoryDto } from './dto/dashboard-category.dto';
-import { DASHBOARD_CATEGORIES } from './dashboard-categories.config';
+import {
+  DASHBOARD_CATEGORIES,
+  DashboardCategoryConfig,
+} from './dashboard-categories.config';
 
 const MIN_SAMPLE_THRESHOLD = 5;
 
@@ -78,8 +85,15 @@ export class DashboardService {
   async getSummary(
     filters: DashboardFiltersDto,
   ): Promise<{ count: number; suppressed: boolean }> {
-    await this.validateFilters(filters);
-    const count = await this.buildFilteredSurveyQuery(filters).getCount();
+    const { categoryInstruments } = await this.validateFilters(filters);
+    const categoryInstrumentIds = this.resolveCategoryInstrumentIds(
+      filters,
+      categoryInstruments,
+    );
+    const count = await this.buildFilteredSurveyQuery(
+      filters,
+      categoryInstrumentIds,
+    ).getCount();
     return { count, suppressed: count < MIN_SAMPLE_THRESHOLD };
   }
 
@@ -94,9 +108,13 @@ export class DashboardService {
     filters: DashboardFiltersDto,
   ): Promise<DashboardDepartmentCountDto[]> {
     const { departmentId: _departmentId, townId: _townId, ...rest } = filters;
-    await this.validateFilters(rest);
+    const { categoryInstruments } = await this.validateFilters(rest);
+    const categoryInstrumentIds = this.resolveCategoryInstrumentIds(
+      rest,
+      categoryInstruments,
+    );
 
-    const rows = await this.buildFilteredSurveyQuery(rest)
+    const rows = await this.buildFilteredSurveyQuery(rest, categoryInstrumentIds)
       .innerJoin('survey.department', 'department')
       .select('department.departmentId', 'departmentId')
       .addSelect('department.name', 'departmentName')
@@ -124,15 +142,17 @@ export class DashboardService {
    * `farmer.experienceYears` solo existen como preguntas en S1a, pero el
    * perfil debe reflejar la muestra completa (filtrada por cultivo/tipo de
    * actor), no solo cuando S1a está seleccionado. Por eso ignora
-   * instrumentId/departmentId/townId (mismo criterio que `getDepartmentCounts`
-   * para department; instrumentId se ignora porque agrupar "por instrumento"
-   * no aplica a un perfil poblacional).
+   * instrumentId/categoryId/departmentId/townId (mismo criterio que
+   * `getDepartmentCounts` para department; instrumentId/categoryId se ignoran
+   * porque agrupar "por instrumento o categoría" no aplica a un perfil
+   * poblacional — spec 43, D2).
    */
   async getOverview(
     filters: DashboardFiltersDto,
   ): Promise<DashboardOverviewDto> {
     const {
       instrumentId: _instrumentId,
+      categoryId: _categoryId,
       departmentId: _departmentId,
       townId: _townId,
       ...rest
@@ -221,15 +241,33 @@ export class DashboardService {
   async getAnalytics(
     filters: DashboardFiltersDto,
   ): Promise<DashboardResponseDto> {
-    const { instrument, departmentName, townName, cropName, actorTypeName } =
-      await this.validateFilters(filters);
+    const {
+      instrument,
+      category,
+      categoryInstruments,
+      departmentName,
+      townName,
+      cropName,
+      actorTypeName,
+    } = await this.validateFilters(filters);
+    const categoryInstrumentIds = this.resolveCategoryInstrumentIds(
+      filters,
+      categoryInstruments,
+    );
 
-    const totalCount = await this.buildFilteredSurveyQuery(filters).getCount();
-    const dateRange = totalCount > 0 ? await this.getDateRange(filters) : null;
+    const totalCount = await this.buildFilteredSurveyQuery(
+      filters,
+      categoryInstrumentIds,
+    ).getCount();
+    const dateRange =
+      totalCount > 0
+        ? await this.getDateRange(filters, categoryInstrumentIds)
+        : null;
 
     const metadata = {
       totalCount,
       instrumentName: instrument?.name,
+      categoryName: category?.name,
       departmentName,
       townName,
       cropName,
@@ -247,11 +285,19 @@ export class DashboardService {
       };
     }
 
-    if (!instrument) {
+    if (!instrument && !category) {
       return { metadata, suppressed: false, questions: [] };
     }
 
-    const questions = await this.getEligibleQuestions(instrument.instrumentId);
+    // D2 (spec 43): instrumentId y categoryId son mutuamente excluyentes
+    // (validado en validateFilters), así que a lo sumo uno de los dos ramales
+    // siguientes se ejecuta.
+    const questions = instrument
+      ? await this.getEligibleQuestions(instrument.instrumentId)
+      : await this.getEligibleQuestionsForCategory(
+          category!,
+          categoryInstruments,
+        );
 
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
@@ -261,13 +307,59 @@ export class DashboardService {
     return { metadata, suppressed: false, questions: dashboardQuestions };
   }
 
+  /**
+   * D2 (spec 43): agrega las preguntas elegibles de todos los instrumentos
+   * activos de la categoría, respetando el filtro por sección (D1) por
+   * instrumento, y deduplicando por questionId (defensivo — no debería haber
+   * solapamiento si las secciones por categoría son disjuntas).
+   */
+  private async getEligibleQuestionsForCategory(
+    category: DashboardCategoryConfig,
+    activeInstruments: Instrument[],
+  ): Promise<Question[]> {
+    const mappingByCode = new Map(
+      category.instruments.map((mapping) => [
+        mapping.instrumentCode,
+        mapping,
+      ]),
+    );
+
+    const seen = new Set<string>();
+    const result: Question[] = [];
+
+    for (const instrument of activeInstruments) {
+      const mapping = instrument.code
+        ? mappingByCode.get(instrument.code)
+        : undefined;
+      const questions = await this.getEligibleQuestions(
+        instrument.instrumentId,
+        mapping?.sectionNames,
+      );
+      for (const question of questions) {
+        if (seen.has(question.questionId)) continue;
+        seen.add(question.questionId);
+        result.push(question);
+      }
+    }
+
+    return result;
+  }
+
   private async validateFilters(filters: DashboardFiltersDto): Promise<{
     instrument: Instrument | null;
+    category: DashboardCategoryConfig | null;
+    categoryInstruments: Instrument[];
     departmentName?: string;
     townName?: string;
     cropName?: string;
     actorTypeName?: string;
   }> {
+    if (filters.instrumentId && filters.categoryId) {
+      throw new BadRequestException(
+        'No se puede filtrar por instrumentId y categoryId al mismo tiempo.',
+      );
+    }
+
     let instrument: Instrument | null = null;
 
     if (filters.instrumentId) {
@@ -277,6 +369,24 @@ export class DashboardService {
       if (!instrument) {
         throw new NotFoundException('Instrumento no encontrado.');
       }
+    }
+
+    let category: DashboardCategoryConfig | null = null;
+    let categoryInstruments: Instrument[] = [];
+
+    if (filters.categoryId) {
+      category =
+        DASHBOARD_CATEGORIES.find((c) => c.id === filters.categoryId) ??
+        null;
+      if (!category) {
+        throw new NotFoundException('Categoría no encontrada.');
+      }
+      const instrumentCodes = category.instruments.map(
+        (mapping) => mapping.instrumentCode,
+      );
+      categoryInstruments = await this.instrumentRepo.find({
+        where: { code: In(instrumentCodes), isActive: true },
+      });
     }
 
     let departmentName: string | undefined;
@@ -317,13 +427,49 @@ export class DashboardService {
       actorTypeName = actorType.name;
     }
 
-    return { instrument, departmentName, townName, cropName, actorTypeName };
+    return {
+      instrument,
+      category,
+      categoryInstruments,
+      departmentName,
+      townName,
+      cropName,
+      actorTypeName,
+    };
   }
 
-  /** D10: instrumentId se resuelve vía INNER JOIN a surveys_instruments (relación ManyToMany). */
+  /**
+   * `undefined` cuando `filters.categoryId` no se pidió (sin filtro de
+   * instrumento); un array — posiblemente vacío — cuando sí se pidió, para
+   * que `applySurveyFilters` distinga "sin categoría" de "categoría sin
+   * instrumentos activos hoy" (ver nota en `applySurveyFilters`).
+   */
+  private resolveCategoryInstrumentIds(
+    filters: DashboardFiltersDto,
+    categoryInstruments: Instrument[],
+  ): string[] | undefined {
+    if (!filters.categoryId) return undefined;
+    return categoryInstruments.map((i) => i.instrumentId);
+  }
+
+  /**
+   * D10: instrumentId se resuelve vía INNER JOIN a surveys_instruments
+   * (relación ManyToMany). `categoryInstrumentIds` (spec 43, D2) aplica el
+   * mismo JOIN pero con IN (...) — el conjunto de instrumentos activos de la
+   * categoría — y solo cuando no hay instrumentId (mutuamente excluyentes,
+   * validado en `validateFilters`).
+   *
+   * `categoryInstrumentIds` es `undefined` cuando no se pidió `categoryId`
+   * (no se aplica ningún filtro de instrumento) y es un array (posiblemente
+   * vacío) cuando sí se pidió: si la categoría no tiene instrumentos activos
+   * hoy, el array vacío fuerza cero resultados (`1 = 0`) — de lo contrario la
+   * consulta caería de nuevo a "todas las encuestas", que es incorrecto para
+   * una categoría sin datos, no equivalente a "sin filtro".
+   */
   private applySurveyFilters<T extends object>(
     qb: SelectQueryBuilder<T>,
     filters: DashboardFiltersDto,
+    categoryInstrumentIds?: string[],
   ): void {
     if (filters.instrumentId) {
       qb.innerJoin(
@@ -332,6 +478,17 @@ export class DashboardService {
         'instrument.instrumentId = :instrumentId',
         { instrumentId: filters.instrumentId },
       );
+    } else if (categoryInstrumentIds !== undefined) {
+      if (categoryInstrumentIds.length) {
+        qb.innerJoin(
+          'survey.instruments',
+          'instrument',
+          'instrument.instrumentId IN (:...categoryInstrumentIds)',
+          { categoryInstrumentIds },
+        );
+      } else {
+        qb.andWhere('1 = 0');
+      }
     }
     if (filters.departmentId) {
       qb.andWhere('survey.department = :departmentId', {
@@ -353,18 +510,20 @@ export class DashboardService {
 
   private buildFilteredSurveyQuery(
     filters: DashboardFiltersDto,
+    categoryInstrumentIds?: string[],
   ): SelectQueryBuilder<Survey> {
     const qb = this.surveyRepo
       .createQueryBuilder('survey')
       .where('survey.sincronized = true');
-    this.applySurveyFilters(qb, filters);
+    this.applySurveyFilters(qb, filters, categoryInstrumentIds);
     return qb;
   }
 
   private async getDateRange(
     filters: DashboardFiltersDto,
+    categoryInstrumentIds?: string[],
   ): Promise<{ from: string; to: string } | null> {
-    const raw = await this.buildFilteredSurveyQuery(filters)
+    const raw = await this.buildFilteredSurveyQuery(filters, categoryInstrumentIds)
       .select('MIN(survey.createdAt)', 'from')
       .addSelect('MAX(survey.createdAt)', 'to')
       .getRawOne<{ from: string | null; to: string | null }>();

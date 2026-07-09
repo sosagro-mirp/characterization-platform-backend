@@ -15,6 +15,12 @@ export class DashboardMetadataDto {
 
   @ApiProperty({
     required: false,
+    description: 'Nombre de la categoría seleccionada, si aplica (spec 43).',
+  })
+  categoryName?: string;
+
+  @ApiProperty({
+    required: false,
     description: 'Nombre del departamento filtrado, si aplica.',
   })
   departmentName?: string;
