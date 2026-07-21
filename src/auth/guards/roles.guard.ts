@@ -5,10 +5,15 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import type { Request } from 'express';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import type { RoleName } from '../constants';
 import type { AuthenticatedUser } from '../decorators/current-user.decorator';
+
+interface RequestWithUser extends Request {
+  user?: AuthenticatedUser;
+}
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -27,8 +32,7 @@ export class RolesGuard implements CanActivate {
     );
     if (!required || required.length === 0) return true;
 
-    const user = context.switchToHttp().getRequest()
-      .user as AuthenticatedUser | undefined;
+    const user = context.switchToHttp().getRequest<RequestWithUser>().user;
     if (!user?.role || !required.includes(user.role as RoleName)) {
       throw new ForbiddenException('Insufficient role');
     }

@@ -53,7 +53,9 @@ export class CampaignSessionsService {
     return {
       farmerId: session.farmer.id,
       name: session.farmer.name,
-      farm: session.farmer.farm ? { name: session.farmer.farm.name } : undefined,
+      farm: session.farmer.farm
+        ? { name: session.farmer.farm.name }
+        : undefined,
     };
   }
 
@@ -65,17 +67,15 @@ export class CampaignSessionsService {
 
     const session = this.sessionsRepository.create({
       campaign,
-      farmer: dto.farmerId ? ({ id: dto.farmerId } as any) : undefined,
-      user: dto.userId ? ({ userId: dto.userId } as any) : undefined,
-      actorType: dto.actorTypeId
-        ? ({ actorTypeId: dto.actorTypeId } as any)
-        : undefined,
+      farmer: dto.farmerId ? { id: dto.farmerId } : undefined,
+      user: dto.userId ? { userId: dto.userId } : undefined,
+      actorType: dto.actorTypeId ? { actorTypeId: dto.actorTypeId } : undefined,
       department: dto.departmentId
-        ? ({ departmentId: dto.departmentId } as any)
+        ? { departmentId: dto.departmentId }
         : undefined,
-      town: dto.townId ? ({ townId: dto.townId } as any) : undefined,
+      town: dto.townId ? { townId: dto.townId } : undefined,
       vereda: dto.vereda,
-      crop: dto.cropId ? ({ cropId: dto.cropId } as any) : undefined,
+      crop: dto.cropId ? { cropId: dto.cropId } : undefined,
     });
 
     if (dto.cropIds?.length) {
@@ -149,8 +149,18 @@ export class CampaignSessionsService {
 
     return matches.some((r) => {
       if (r.option?.optionId === expected) return true;
-      if (r.textValue !== null && r.textValue !== undefined && r.textValue === expected) return true;
-      if (r.numericValue !== null && r.numericValue !== undefined && String(r.numericValue) === expected) return true;
+      if (
+        r.textValue !== null &&
+        r.textValue !== undefined &&
+        r.textValue === expected
+      )
+        return true;
+      if (
+        r.numericValue !== null &&
+        r.numericValue !== undefined &&
+        String(r.numericValue) === expected
+      )
+        return true;
       if (r.booleanValue !== null && r.booleanValue !== undefined) {
         if (expected === 'true' && r.booleanValue === true) return true;
         if (expected === 'false' && r.booleanValue === false) return true;
@@ -164,7 +174,9 @@ export class CampaignSessionsService {
     allResponses: Response[],
     sessionCrops: TypeOfCrop[],
   ): boolean {
-    const conditions = (step.conditions ?? []).sort((a, b) => a.order - b.order);
+    const conditions = (step.conditions ?? []).sort(
+      (a, b) => a.order - b.order,
+    );
     if (conditions.length === 0) return true;
 
     let result = this.evalCondition(conditions[0], allResponses, sessionCrops);
@@ -201,10 +213,13 @@ export class CampaignSessionsService {
 
     for (const step of steps) {
       if (completedOrders.has(step.order)) continue;
-      if (!this.stepPassesConditions(step, allResponses, sessionCrops)) continue;
+      if (!this.stepPassesConditions(step, allResponses, sessionCrops))
+        continue;
 
       if (!step.instrument) {
-        throw new NotFoundException(`Instrument for step ${step.stepId} not found`);
+        throw new NotFoundException(
+          `Instrument for step ${step.stepId} not found`,
+        );
       }
 
       return {
