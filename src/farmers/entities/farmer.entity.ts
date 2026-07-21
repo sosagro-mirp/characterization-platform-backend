@@ -19,6 +19,13 @@ import {
 
 @Entity({ name: 'farmers' })
 export class Farmer {
+  // DEBT: inconsistente con el resto del modelo, que usa {entidad}Id como
+  // nombre de PK (Farm.farmId, User.userId, etc.). Renombrar a farmerId
+  // requiere migración de columna + actualizar los joinColumn de las tablas
+  // M:M (farmers_technologies, farmers_obstacles,
+  // farmers_digital_funcionalities) + coordinar el cambio de contrato de API
+  // con frontend/mobile si consumen `farmer.id`. Ver
+  // docs/reports/auditorias/01-auditoria-backend-main.md hallazgo menor.
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -49,7 +56,12 @@ export class Farmer {
   @Column({ type: 'varchar', length: 50, nullable: true })
   gender: string | null;
 
-  @Column({ name: 'education_level', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'education_level',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   educationLevel: string | null;
 
   @Column({ name: 'experience_years', type: 'int', nullable: true })

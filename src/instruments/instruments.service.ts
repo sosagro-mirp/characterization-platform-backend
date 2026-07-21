@@ -57,6 +57,15 @@ export class InstrumentsService {
     });
   }
 
+  /** Fase 2 (Spec 30): catálogo público para el dashboard — solo instrumentos activos. */
+  async findAllPublic(): Promise<Pick<Instrument, 'instrumentId' | 'name' | 'code'>[]> {
+    return await this.instrumentsRepository.find({
+      where: { isActive: true },
+      select: ['instrumentId', 'name', 'code'],
+      order: { name: 'ASC' },
+    });
+  }
+
   async findByActorType(actorTypeId: string): Promise<Instrument[]> {
     return await this.instrumentsRepository
       .createQueryBuilder('instrument')

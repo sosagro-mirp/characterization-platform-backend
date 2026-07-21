@@ -41,6 +41,7 @@ import { HealthModule } from './health/health.module';
 import { ChangeRequestsModule } from './change-requests/change-requests.module';
 import { MediaAttachmentsModule } from './media-attachments/media-attachments.module';
 import { StorageModule } from './storage/storage.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -124,6 +125,7 @@ import { StorageModule } from './storage/storage.module';
     ChangeRequestsModule,
     MediaAttachmentsModule,
     StorageModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [

@@ -7,13 +7,22 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { IsOptional, IsUUID } from 'class-validator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
+import { Public } from '../auth/decorators/public.decorator';
 import { TownsService } from './towns.service';
 import { CreateTownDto } from './dto/create-town.dto';
 import { UpdateTownDto } from './dto/update-town.dto';
+
+class FindAllTownsPublicQuery {
+  @IsOptional()
+  @IsUUID()
+  departmentId?: string;
+}
 
 @ApiTags('Towns')
 @ApiBearerAuth()
@@ -35,6 +44,23 @@ export class TownsController {
   @ApiResponse({ status: 200, description: 'Lista de municipios.' })
   findAll() {
     return this.townsService.findAll();
+  }
+
+  @Public()
+  @Get('public')
+  @ApiOperation({
+    summary: 'Listar municipios (público)',
+    description: 'Ruta pública para el selector de filtros del dashboard. No requiere autenticación.',
+  })
+  @ApiQuery({
+    name: 'departmentId',
+    required: false,
+    description: 'Filtrar municipios por departamento',
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiResponse({ status: 200, description: 'Lista de municipios.' })
+  findAllPublic(@Query() query: FindAllTownsPublicQuery) {
+    return this.townsService.findAllPublic(query.departmentId);
   }
 
   @Get(':id')
