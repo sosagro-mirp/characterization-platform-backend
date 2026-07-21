@@ -11,16 +11,38 @@ import { AppModule } from '../src/app.module';
 const TEST_PASSWORD = 'E2eTest1234!';
 const LOCAL_ID = 'e2e-cr-local-uuid-001';
 
+interface LoginResponse {
+  accessToken: string;
+}
+
+interface ChangeRequestResponse {
+  changeRequestId: string;
+  source: string;
+  category: string | null;
+  status: string;
+  createdBy?: { userId: string };
+  resolvedAt?: string | null;
+  resolvedBy?: { userId: string };
+}
+
+interface RoleRow {
+  role_id: string;
+  name: string;
+}
+
 function testEmail(role: string) {
   return `e2e-cr-${role}@test.local`;
 }
 
-async function loginAs(app: INestApplication<App>, email: string): Promise<string> {
+async function loginAs(
+  app: INestApplication<App>,
+  email: string,
+): Promise<string> {
   const res = await request(app.getHttpServer())
     .post('/api/auth/login')
     .send({ email, password: TEST_PASSWORD })
     .expect(200);
-  return res.body.accessToken as string;
+  return (res.body as LoginResponse).accessToken;
 }
 
 // ─── suite ──────────────────────────────────────────────────────────────────
@@ -34,7 +56,6 @@ describe('Bloque A — Change Requests (e2e)', () => {
   let pollsterToken: string;
 
   let adminUserId: string;
-  let pollsterUserId: string;
 
   // changeRequestId creado en A1 (mobile) — reutilizado en A8/A9/A10
   let mobileTicketId: string;
@@ -49,16 +70,20 @@ describe('Bloque A — Change Requests (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     );
     await app.init();
 
     ds = moduleFixture.get(DataSource);
 
     // Resolve role IDs dynamically
-    const roles = await ds.query(
+    const roles = await ds.query<RoleRow[]>(
       `SELECT role_id, name FROM roles WHERE name IN ('admin','researcher','pollster')`,
-    ) as { role_id: string; name: string }[];
+    );
 
     const roleId = (name: string) =>
       roles.find((r) => r.name === name)!.role_id;
@@ -69,30 +94,30 @@ describe('Bloque A — Change Requests (e2e)', () => {
     const insertUser = async (name: string, role: string): Promise<string> => {
       const email = testEmail(role);
       // Upsert-style: skip if already exists (re-run safety)
-      const existing = await ds.query(
+      const existing = await ds.query<{ user_id: string }[]>(
         `SELECT user_id FROM users WHERE email = $1`,
         [email],
-      ) as { user_id: string }[];
+      );
 
       if (existing.length) return existing[0].user_id;
 
-      const result = await ds.query(
+      const result = await ds.query<{ user_id: string }[]>(
         `INSERT INTO users (user_id, name, last_name, email, password, role_id, must_change_password)
          VALUES (gen_random_uuid(), $1, 'E2E', $2, $3, $4, false)
          RETURNING user_id`,
         [name, email, hash, roleId(role)],
-      ) as { user_id: string }[];
+      );
       return result[0].user_id;
     };
 
-    adminUserId    = await insertUser('E2E Admin',      'admin');
-    pollsterUserId = await insertUser('E2E Pollster',   'pollster');
+    adminUserId = await insertUser('E2E Admin', 'admin');
+    await insertUser('E2E Pollster', 'pollster');
     await insertUser('E2E Researcher', 'researcher');
 
     // Obtain tokens
-    adminToken      = await loginAs(app, testEmail('admin'));
+    adminToken = await loginAs(app, testEmail('admin'));
     researcherToken = await loginAs(app, testEmail('researcher'));
-    pollsterToken   = await loginAs(app, testEmail('pollster'));
+    pollsterToken = await loginAs(app, testEmail('pollster'));
   }, 30_000);
 
   afterAll(async () => {
@@ -103,9 +128,7 @@ describe('Bloque A — Change Requests (e2e)', () => {
       )`,
     );
     // Delete test users
-    await ds.query(
-      `DELETE FROM users WHERE email LIKE 'e2e-cr-%@test.local'`,
-    );
+    await ds.query(`DELETE FROM users WHERE email LIKE 'e2e-cr-%@test.local'`);
     await app.close();
   }, 15_000);
 
@@ -117,17 +140,19 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .post('/api/change-requests')
         .set('Authorization', `Bearer ${pollsterToken}`)
         .send({
-          description: 'El nombre del agricultor Juan Pérez está mal escrito, es Juan Peres.',
+          description:
+            'El nombre del agricultor Juan Pérez está mal escrito, es Juan Peres.',
           localId: LOCAL_ID,
         })
         .expect(201);
 
-      expect(res.body.source).toBe('mobile');
-      expect(res.body.category).toBeNull();
-      expect(res.body.status).toBe('open');
-      expect(res.body.changeRequestId).toBeDefined();
+      const body = res.body as ChangeRequestResponse;
+      expect(body.source).toBe('mobile');
+      expect(body.category).toBeNull();
+      expect(body.status).toBe('open');
+      expect(body.changeRequestId).toBeDefined();
 
-      mobileTicketId = res.body.changeRequestId as string;
+      mobileTicketId = body.changeRequestId;
     });
 
     it('200: idempotencia — reenvío con mismo localId devuelve el mismo ticket', async () => {
@@ -135,12 +160,15 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .post('/api/change-requests')
         .set('Authorization', `Bearer ${pollsterToken}`)
         .send({
-          description: 'El nombre del agricultor Juan Pérez está mal escrito, es Juan Peres.',
+          description:
+            'El nombre del agricultor Juan Pérez está mal escrito, es Juan Peres.',
           localId: LOCAL_ID,
         })
         .expect(200);
 
-      expect(res.body.changeRequestId).toBe(mobileTicketId);
+      expect((res.body as ChangeRequestResponse).changeRequestId).toBe(
+        mobileTicketId,
+      );
     });
   });
 
@@ -152,14 +180,16 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .post('/api/change-requests')
         .set('Authorization', `Bearer ${researcherToken}`)
         .send({
-          description: 'El botón de guardar en la sección de instrumentos no responde al primer click.',
+          description:
+            'El botón de guardar en la sección de instrumentos no responde al primer click.',
           category: 'bug_ui',
         })
         .expect(201);
 
-      expect(res.body.source).toBe('web');
-      expect(res.body.category).toBe('bug_ui');
-      expect(res.body.status).toBe('open');
+      const body = res.body as ChangeRequestResponse;
+      expect(body.source).toBe('web');
+      expect(body.category).toBe('bug_ui');
+      expect(body.status).toBe('open');
     });
   });
 
@@ -170,7 +200,9 @@ describe('Bloque A — Change Requests (e2e)', () => {
       await request(app.getHttpServer())
         .post('/api/change-requests')
         .set('Authorization', `Bearer ${pollsterToken}`)
-        .send({ description: 'Descripción de prueba sin categoría ni localId.' })
+        .send({
+          description: 'Descripción de prueba sin categoría ni localId.',
+        })
         .expect(400);
     });
   });
@@ -196,10 +228,11 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body.length).toBeGreaterThanOrEqual(2);
+      const body = res.body as ChangeRequestResponse[];
+      expect(Array.isArray(body)).toBe(true);
+      expect(body.length).toBeGreaterThanOrEqual(2);
 
-      const ticket = res.body[0];
+      const ticket = body[0];
       expect(ticket).toHaveProperty('createdBy');
       expect(ticket.createdBy).toHaveProperty('userId');
     });
@@ -214,7 +247,11 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(res.body.every((t: { source: string }) => t.source === 'mobile')).toBe(true);
+      expect(
+        (res.body as ChangeRequestResponse[]).every(
+          (t) => t.source === 'mobile',
+        ),
+      ).toBe(true);
     });
 
     it('?source=web devuelve solo tickets de web', async () => {
@@ -223,7 +260,9 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(res.body.every((t: { source: string }) => t.source === 'web')).toBe(true);
+      expect(
+        (res.body as ChangeRequestResponse[]).every((t) => t.source === 'web'),
+      ).toBe(true);
     });
   });
 
@@ -236,7 +275,9 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(res.body.every((t: { status: string }) => t.status === 'open')).toBe(true);
+      expect(
+        (res.body as ChangeRequestResponse[]).every((t) => t.status === 'open'),
+      ).toBe(true);
     });
 
     it('?status=resolved devuelve array vacío (aún no hay resueltos)', async () => {
@@ -246,7 +287,7 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .expect(200);
 
       // Solo verifica que los del suite de test no están (pueden existir otros resueltos en la DB)
-      const fromSuite = (res.body as { changeRequestId: string }[]).find(
+      const fromSuite = (res.body as ChangeRequestResponse[]).find(
         (t) => t.changeRequestId === mobileTicketId,
       );
       expect(fromSuite).toBeUndefined();
@@ -262,10 +303,11 @@ describe('Bloque A — Change Requests (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
 
-      expect(res.body.status).toBe('resolved');
-      expect(res.body.resolvedAt).not.toBeNull();
-      expect(res.body.resolvedBy).toBeDefined();
-      expect(res.body.resolvedBy.userId).toBe(adminUserId);
+      const body = res.body as ChangeRequestResponse;
+      expect(body.status).toBe('resolved');
+      expect(body.resolvedAt).not.toBeNull();
+      expect(body.resolvedBy).toBeDefined();
+      expect(body.resolvedBy?.userId).toBe(adminUserId);
     });
   });
 
