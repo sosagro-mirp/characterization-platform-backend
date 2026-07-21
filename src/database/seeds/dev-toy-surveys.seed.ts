@@ -2,7 +2,6 @@ import { EntityManager } from 'typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
-import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
@@ -48,7 +47,10 @@ function pickRandom<T>(arr: T[]): T {
 }
 
 function pickRandomSubset<T>(arr: T[], min: number, max: number): T[] {
-  const count = Math.min(arr.length, Math.floor(Math.random() * (max - min + 1)) + min);
+  const count = Math.min(
+    arr.length,
+    Math.floor(Math.random() * (max - min + 1)) + min,
+  );
   const shuffled = [...arr].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
@@ -107,11 +109,12 @@ async function createResponsesForSurvey(
     }
 
     if (typeName === 'numeric') {
-      const value = question.systemField === 'farmer.age'
-        ? randomInt(18, 70)
-        : question.systemField === 'farmer.experienceYears'
-          ? randomInt(0, 40)
-          : randomInt(0, 50);
+      const value =
+        question.systemField === 'farmer.age'
+          ? randomInt(18, 70)
+          : question.systemField === 'farmer.experienceYears'
+            ? randomInt(0, 40)
+            : randomInt(0, 50);
       await responseRepo.save(
         responseRepo.create({
           survey,
@@ -139,7 +142,11 @@ async function createResponsesForSurvey(
     if (typeName === 'multiple_choice') {
       const options = question.options.filter((o) => !o.isOther);
       if (options.length === 0) continue;
-      const selected = pickRandomSubset(options, 1, Math.min(3, options.length));
+      const selected = pickRandomSubset(
+        options,
+        1,
+        Math.min(3, options.length),
+      );
       for (const option of selected) {
         await responseRepo.save(
           responseRepo.create({
@@ -280,5 +287,7 @@ export async function seedDevToySurveys(manager: EntityManager): Promise<void> {
     documentPrefix: DEV_TOY_DOCUMENT_PREFIX,
   });
 
-  console.log(`[seed:dev-toy] ${total} encuestas de juguete creadas (S_DCU + S1a).`);
+  console.log(
+    `[seed:dev-toy] ${total} encuestas de juguete creadas (S_DCU + S1a).`,
+  );
 }

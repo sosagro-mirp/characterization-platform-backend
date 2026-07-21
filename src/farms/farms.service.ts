@@ -17,8 +17,29 @@ export class FarmsService {
     private readonly cropsRepository: Repository<TypeOfCrop>,
   ) {}
 
-  create(createFarmDto: CreateFarmDto) {
-    return 'This action adds a new farm';
+  async create(dto: CreateFarmDto): Promise<Farm> {
+    const {
+      cropIds,
+      deviceIds: _deviceIds,
+      townId,
+      hasStabilityElectricity,
+      ...scalar
+    } = dto;
+
+    const farm = this.farmsRepository.create({
+      ...scalar,
+      hasElectricityAccess: hasStabilityElectricity,
+      town: townId ? { townId } : undefined,
+    });
+
+    if (cropIds?.length) {
+      farm.crops = await this.cropsRepository.findBy({ cropId: In(cropIds) });
+    }
+
+    // DEBT: deviceIds se acepta en el DTO pero ni create() ni update() lo
+    // persisten; falta inyectar el repo de Device y asociar farms_devices.
+    const saved = await this.farmsRepository.save(farm);
+    return this.findOne(saved.farmId);
   }
 
   findAll() {
@@ -50,7 +71,8 @@ export class FarmsService {
     return this.findOne(id);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} farm`;
+  async remove(id: string): Promise<void> {
+    const farm = await this.findOne(id);
+    await this.farmsRepository.remove(farm);
   }
 }
