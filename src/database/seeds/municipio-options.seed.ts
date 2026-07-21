@@ -6,8 +6,8 @@ import { Question } from 'src/questions/entities/question.entity';
 
 // Spec 38 — Fase 2
 // Puebla todos los municipios de los 6 departamentos del proyecto en la tabla towns
-// y crea las opciones vinculadas a la pregunta "Municipio" (25f2a0ae).
-// También asigna metadata_id a las opciones existentes de la pregunta "Departamento" (e8cd045f).
+// y crea las opciones vinculadas a la pregunta "Municipio" (2aaf5f9e).
+// También asigna metadata_id a las opciones existentes de la pregunta "Departamento" (3f9739f4).
 //
 // Mapeo nombre → metadata_id para Bloque B:
 // Antioquia        → department.department_id de "Antioquia"
@@ -18,8 +18,8 @@ import { Question } from 'src/questions/entities/question.entity';
 // Norte de Santander → department.department_id de "Norte de Santander"
 // Otros            → null (sin departamento vinculado)
 
-const QUESTION_ID_MUNICIPIO = '25f2a0ae-7e48-489e-a46c-37e28cf1a662';
-const QUESTION_ID_DEPARTAMENTO = 'e8cd045f-1901-40b6-b8fb-9ec49dd5f1b3';
+const QUESTION_ID_MUNICIPIO = '2aaf5f9e-924c-4048-9a29-d617cde4fb7d';
+const QUESTION_ID_DEPARTAMENTO = '3f9739f4-6a3a-4fdd-a57b-531d70f2bdfc';
 
 const MUNICIPIOS: Record<string, string[]> = {
   Antioquia: [
