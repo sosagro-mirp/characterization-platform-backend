@@ -223,7 +223,15 @@ export class InstrumentsService {
                 name: question.type.name,
               }
             : null,
-          options: (question.options ?? []).map((option) => {
+          options: (
+            question.type?.name === 'likert'
+              // Likert scales must render in a consistent direction (worst -> best);
+              // relying on createdAt (seed insertion order) let some questions come
+              // back reversed relative to others. `value` already encodes the
+              // intended scale position for every likert option, so it's a safe sort key.
+              ? [...(question.options ?? [])].sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+              : (question.options ?? [])
+          ).map((option) => {
             let departmentId: string | null = null;
             if (question.systemField === 'farm.department') {
               departmentId = option.metadataId ?? null;

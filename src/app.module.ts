@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -45,6 +46,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({ isGlobal: true }),
     LoggerModule.forRoot({
       pinoHttp: {
@@ -84,6 +86,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
           type: 'postgres',
           ...(databaseUrl ? { url: databaseUrl } : { host: dbHost, port: dbPort, database: dbName, username: dbUser, password: dbPassword }),
           ssl: dbSsl ? { rejectUnauthorized: false } : false,
+          extra: { max: 20 },
           autoLoadEntities: true,
           synchronize: configService.get<string>('DB_SYNC') === 'true',
           migrationsRun: nodeEnv === 'production',
@@ -130,6 +133,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
   controllers: [AppController],
   providers: [
     AppService,
+    { provide: APP_FILTER, useClass: SentryGlobalFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
