@@ -70,9 +70,14 @@ export class FarmersService {
         name: true,
         documentId: true,
         phone: true,
-        farm: { farmId: true, name: true, town: { townId: true, name: true } },
+        farm: {
+          farmId: true,
+          name: true,
+          town: { townId: true, name: true },
+          crops: { cropId: true, name: true },
+        },
       },
-      relations: ['farm', 'farm.town'],
+      relations: ['farm', 'farm.town', 'farm.crops'],
       where: [
         { name: ILike(`%${query}%`) },
         { documentId: ILike(`%${query}%`) },
