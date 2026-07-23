@@ -5,12 +5,19 @@ import { Farmer } from './entities/farmer.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
 
+interface FindCallArgs {
+  relations: string[];
+  select: { farm: { crops: { cropId: boolean; name: boolean } } };
+}
+
 describe('FarmersService', () => {
   let service: FarmersService;
-  let farmersRepository: { find: jest.Mock };
+  let farmersRepository: {
+    find: jest.Mock<Promise<unknown[]>, [FindCallArgs]>;
+  };
 
   beforeEach(async () => {
-    farmersRepository = { find: jest.fn() };
+    farmersRepository = { find: jest.fn<Promise<unknown[]>, [FindCallArgs]>() };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -57,7 +64,9 @@ describe('FarmersService', () => {
 
       const result = await service.search('santiago');
 
-      expect(result[0].farm.crops).toEqual([{ cropId: 'crop-1', name: 'Café' }]);
+      expect(result[0].farm.crops).toEqual([
+        { cropId: 'crop-1', name: 'Café' },
+      ]);
     });
 
     it('returns an empty crops array without error when the farm has none', async () => {

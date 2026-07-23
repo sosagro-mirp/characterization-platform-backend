@@ -87,7 +87,10 @@ export class FarmersService {
   }
 
   async findAll(): Promise<Farmer[]> {
-    return this.farmersRepository.find({ relations: FARMER_RELATIONS, take: 500 });
+    return this.farmersRepository.find({
+      relations: FARMER_RELATIONS,
+      take: 500,
+    });
   }
 
   async findOne(id: string): Promise<Farmer> {
