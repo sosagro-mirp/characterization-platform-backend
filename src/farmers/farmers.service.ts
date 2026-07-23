@@ -70,9 +70,14 @@ export class FarmersService {
         name: true,
         documentId: true,
         phone: true,
-        farm: { farmId: true, name: true, town: { townId: true, name: true } },
+        farm: {
+          farmId: true,
+          name: true,
+          town: { townId: true, name: true },
+          crops: { cropId: true, name: true },
+        },
       },
-      relations: ['farm', 'farm.town'],
+      relations: ['farm', 'farm.town', 'farm.crops'],
       where: [
         { name: ILike(`%${query}%`) },
         { documentId: ILike(`%${query}%`) },
@@ -82,7 +87,10 @@ export class FarmersService {
   }
 
   async findAll(): Promise<Farmer[]> {
-    return this.farmersRepository.find({ relations: FARMER_RELATIONS, take: 500 });
+    return this.farmersRepository.find({
+      relations: FARMER_RELATIONS,
+      take: 500,
+    });
   }
 
   async findOne(id: string): Promise<Farmer> {
