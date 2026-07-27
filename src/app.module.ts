@@ -5,6 +5,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { RolesGuard } from './auth/guards/roles.guard';
+import { ApiKeyAuthGuard } from './auth/guards/api-key-auth.guard';
+import { ApiKeyScopeGuard } from './auth/guards/api-key-scope.guard';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
@@ -43,6 +45,7 @@ import { ChangeRequestsModule } from './change-requests/change-requests.module';
 import { MediaAttachmentsModule } from './media-attachments/media-attachments.module';
 import { StorageModule } from './storage/storage.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
 
 @Module({
   imports: [
@@ -51,23 +54,24 @@ import { DashboardModule } from './dashboard/dashboard.module';
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL ?? 'info',
-        transport: process.env.NODE_ENV === 'production'
-          ? { target: 'pino/file', options: { destination: 1 } }
-          : {
-              target: 'pino-pretty',
-              options: {
-                colorize: true,
-                singleLine: false,
-                translateTime: 'SYS:standard',
-                ignore: 'pid,hostname',
+        transport:
+          process.env.NODE_ENV === 'production'
+            ? { target: 'pino/file', options: { destination: 1 } }
+            : {
+                target: 'pino-pretty',
+                options: {
+                  colorize: true,
+                  singleLine: false,
+                  translateTime: 'SYS:standard',
+                  ignore: 'pid,hostname',
+                },
               },
-            },
       },
     }),
     ThrottlerModule.forRoot([
       {
-        ttl: 60_000,  // 1 minute
-        limit: 60,    // 60 requests per minute per IP
+        ttl: 60_000, // 1 minute
+        limit: 60, // 60 requests per minute per IP
       },
     ]),
     TypeOrmModule.forRootAsync({
@@ -75,7 +79,10 @@ import { DashboardModule } from './dashboard/dashboard.module';
       useFactory: (configService: ConfigService) => {
         const databaseUrl = configService.get<string>('DATABASE_URL');
         const dbHost = configService.get<string>('DB_HOST');
-        const dbPort = parseInt(configService.get<string>('DB_PORT') || '5432', 10);
+        const dbPort = parseInt(
+          configService.get<string>('DB_PORT') || '5432',
+          10,
+        );
         const dbName = configService.get<string>('DB_NAME');
         const dbUser = configService.get<string>('DB_USER');
         const dbPassword = configService.get<string>('DB_PASSWORD');
@@ -84,7 +91,15 @@ import { DashboardModule } from './dashboard/dashboard.module';
 
         return {
           type: 'postgres',
-          ...(databaseUrl ? { url: databaseUrl } : { host: dbHost, port: dbPort, database: dbName, username: dbUser, password: dbPassword }),
+          ...(databaseUrl
+            ? { url: databaseUrl }
+            : {
+                host: dbHost,
+                port: dbPort,
+                database: dbName,
+                username: dbUser,
+                password: dbPassword,
+              }),
           ssl: dbSsl ? { rejectUnauthorized: false } : false,
           extra: { max: 20 },
           autoLoadEntities: true,
@@ -129,14 +144,17 @@ import { DashboardModule } from './dashboard/dashboard.module';
     MediaAttachmentsModule,
     StorageModule,
     DashboardModule,
+    ApiKeysModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     { provide: APP_FILTER, useClass: SentryGlobalFilter },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ApiKeyAuthGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: ApiKeyScopeGuard },
   ],
 })
 export class AppModule {}

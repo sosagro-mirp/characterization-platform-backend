@@ -51,6 +51,16 @@ async function bootstrap() {
       },
       'bearer',
     )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'X-API-Key',
+        in: 'header',
+        description:
+          'API key de cliente automatizado (ej. el MCP de administración). Formato: sosagro_sk_<prefijo>_<secreto>',
+      },
+      'apiKey',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
@@ -71,6 +81,7 @@ async function bootstrap() {
     { name: 'Responses' },
     { name: 'Users' },
     { name: 'Auth' },
+    { name: 'API Keys' },
     { name: 'Health' },
   ];
 
