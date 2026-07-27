@@ -8,6 +8,8 @@ import { CampaignSession } from './entities/campaign-session.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
+import { Farmer } from 'src/farmers/entities/farmer.entity';
+import { User } from 'src/users/entities/user.entity';
 
 interface NextStepInstrument {
   instrumentId: string;
@@ -32,6 +34,10 @@ export class CampaignSessionsService {
     private readonly campaignsRepository: Repository<Campaign>,
     @InjectRepository(TypeOfCrop)
     private readonly cropsRepository: Repository<TypeOfCrop>,
+    @InjectRepository(Farmer)
+    private readonly farmersRepository: Repository<Farmer>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
   ) {}
 
   async getLastFarmer(userId: string): Promise<{
@@ -64,6 +70,20 @@ export class CampaignSessionsService {
       where: { campaignId: dto.campaignId },
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
+
+    if (dto.farmerId) {
+      const farmer = await this.farmersRepository.findOne({
+        where: { id: dto.farmerId },
+      });
+      if (!farmer) throw new NotFoundException('Farmer not found');
+    }
+
+    if (dto.userId) {
+      const user = await this.usersRepository.findOne({
+        where: { userId: dto.userId },
+      });
+      if (!user) throw new NotFoundException('User not found');
+    }
 
     const session = this.sessionsRepository.create({
       campaign,
