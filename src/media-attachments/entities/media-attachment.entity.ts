@@ -38,13 +38,23 @@ export class MediaAttachment {
   @JoinColumn({ name: 'response_id', referencedColumnName: 'responseId' })
   response?: Response;
 
-  @Column({ name: 'storage_key', type: 'varchar', length: 500, nullable: false })
+  @Column({
+    name: 'storage_key',
+    type: 'varchar',
+    length: 500,
+    nullable: false,
+  })
   storageKey: string;
 
   @Column({ name: 'public_url', type: 'varchar', length: 1000, nullable: true })
   publicUrl?: string;
 
-  @Column({ name: 'original_filename', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'original_filename',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   originalFilename?: string;
 
   @Column({ name: 'mime_type', type: 'varchar', length: 100, nullable: false })
@@ -66,9 +76,17 @@ export class MediaAttachment {
   @JoinColumn({ name: 'created_by_id', referencedColumnName: 'userId' })
   createdBy?: User;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   updatedAt: Date;
 }

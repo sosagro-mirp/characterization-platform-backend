@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,27 @@ async function saveOptions(
 const NAME = `S12: Aspectos fitosanitarios/Diagnóstico`;
 const VERSION = 1;
 
-export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["likert", "multiple_choice", "open_text", "single_choice", "yes_no"];
+  const typeNames = [
+    'likert',
+    'multiple_choice',
+    'open_text',
+    'single_choice',
+    'yes_no',
+  ];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -87,11 +106,41 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3, sec4, sec5] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `1. Estado Sanitario del Cultivo`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `2. Diagnóstico y Uso de Laboratorios`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `3. Red de Apoyo Técnico`, order: 3, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `4. Necesidades Diagnósticas`, order: 4, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `5. Riesgos Emergentes y Futuro`, order: 5, instrument }))
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `1. Estado Sanitario del Cultivo`,
+        order: 1,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `2. Diagnóstico y Uso de Laboratorios`,
+        order: 2,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `3. Red de Apoyo Técnico`,
+        order: 3,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `4. Necesidades Diagnósticas`,
+        order: 4,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `5. Riesgos Emergentes y Futuro`,
+        order: 5,
+        instrument,
+      }),
+    ),
   ]);
 
   // ── 1. Estado Sanitario del Cultivo ──
@@ -144,7 +193,6 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       { text: `Alto (15–30%)` },
       { text: `Muy alto (>30%)` },
     ]);
-
   }
 
   // ── 2. Diagnóstico y Uso de Laboratorios ──
@@ -267,7 +315,6 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       { text: `Requisitos regulatorios` },
       { text: `Otros`, isOther: true },
     ]);
-
   }
 
   // ── 3. Red de Apoyo Técnico ──
@@ -315,7 +362,6 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       { text: `Bioseguridad` },
       { text: `Trazabilidad` },
     ]);
-
   }
 
   // ── 4. Necesidades Diagnósticas ──
@@ -377,7 +423,6 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       { text: `Entre $50.000 - $100.000` },
       { text: `Más de $100.000` },
     ]);
-
   }
 
   // ── 5. Riesgos Emergentes y Futuro ──
@@ -520,7 +565,6 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(manage
       { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
-
   }
 
   console.log(`[seed] "${NAME}" insertado (28 preguntas).`);

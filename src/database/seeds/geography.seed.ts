@@ -74,7 +74,10 @@ export async function seedGeography(manager: EntityManager): Promise<void> {
 
     for (const townDef of deptDef.towns) {
       const existing = await townRepo.findOne({
-        where: { name: townDef.name, department: { departmentId: department.departmentId } },
+        where: {
+          name: townDef.name,
+          department: { departmentId: department.departmentId },
+        },
         relations: ['department'],
       });
 

@@ -8,7 +8,10 @@ import { EntityManager, In, Repository } from 'typeorm';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
-import { MediaAttachment, MediaAttachmentStatus } from 'src/media-attachments/entities/media-attachment.entity';
+import {
+  MediaAttachment,
+  MediaAttachmentStatus,
+} from 'src/media-attachments/entities/media-attachment.entity';
 import { CreateResponseDto } from './dto/create-response.dto';
 import { Response } from './entities/response.entity';
 
@@ -250,10 +253,9 @@ export class ResponsesService {
     const saved = await manager.getRepository(Response).save(response);
 
     if (attachment) {
-      await manager.getRepository(MediaAttachment).update(
-        { attachmentId },
-        { response: saved },
-      );
+      await manager
+        .getRepository(MediaAttachment)
+        .update({ attachmentId }, { response: saved });
     }
 
     return saved;

@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddCampaignSessionsCropsAndNullableColumns1749686400000
-  implements MigrationInterface
-{
+export class AddCampaignSessionsCropsAndNullableColumns1749686400000 implements MigrationInterface {
   name = 'AddCampaignSessionsCropsAndNullableColumns1749686400000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -106,7 +104,9 @@ export class AddCampaignSessionsCropsAndNullableColumns1749686400000
         ALTER COLUMN "participation_in_training" SET NOT NULL
     `);
 
-    await queryRunner.query(`ALTER TABLE "instruments" DROP CONSTRAINT "UQ_instruments_code"`);
+    await queryRunner.query(
+      `ALTER TABLE "instruments" DROP CONSTRAINT "UQ_instruments_code"`,
+    );
     await queryRunner.query(`ALTER TABLE "instruments" DROP COLUMN "code"`);
 
     await queryRunner.query(`

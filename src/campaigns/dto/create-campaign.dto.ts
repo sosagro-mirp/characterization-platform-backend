@@ -14,7 +14,9 @@ export class CreateCampaignDto {
   @MaxLength(255)
   name: string;
 
-  @ApiPropertyOptional({ example: 'Aplica datos personales, cultivo y tecnología.' })
+  @ApiPropertyOptional({
+    example: 'Aplica datos personales, cultivo y tecnología.',
+  })
   @IsOptional()
   @IsString()
   description?: string;

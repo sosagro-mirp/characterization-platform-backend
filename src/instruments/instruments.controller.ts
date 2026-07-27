@@ -12,7 +12,14 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsUUID } from 'class-validator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -70,7 +77,8 @@ export class InstrumentsController {
   @ApiQuery({
     name: 'excludeSystem',
     required: false,
-    description: 'Si true, excluye instrumentos con código de sistema (S1, S2, etc.)',
+    description:
+      'Si true, excluye instrumentos con código de sistema (S1, S2, etc.)',
     schema: { type: 'boolean' },
   })
   @ApiResponse({ status: 200, description: 'Lista de instrumentos.' })
@@ -84,7 +92,11 @@ export class InstrumentsController {
   @Public()
   @Get('by-code/:code')
   @ApiOperation({ summary: 'Obtener instrumento por código (S1, S2, etc.)' })
-  @ApiParam({ name: 'code', description: 'Código del instrumento (máx 10 chars)', example: 'S1' })
+  @ApiParam({
+    name: 'code',
+    description: 'Código del instrumento (máx 10 chars)',
+    example: 'S1',
+  })
   @ApiResponse({ status: 200, description: '{ instrumentId, name }' })
   @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
   findByCode(@Param('code') code: string) {
@@ -100,7 +112,10 @@ export class InstrumentsController {
       '(sections → questions → options) lista para renderizar en la UI.',
   })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID del instrumento' })
-  @ApiResponse({ status: 200, description: 'Estructura completa del instrumento.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Estructura completa del instrumento.',
+  })
   @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
   findOneForRender(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.instrumentsService.findOneForRender(id);
@@ -113,7 +128,10 @@ export class InstrumentsController {
     description:
       'Ruta pública para el selector de instrumentos del dashboard. Solo instrumentos con isActive=true. No requiere autenticación.',
   })
-  @ApiResponse({ status: 200, description: 'Lista de instrumentos activos (instrumentId, name, code).' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de instrumentos activos (instrumentId, name, code).',
+  })
   findAllPublic() {
     return this.instrumentsService.findAllPublic();
   }
@@ -149,7 +167,11 @@ export class InstrumentsController {
         'Only admin can activate or deactivate instruments',
       );
     }
-    return this.instrumentsService.update(id, updateInstrumentDto, user?.userId);
+    return this.instrumentsService.update(
+      id,
+      updateInstrumentDto,
+      user?.userId,
+    );
   }
 
   @Delete(':id')
@@ -159,7 +181,10 @@ export class InstrumentsController {
   @ApiOperation({ summary: 'Eliminar instrumento' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Instrumento eliminado.' })
-  @ApiResponse({ status: 400, description: 'Instrumento con encuestas asociadas.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Instrumento con encuestas asociadas.',
+  })
   @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.instrumentsService.remove(id);

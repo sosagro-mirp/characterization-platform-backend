@@ -13,23 +13,39 @@ export class DashboardMetadataDto {
   })
   instrumentName?: string;
 
-  @ApiProperty({ required: false, description: 'Nombre del departamento filtrado, si aplica.' })
+  @ApiProperty({
+    required: false,
+    description: 'Nombre del departamento filtrado, si aplica.',
+  })
   departmentName?: string;
 
-  @ApiProperty({ required: false, description: 'Nombre del municipio filtrado, si aplica.' })
+  @ApiProperty({
+    required: false,
+    description: 'Nombre del municipio filtrado, si aplica.',
+  })
   townName?: string;
 
-  @ApiProperty({ required: false, description: 'Nombre del cultivo filtrado, si aplica.' })
+  @ApiProperty({
+    required: false,
+    description: 'Nombre del cultivo filtrado, si aplica.',
+  })
   cropName?: string;
 
-  @ApiProperty({ required: false, description: 'Nombre del tipo de actor filtrado, si aplica.' })
+  @ApiProperty({
+    required: false,
+    description: 'Nombre del tipo de actor filtrado, si aplica.',
+  })
   actorTypeName?: string;
 
   @ApiProperty({
     required: false,
     nullable: true,
-    description: 'Rango de fechas (createdAt mín/máx) de las encuestas en la muestra filtrada. Null si totalCount es 0.',
-    example: { from: '2026-01-15T00:00:00.000Z', to: '2026-06-20T00:00:00.000Z' },
+    description:
+      'Rango de fechas (createdAt mín/máx) de las encuestas en la muestra filtrada. Null si totalCount es 0.',
+    example: {
+      from: '2026-01-15T00:00:00.000Z',
+      to: '2026-06-20T00:00:00.000Z',
+    },
   })
   dateRange?: { from: string; to: string } | null;
 

@@ -21,7 +21,10 @@ export class CreateFarmDto {
   name: string;
 
   /** Descripción de la ubicación o dirección de la finca */
-  @ApiProperty({ example: 'Vereda El Manzanillo, km 5 vía Apartadó', maxLength: 255 })
+  @ApiProperty({
+    example: 'Vereda El Manzanillo, km 5 vía Apartadó',
+    maxLength: 255,
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)

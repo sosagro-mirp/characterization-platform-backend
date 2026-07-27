@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddAuditFieldsToInstrumentsAndCampaigns1781700000004
-  implements MigrationInterface
-{
+export class AddAuditFieldsToInstrumentsAndCampaigns1781700000004 implements MigrationInterface {
   name = 'AddAuditFieldsToInstrumentsAndCampaigns1781700000004';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

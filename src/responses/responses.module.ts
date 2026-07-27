@@ -10,7 +10,13 @@ import { ResponsesService } from './responses.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Response, Survey, Question, OptionQuestion, MediaAttachment]),
+    TypeOrmModule.forFeature([
+      Response,
+      Survey,
+      Question,
+      OptionQuestion,
+      MediaAttachment,
+    ]),
   ],
   controllers: [ResponsesController],
   providers: [ResponsesService],

@@ -51,7 +51,9 @@ export class CampaignsService {
   async create(dto: CreateCampaignDto, userId?: string): Promise<Campaign> {
     let user: User | undefined;
     if (userId) {
-      user = await this.usersRepository.findOne({ where: { userId } }) ?? undefined;
+      user =
+        (await this.usersRepository.findOne({ where: { userId } })) ??
+        undefined;
     }
 
     const campaign = this.campaignsRepository.create({
@@ -91,7 +93,11 @@ export class CampaignsService {
     return campaign;
   }
 
-  async update(campaignId: string, dto: UpdateCampaignDto, userId?: string): Promise<Campaign> {
+  async update(
+    campaignId: string,
+    dto: UpdateCampaignDto,
+    userId?: string,
+  ): Promise<Campaign> {
     const campaign = await this.findOne(campaignId);
     if (dto.name !== undefined) campaign.name = dto.name;
     if (dto.description !== undefined) campaign.description = dto.description;
@@ -106,7 +112,9 @@ export class CampaignsService {
     return this.findOne(campaignId);
   }
 
-  async getSessionsSummary(campaignId: string): Promise<{ sessionCount: number }> {
+  async getSessionsSummary(
+    campaignId: string,
+  ): Promise<{ sessionCount: number }> {
     await this.findOne(campaignId);
     const sessionCount = await this.sessionsRepository.count({
       where: { campaign: { campaignId } },
@@ -136,7 +144,9 @@ export class CampaignsService {
 
     if (!campaign) throw new NotFoundException('Campaign not found');
 
-    const sortedSteps = (campaign.steps ?? []).sort((a, b) => a.order - b.order);
+    const sortedSteps = (campaign.steps ?? []).sort(
+      (a, b) => a.order - b.order,
+    );
 
     return {
       campaignId: campaign.campaignId,
@@ -149,7 +159,9 @@ export class CampaignsService {
   }
 
   private mapStepToRender(step: CampaignStep): CampaignStepRender {
-    const sortedConditions = (step.conditions ?? []).sort((a, b) => a.order - b.order);
+    const sortedConditions = (step.conditions ?? []).sort(
+      (a, b) => a.order - b.order,
+    );
     return {
       stepId: step.stepId,
       order: step.order,
@@ -167,7 +179,10 @@ export class CampaignsService {
           ? { cropId: c.conditionCrop.cropId, name: c.conditionCrop.name }
           : null,
         conditionQuestion: c.conditionQuestion
-          ? { questionId: c.conditionQuestion.questionId, text: c.conditionQuestion.text }
+          ? {
+              questionId: c.conditionQuestion.questionId,
+              text: c.conditionQuestion.text,
+            }
           : null,
         conditionValue: c.conditionValue ?? null,
       })),

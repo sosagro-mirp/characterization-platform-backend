@@ -79,7 +79,8 @@ export class CampaignsController {
   @Roles(ROLES.ADMIN)
   @ApiOperation({
     summary: 'Resumen de sesiones de una campaña',
-    description: 'Retorna el número de sesiones asociadas. Usar antes de eliminar para mostrar advertencia al usuario.',
+    description:
+      'Retorna el número de sesiones asociadas. Usar antes de eliminar para mostrar advertencia al usuario.',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   getSessionsSummary(@Param('id', new ParseUUIDPipe()) id: string) {

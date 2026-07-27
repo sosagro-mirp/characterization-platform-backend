@@ -22,7 +22,12 @@ export class Campaign {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ name: 'is_active', type: 'boolean', nullable: false, default: true })
+  @Column({
+    name: 'is_active',
+    type: 'boolean',
+    nullable: false,
+    default: true,
+  })
   isActive: boolean;
 
   @OneToMany(() => CampaignStep, (step) => step.campaign)

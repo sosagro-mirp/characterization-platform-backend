@@ -143,7 +143,9 @@ async function run(): Promise<void> {
       await seedTypesOfCrops(manager);
       await seedTypesOfQuestions(manager);
       // S1 — Identificación
-      await seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioProductor(manager);
+      await seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioProductor(
+        manager,
+      );
       await seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manager);
       // S2 — Cultivos
       await seedInstrumentoS2CultivosIdentificacionDeCadenas(manager);
@@ -153,7 +155,9 @@ async function run(): Promise<void> {
       await seedInstrumentoS27BloqueCanamo(manager);
       // S3 — Manejo del cultivo
       await seedInstrumentoS341SusceptibilidadAEnfermedades(manager);
-      await seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbientales(manager);
+      await seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbientales(
+        manager,
+      );
       await seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(manager);
       // S4 — Poscosecha
       await seedInstrumentoS41PoscosechaCacao(manager);
@@ -162,7 +166,9 @@ async function run(): Promise<void> {
       await seedInstrumentoS44PoscosechaCanamo(manager);
       await seedInstrumentoS45EnergiaYEquipos(manager);
       // S5 — Calidad
-      await seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalidad(manager);
+      await seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalidad(
+        manager,
+      );
       // S6 — Residuos
       await seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager);
       await seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager);
@@ -183,9 +189,13 @@ async function run(): Promise<void> {
       // S10 — Participación
       await seedInstrumentoS10InteresEnParticiparEnElProyecto(manager);
       // S11 — Adopción tecnológica
-      await seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas(manager);
+      await seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas(
+        manager,
+      );
       await seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras(manager);
-      await seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(manager);
+      await seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(
+        manager,
+      );
       // S12 — Fitosanitario
       await seedInstrumentoS12AspectosFitosanitariosDiagnostico(manager);
       // S13 — Validaciones técnico

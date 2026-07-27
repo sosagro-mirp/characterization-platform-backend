@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
@@ -21,7 +25,10 @@ export class InstrumentsService {
     private readonly townsRepository: Repository<Town>,
   ) {}
 
-  async create(createInstrumentDto: CreateInstrumentDto, userId?: string): Promise<Instrument> {
+  async create(
+    createInstrumentDto: CreateInstrumentDto,
+    userId?: string,
+  ): Promise<Instrument> {
     const { actorTypeIds, ...rest } = createInstrumentDto;
 
     let actorTypes: ActorType[] = [];
@@ -37,7 +44,9 @@ export class InstrumentsService {
 
     let user: User | undefined;
     if (userId) {
-      user = await this.usersRepository.findOne({ where: { userId } }) ?? undefined;
+      user =
+        (await this.usersRepository.findOne({ where: { userId } })) ??
+        undefined;
     }
 
     const instrument = this.instrumentsRepository.create({
@@ -58,7 +67,9 @@ export class InstrumentsService {
   }
 
   /** Fase 2 (Spec 30): catálogo público para el dashboard — solo instrumentos activos. */
-  async findAllPublic(): Promise<Pick<Instrument, 'instrumentId' | 'name' | 'code'>[]> {
+  async findAllPublic(): Promise<
+    Pick<Instrument, 'instrumentId' | 'name' | 'code'>[]
+  > {
     return await this.instrumentsRepository.find({
       where: { isActive: true },
       select: ['instrumentId', 'name', 'code'],
@@ -77,12 +88,15 @@ export class InstrumentsService {
       .getMany();
   }
 
-  async findByCode(code: string): Promise<{ instrumentId: string; name: string }> {
+  async findByCode(
+    code: string,
+  ): Promise<{ instrumentId: string; name: string }> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { code },
       select: ['instrumentId', 'name'],
     });
-    if (!instrument) throw new NotFoundException(`Instrument with code '${code}' not found`);
+    if (!instrument)
+      throw new NotFoundException(`Instrument with code '${code}' not found`);
     return { instrumentId: instrument.instrumentId, name: instrument.name };
   }
 
@@ -99,7 +113,11 @@ export class InstrumentsService {
     return instrument;
   }
 
-  async update(id: string, updateInstrumentDto: UpdateInstrumentDto, userId?: string): Promise<Instrument> {
+  async update(
+    id: string,
+    updateInstrumentDto: UpdateInstrumentDto,
+    userId?: string,
+  ): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
       relations: { actorTypes: true },
@@ -223,20 +241,24 @@ export class InstrumentsService {
                 name: question.type.name,
               }
             : null,
-          options: (
-            question.type?.name === 'likert'
-              // Likert scales must render in a consistent direction (worst -> best);
+          options: (question.type?.name === 'likert'
+            ? // Likert scales must render in a consistent direction (worst -> best);
               // relying on createdAt (seed insertion order) let some questions come
               // back reversed relative to others. `value` already encodes the
               // intended scale position for every likert option, so it's a safe sort key.
-              ? [...(question.options ?? [])].sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
-              : (question.options ?? [])
+              [...(question.options ?? [])].sort(
+                (a, b) => (a.value ?? 0) - (b.value ?? 0),
+              )
+            : (question.options ?? [])
           ).map((option) => {
             let departmentId: string | null = null;
             if (question.systemField === 'farm.department') {
               departmentId = option.metadataId ?? null;
             } else if (question.systemField === 'farm.town') {
-              departmentId = (option.metadataId && townToDepartment.get(option.metadataId)) || null;
+              departmentId =
+                (option.metadataId &&
+                  townToDepartment.get(option.metadataId)) ||
+                null;
             }
             return {
               optionId: option.optionId,

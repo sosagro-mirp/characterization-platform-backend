@@ -12,7 +12,10 @@ import {
 
 export class CreateQuestionDto {
   /** Texto de la pregunta */
-  @ApiProperty({ example: '¿Cuántos años lleva cultivando cacao?', maxLength: 255 })
+  @ApiProperty({
+    example: '¿Cuántos años lleva cultivando cacao?',
+    maxLength: 255,
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)

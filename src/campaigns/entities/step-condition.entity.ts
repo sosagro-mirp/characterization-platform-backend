@@ -37,7 +37,12 @@ export class StepCondition {
   })
   logicalOperator: LogicalOperator | null;
 
-  @Column({ name: 'condition_type', type: 'varchar', length: 10, nullable: false })
+  @Column({
+    name: 'condition_type',
+    type: 'varchar',
+    length: 10,
+    nullable: false,
+  })
   conditionType: ConditionType;
 
   @ManyToOne(() => Question, { nullable: true, onDelete: 'SET NULL' })

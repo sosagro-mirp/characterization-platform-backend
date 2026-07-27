@@ -9,7 +9,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { Public } from '../auth/decorators/public.decorator';
@@ -33,7 +39,11 @@ export class OptionsQuestionController {
     description:
       'Público: usado por el flujo de encuesta en campo para registrar la opción "Otro" con texto libre.',
   })
-  @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
   @ApiResponse({ status: 201, description: 'Opción creada.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
   @ApiResponse({ status: 404, description: 'Pregunta no encontrada.' })
@@ -51,11 +61,19 @@ export class OptionsQuestionController {
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({
     summary: 'Crear opciones en lote',
-    description: 'Crea múltiples opciones para una pregunta en una sola transacción.',
+    description:
+      'Crea múltiples opciones para una pregunta en una sola transacción.',
   })
-  @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
   @ApiResponse({ status: 201, description: 'Opciones creadas en lote.' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o pregunta no encontrada.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos o pregunta no encontrada.',
+  })
   createMany(
     @Param('questionId', new ParseUUIDPipe()) questionId: string,
     @Body(new ParseArrayPipe({ items: CreateOptionQuestionDto }))
@@ -70,7 +88,11 @@ export class OptionsQuestionController {
   @Get()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Listar opciones de una pregunta' })
-  @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
   @ApiResponse({ status: 200, description: 'Lista de opciones.' })
   findAll(@Param('questionId', new ParseUUIDPipe()) questionId: string) {
     return this.optionsQuestionService.findAll(questionId);
@@ -79,7 +101,11 @@ export class OptionsQuestionController {
   @Get(':id')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Obtener opción por ID' })
-  @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
   @ApiResponse({ status: 200, description: 'Opción encontrada.' })
   @ApiResponse({ status: 404, description: 'Opción no encontrada.' })
@@ -93,7 +119,11 @@ export class OptionsQuestionController {
   @Patch(':id')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Actualizar opción' })
-  @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
   @ApiResponse({ status: 200, description: 'Opción actualizada.' })
   @ApiResponse({ status: 404, description: 'Opción no encontrada.' })
@@ -112,7 +142,11 @@ export class OptionsQuestionController {
   @Delete(':id')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Eliminar opción' })
-  @ApiParam({ name: 'questionId', format: 'uuid', description: 'ID de la pregunta padre' })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
   @ApiResponse({ status: 200, description: 'Opción eliminada.' })
   @ApiResponse({ status: 404, description: 'Opción no encontrada.' })

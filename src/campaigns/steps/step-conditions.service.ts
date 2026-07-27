@@ -25,7 +25,10 @@ export class StepConditionsService {
     private readonly cropsRepository: Repository<TypeOfCrop>,
   ) {}
 
-  private async loadStep(campaignId: string, stepId: string): Promise<CampaignStep> {
+  private async loadStep(
+    campaignId: string,
+    stepId: string,
+  ): Promise<CampaignStep> {
     const step = await this.stepsRepository.findOne({
       where: { stepId, campaign: { campaignId } },
     });
@@ -38,25 +41,48 @@ export class StepConditionsService {
     order?: number,
   ): void {
     const effectiveOrder = (dto as CreateStepConditionDto).order ?? order;
-    if (effectiveOrder === 1 && (dto as CreateStepConditionDto).logicalOperator !== undefined) {
+    if (
+      effectiveOrder === 1 &&
+      (dto as CreateStepConditionDto).logicalOperator !== undefined
+    ) {
       const op = (dto as CreateStepConditionDto).logicalOperator;
       if (op !== undefined && op !== null) {
-        throw new BadRequestException('La primera condición no puede tener logicalOperator');
+        throw new BadRequestException(
+          'La primera condición no puede tener logicalOperator',
+        );
       }
     }
-    if (effectiveOrder !== undefined && effectiveOrder > 1 && !dto.logicalOperator) {
-      throw new BadRequestException('Las condiciones con order > 1 requieren logicalOperator');
+    if (
+      effectiveOrder !== undefined &&
+      effectiveOrder > 1 &&
+      !dto.logicalOperator
+    ) {
+      throw new BadRequestException(
+        'Las condiciones con order > 1 requieren logicalOperator',
+      );
     }
 
     const type = (dto as CreateStepConditionDto).conditionType;
-    if (type === 'question' && !(dto as CreateStepConditionDto).conditionQuestionId) {
-      throw new BadRequestException('conditionQuestionId es requerido para conditionType = question');
+    if (
+      type === 'question' &&
+      !(dto as CreateStepConditionDto).conditionQuestionId
+    ) {
+      throw new BadRequestException(
+        'conditionQuestionId es requerido para conditionType = question',
+      );
     }
     if (type === 'crop' && !(dto as CreateStepConditionDto).conditionCropId) {
-      throw new BadRequestException('conditionCropId es requerido para conditionType = crop');
+      throw new BadRequestException(
+        'conditionCropId es requerido para conditionType = crop',
+      );
     }
-    if (type === 'crop' && (dto as CreateStepConditionDto).conditionQuestionId) {
-      throw new BadRequestException('conditionQuestionId debe ser nulo para conditionType = crop');
+    if (
+      type === 'crop' &&
+      (dto as CreateStepConditionDto).conditionQuestionId
+    ) {
+      throw new BadRequestException(
+        'conditionQuestionId debe ser nulo para conditionType = crop',
+      );
     }
   }
 
@@ -122,9 +148,12 @@ export class StepConditionsService {
     if (!condition) throw new NotFoundException('Condition not found');
 
     if (dto.order !== undefined) condition.order = dto.order;
-    if (dto.logicalOperator !== undefined) condition.logicalOperator = dto.logicalOperator;
-    if (dto.conditionType !== undefined) condition.conditionType = dto.conditionType;
-    if (dto.conditionValue !== undefined) condition.conditionValue = dto.conditionValue;
+    if (dto.logicalOperator !== undefined)
+      condition.logicalOperator = dto.logicalOperator;
+    if (dto.conditionType !== undefined)
+      condition.conditionType = dto.conditionType;
+    if (dto.conditionValue !== undefined)
+      condition.conditionValue = dto.conditionValue;
 
     if (dto.conditionQuestionId !== undefined) {
       if (dto.conditionQuestionId === null) {

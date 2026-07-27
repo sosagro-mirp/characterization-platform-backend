@@ -20,11 +20,15 @@ import { MediaAttachmentsService } from './media-attachments.service';
 @ApiBearerAuth()
 @Controller()
 export class MediaAttachmentsController {
-  constructor(private readonly mediaAttachmentsService: MediaAttachmentsService) {}
+  constructor(
+    private readonly mediaAttachmentsService: MediaAttachmentsService,
+  ) {}
 
   @Post('media-attachments/presigned-url')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
-  @ApiOperation({ summary: 'Solicitar presigned URL para subir un archivo a R2' })
+  @ApiOperation({
+    summary: 'Solicitar presigned URL para subir un archivo a R2',
+  })
   createPresignedUrl(
     @Body() dto: CreatePresignedUrlDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -34,7 +38,9 @@ export class MediaAttachmentsController {
 
   @Patch('media-attachments/:attachmentId/confirm')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
-  @ApiOperation({ summary: 'Confirmar que el archivo fue subido exitosamente a R2' })
+  @ApiOperation({
+    summary: 'Confirmar que el archivo fue subido exitosamente a R2',
+  })
   confirmUpload(
     @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
     @Body() dto: ConfirmUploadDto,
