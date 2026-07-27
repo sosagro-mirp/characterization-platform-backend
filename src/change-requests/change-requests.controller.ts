@@ -1,6 +1,22 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, Res } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Res,
+} from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ChangeRequestsService } from './change-requests.service';
 import { CreateChangeRequestDto } from './dto/create-change-request.dto';
 import { ListChangeRequestsQueryDto } from './dto/list-change-requests-query.dto';
@@ -20,9 +36,18 @@ export class ChangeRequestsController {
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({ summary: 'Crear solicitud de cambio (ticket)' })
   @ApiResponse({ status: 201, description: 'Ticket creado.' })
-  @ApiResponse({ status: 200, description: 'Ticket ya existía (idempotencia por localId).' })
-  @ApiResponse({ status: 400, description: 'Faltan category (web) o localId (mobile).' })
-  @ApiResponse({ status: 404, description: 'Usuario o agricultor no encontrado.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ticket ya existía (idempotencia por localId).',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Faltan category (web) o localId (mobile).',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Usuario o agricultor no encontrado.',
+  })
   async create(
     @Body() dto: CreateChangeRequestDto,
     @CurrentUser() user: AuthenticatedUser,
@@ -45,7 +70,9 @@ export class ChangeRequestsController {
   @Get('my-resolved')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
-  @ApiOperation({ summary: 'Mis solicitudes resueltas (usado por mobile en sync)' })
+  @ApiOperation({
+    summary: 'Mis solicitudes resueltas (usado por mobile en sync)',
+  })
   @ApiResponse({ status: 200, description: 'Solicitudes propias resueltas.' })
   myResolved(
     @Query() query: ResolvedSinceQueryDto,

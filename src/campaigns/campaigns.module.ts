@@ -28,7 +28,11 @@ import { StepConditionsService } from './steps/step-conditions.service';
       User,
     ]),
   ],
-  controllers: [CampaignsController, CampaignStepsController, StepConditionsController],
+  controllers: [
+    CampaignsController,
+    CampaignStepsController,
+    StepConditionsController,
+  ],
   providers: [CampaignsService, CampaignStepsService, StepConditionsService],
   exports: [CampaignsService, CampaignStepsService],
 })

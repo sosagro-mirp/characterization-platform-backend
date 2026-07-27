@@ -9,7 +9,14 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { IsOptional, IsUUID } from 'class-validator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
@@ -50,7 +57,8 @@ export class TownsController {
   @Get('public')
   @ApiOperation({
     summary: 'Listar municipios (público)',
-    description: 'Ruta pública para el selector de filtros del dashboard. No requiere autenticación.',
+    description:
+      'Ruta pública para el selector de filtros del dashboard. No requiere autenticación.',
   })
   @ApiQuery({
     name: 'departmentId',

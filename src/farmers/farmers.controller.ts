@@ -43,7 +43,10 @@ export class FarmersController {
   @Public()
   @ApiOperation({ summary: 'Search farmers by name or document ID' })
   @ApiQuery({ name: 'q', description: 'Search term', required: true })
-  @ApiResponse({ status: 200, description: 'List of matching farmers (max 10).' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of matching farmers (max 10).',
+  })
   search(@Query('q') q: string) {
     return this.farmersService.search(q ?? '');
   }

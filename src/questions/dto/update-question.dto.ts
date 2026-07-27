@@ -10,7 +10,10 @@ import {
 } from 'class-validator';
 
 export class UpdateQuestionDto {
-  @ApiPropertyOptional({ example: '¿Cuántos años lleva cultivando?', maxLength: 255 })
+  @ApiPropertyOptional({
+    example: '¿Cuántos años lleva cultivando?',
+    maxLength: 255,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)

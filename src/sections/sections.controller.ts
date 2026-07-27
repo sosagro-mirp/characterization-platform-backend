@@ -10,7 +10,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { CreateSectionDto } from './dto/create-section.dto';
@@ -25,8 +31,15 @@ export class SectionsController {
   constructor(private readonly sectionsService: SectionsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crear sección', description: 'Crea una sección dentro de un instrumento.' })
-  @ApiParam({ name: 'instrumentId', format: 'uuid', description: 'ID del instrumento padre' })
+  @ApiOperation({
+    summary: 'Crear sección',
+    description: 'Crea una sección dentro de un instrumento.',
+  })
+  @ApiParam({
+    name: 'instrumentId',
+    format: 'uuid',
+    description: 'ID del instrumento padre',
+  })
   @ApiResponse({ status: 201, description: 'Sección creada.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
   @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
@@ -39,7 +52,11 @@ export class SectionsController {
 
   @Get()
   @ApiOperation({ summary: 'Listar secciones de un instrumento' })
-  @ApiParam({ name: 'instrumentId', format: 'uuid', description: 'ID del instrumento padre' })
+  @ApiParam({
+    name: 'instrumentId',
+    format: 'uuid',
+    description: 'ID del instrumento padre',
+  })
   @ApiResponse({ status: 200, description: 'Lista de secciones.' })
   @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
   findAll(@Param('instrumentId', new ParseUUIDPipe()) instrumentId: string) {
@@ -48,8 +65,16 @@ export class SectionsController {
 
   @Get(':sectionId')
   @ApiOperation({ summary: 'Obtener sección por ID' })
-  @ApiParam({ name: 'instrumentId', format: 'uuid', description: 'ID del instrumento padre' })
-  @ApiParam({ name: 'sectionId', format: 'uuid', description: 'ID de la sección' })
+  @ApiParam({
+    name: 'instrumentId',
+    format: 'uuid',
+    description: 'ID del instrumento padre',
+  })
+  @ApiParam({
+    name: 'sectionId',
+    format: 'uuid',
+    description: 'ID de la sección',
+  })
   @ApiResponse({ status: 200, description: 'Sección encontrada.' })
   @ApiResponse({ status: 404, description: 'Sección no encontrada.' })
   findOne(
@@ -70,7 +95,11 @@ export class SectionsController {
     @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
     @Body() updateSectionDto: UpdateSectionDto,
   ) {
-    return this.sectionsService.update(instrumentId, sectionId, updateSectionDto);
+    return this.sectionsService.update(
+      instrumentId,
+      sectionId,
+      updateSectionDto,
+    );
   }
 
   @Delete(':sectionId')

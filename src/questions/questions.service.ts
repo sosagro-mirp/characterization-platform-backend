@@ -108,10 +108,10 @@ export class QuestionsService {
       await this.seedComplianceOptions(saved);
     }
 
-    return await this.questionsRepository.findOne({
+    return (await this.questionsRepository.findOne({
       where: { questionId: saved.questionId },
       relations: ['type', 'options'],
-    }) as Question;
+    })) as Question;
   }
 
   async findOne(questionId: string): Promise<Question> {
@@ -151,7 +151,10 @@ export class QuestionsService {
         throw new NotFoundException('Type of question not found');
       }
 
-      if (TYPES_WITHOUT_OPTIONS.includes(newType.name) && question.options?.length > 0) {
+      if (
+        TYPES_WITHOUT_OPTIONS.includes(newType.name) &&
+        question.options?.length > 0
+      ) {
         await this.optionsRepository.delete({ question: { questionId } });
         question.options = [];
       }
@@ -204,10 +207,10 @@ export class QuestionsService {
       await this.seedComplianceOptions(saved);
     }
 
-    return await this.questionsRepository.findOne({
+    return (await this.questionsRepository.findOne({
       where: { questionId: saved.questionId },
       relations: ['type', 'options'],
-    }) as Question;
+    })) as Question;
   }
 
   async remove(sectionId: string, questionId: string): Promise<void> {

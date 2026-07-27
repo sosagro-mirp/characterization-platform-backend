@@ -101,7 +101,11 @@ export class DashboardService {
       .addSelect('COUNT(*)', 'count')
       .groupBy('department.departmentId')
       .addGroupBy('department.name')
-      .getRawMany<{ departmentId: string; departmentName: string; count: string }>();
+      .getRawMany<{
+        departmentId: string;
+        departmentName: string;
+        count: string;
+      }>();
 
     return rows
       .map((row) => ({
@@ -122,7 +126,9 @@ export class DashboardService {
    * para department; instrumentId se ignora porque agrupar "por instrumento"
    * no aplica a un perfil poblacional).
    */
-  async getOverview(filters: DashboardFiltersDto): Promise<DashboardOverviewDto> {
+  async getOverview(
+    filters: DashboardFiltersDto,
+  ): Promise<DashboardOverviewDto> {
     const {
       instrumentId: _instrumentId,
       departmentId: _departmentId,
@@ -195,10 +201,16 @@ export class DashboardService {
     filters: DashboardFiltersDto,
     systemField: string,
   ): Promise<AggregationNumericDto | null> {
-    const question = await this.questionRepo.findOne({ where: { systemField } });
+    const question = await this.questionRepo.findOne({
+      where: { systemField },
+    });
     if (!question) return null;
 
-    const answeredCount = await this.countAnswered(question, 'numeric', filters);
+    const answeredCount = await this.countAnswered(
+      question,
+      'numeric',
+      filters,
+    );
     if (answeredCount < MIN_SAMPLE_THRESHOLD) return null;
 
     return this.aggregateNumeric(question, filters, answeredCount);
@@ -270,7 +282,8 @@ export class DashboardService {
       const department = await this.departmentRepo.findOne({
         where: { departmentId: filters.departmentId },
       });
-      if (!department) throw new NotFoundException('Departamento no encontrado.');
+      if (!department)
+        throw new NotFoundException('Departamento no encontrado.');
       departmentName = department.name;
     }
 
@@ -297,7 +310,8 @@ export class DashboardService {
       const actorType = await this.actorTypeRepo.findOne({
         where: { actorTypeId: filters.actorTypeId },
       });
-      if (!actorType) throw new NotFoundException('Tipo de actor no encontrado.');
+      if (!actorType)
+        throw new NotFoundException('Tipo de actor no encontrado.');
       actorTypeName = actorType.name;
     }
 

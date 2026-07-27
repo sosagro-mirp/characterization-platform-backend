@@ -1,4 +1,12 @@
-import { Body, Controller, Get, HttpCode, Post, UseGuards, HttpStatus } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  UseGuards,
+  HttpStatus,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -32,7 +40,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Iniciar sesión y obtener JWT' })
   @ApiResponse({ status: 200, type: AuthResponseDto })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas.' })
-  @ApiResponse({ status: 429, description: 'Demasiados intentos de login. Intenta más tarde.' })
+  @ApiResponse({
+    status: 429,
+    description: 'Demasiados intentos de login. Intenta más tarde.',
+  })
   login(@Body() dto: LoginDto): Promise<AuthResponseDto> {
     return this.authService.login(dto);
   }
@@ -41,7 +52,10 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registro temporal de investigadores' })
-  @ApiResponse({ status: 201, description: 'Usuario registrado correctamente.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Usuario registrado correctamente.',
+  })
   @ApiResponse({ status: 403, description: 'Código de validación incorrecto.' })
   @ApiResponse({ status: 409, description: 'El correo ya está registrado.' })
   register(@Body() dto: RegisterDto): Promise<{ message: string }> {

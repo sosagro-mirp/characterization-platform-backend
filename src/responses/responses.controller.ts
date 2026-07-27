@@ -1,5 +1,10 @@
 import { Body, Controller, ParseArrayPipe, Post } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { CreateResponseDto } from './dto/create-response.dto';
@@ -16,7 +21,10 @@ export class ResponsesController {
   @ApiOperation({ summary: 'Crear respuesta individual' })
   @ApiResponse({ status: 201, description: 'Respuesta creada.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
-  @ApiResponse({ status: 404, description: 'Encuesta o pregunta no encontrada.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta o pregunta no encontrada.',
+  })
   create(@Body() createResponseDto: CreateResponseDto) {
     return this.responsesService.create(createResponseDto);
   }
@@ -28,9 +36,18 @@ export class ResponsesController {
       'Envía todas las respuestas de una sesión de encuesta en una sola transacción DB. ' +
       'Endpoint crítico del flujo de encuesta — se llama al finalizar el cuestionario.',
   })
-  @ApiResponse({ status: 201, description: 'Respuestas guardadas exitosamente.' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos. Verificar surveyId y questionIds.' })
-  @ApiResponse({ status: 404, description: 'Encuesta o pregunta no encontrada.' })
+  @ApiResponse({
+    status: 201,
+    description: 'Respuestas guardadas exitosamente.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos. Verificar surveyId y questionIds.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta o pregunta no encontrada.',
+  })
   createMany(
     @Body(new ParseArrayPipe({ items: CreateResponseDto }))
     createResponseDtos: CreateResponseDto[],

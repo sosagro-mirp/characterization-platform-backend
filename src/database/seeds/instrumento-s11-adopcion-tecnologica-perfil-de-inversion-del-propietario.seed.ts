@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,21 @@ async function saveOptions(
 const NAME = `S11: Adopción Tecnológica — Perfil de Inversión del Propietario`;
 const VERSION = 1;
 
-export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["likert", "single_choice"];
+  const typeNames = ['likert', 'single_choice'];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -87,7 +100,11 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
   console.log(`[seed] "${NAME}" creado.`);
 
   const sec1 = await sectionRepo.save(
-    sectionRepo.create({ name: `PR. Perfil de inversión del propietario`, order: 1, instrument }),
+    sectionRepo.create({
+      name: `PR. Perfil de inversión del propietario`,
+      order: 1,
+      instrument,
+    }),
   );
 
   // ── PR. Perfil de inversión del propietario ──
@@ -239,7 +256,6 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
-
   }
 
   console.log(`[seed] "${NAME}" insertado (9 preguntas).`);

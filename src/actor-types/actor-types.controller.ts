@@ -8,7 +8,13 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { Public } from '../auth/decorators/public.decorator';
@@ -43,7 +49,8 @@ export class ActorTypesController {
   @Get('public')
   @ApiOperation({
     summary: 'Listar tipos de actor (público)',
-    description: 'Ruta pública para el selector de filtros del dashboard. No requiere autenticación.',
+    description:
+      'Ruta pública para el selector de filtros del dashboard. No requiere autenticación.',
   })
   @ApiResponse({ status: 200, description: 'Lista de tipos de actor.' })
   findAllPublic() {

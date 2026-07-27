@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ChangeRequest } from './entities/change-request.entity';
@@ -19,12 +23,17 @@ export class ChangeRequestsService {
     private readonly farmersRepo: Repository<Farmer>,
   ) {}
 
-  async create(dto: CreateChangeRequestDto, userId: string): Promise<{ ticket: ChangeRequest; wasCreated: boolean }> {
+  async create(
+    dto: CreateChangeRequestDto,
+    userId: string,
+  ): Promise<{ ticket: ChangeRequest; wasCreated: boolean }> {
     const hasLocalId = !!dto.localId;
     const hasCategory = !!dto.category;
 
     if (!hasLocalId && !hasCategory) {
-      throw new BadRequestException('Se requiere "category" para tickets web o "localId" para tickets móvil.');
+      throw new BadRequestException(
+        'Se requiere "category" para tickets web o "localId" para tickets móvil.',
+      );
     }
 
     // Idempotency for mobile: return existing if localId already registered for this user
@@ -88,14 +97,19 @@ export class ChangeRequestsService {
     return cr;
   }
 
-  async resolve(changeRequestId: string, resolverUserId: string): Promise<ChangeRequest> {
+  async resolve(
+    changeRequestId: string,
+    resolverUserId: string,
+  ): Promise<ChangeRequest> {
     const cr = await this.findOne(changeRequestId);
 
     if (cr.status === 'resolved') {
       throw new BadRequestException('La solicitud ya está resuelta.');
     }
 
-    const resolver = await this.usersRepo.findOne({ where: { userId: resolverUserId } });
+    const resolver = await this.usersRepo.findOne({
+      where: { userId: resolverUserId },
+    });
     if (!resolver) throw new NotFoundException('Usuario no encontrado.');
 
     cr.status = 'resolved';
@@ -105,7 +119,10 @@ export class ChangeRequestsService {
     return this.repo.save(cr);
   }
 
-  async myResolved(userId: string, query: ResolvedSinceQueryDto): Promise<ChangeRequest[]> {
+  async myResolved(
+    userId: string,
+    query: ResolvedSinceQueryDto,
+  ): Promise<ChangeRequest[]> {
     const qb = this.repo
       .createQueryBuilder('cr')
       .leftJoinAndSelect('cr.farmer', 'farmer')

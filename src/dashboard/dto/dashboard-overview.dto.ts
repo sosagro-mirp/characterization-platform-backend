@@ -23,7 +23,8 @@ export class DashboardOverviewDto {
   @ApiProperty({
     type: AggregationNumericDto,
     nullable: true,
-    description: 'Estadísticas de farmer.age. Null si no hay muestra suficiente o la pregunta no existe.',
+    description:
+      'Estadísticas de farmer.age. Null si no hay muestra suficiente o la pregunta no existe.',
   })
   age: AggregationNumericDto | null;
 

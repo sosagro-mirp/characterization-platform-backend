@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,27 @@ async function saveOptions(
 const NAME = `S8C: Infraestructura de Producción Cannabis`;
 const VERSION = 1;
 
-export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["likert", "multiple_choice", "numeric", "single_choice", "yes_no"];
+  const typeNames = [
+    'likert',
+    'multiple_choice',
+    'numeric',
+    'single_choice',
+    'yes_no',
+  ];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -87,9 +106,27 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `8C.1 Estructura de cultivo`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `8C.2 Sistema de riego`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `8C.3 Extracción, secado y poscosecha`, order: 3, instrument }))
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `8C.1 Estructura de cultivo`,
+        order: 1,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `8C.2 Sistema de riego`,
+        order: 2,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `8C.3 Extracción, secado y poscosecha`,
+        order: 3,
+        instrument,
+      }),
+    ),
   ]);
 
   // ── 8C.1 Estructura de cultivo ──
@@ -104,13 +141,18 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       order: o++,
       section: sec1,
     });
-    const opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954 = await saveOptions(manager, q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954, [
-      { text: `Invernadero` },
-      { text: `Mixto` },
-      { text: `Indoor (cuarto de cultivo)` },
-      { text: `Campo abierto` },
-    ]);
-    const opt_9b8673ec_aab3_48d5_9cdf_270ac046a200 = opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954.get(`Invernadero`)!;
+    const opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954 = await saveOptions(
+      manager,
+      q_b32f128e_e6dc_46d6_be4b_b54b8e6f6954,
+      [
+        { text: `Invernadero` },
+        { text: `Mixto` },
+        { text: `Indoor (cuarto de cultivo)` },
+        { text: `Campo abierto` },
+      ],
+    );
+    const opt_9b8673ec_aab3_48d5_9cdf_270ac046a200 =
+      opts_b32f128e_e6dc_46d6_be4b_b54b8e6f6954.get(`Invernadero`)!;
 
     const q_dce512a8_ac9e_4449_85e5_24a196d45958 = await saveQuestion(manager, {
       text: `Material de cubierta del invernadero`,
@@ -232,7 +274,6 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       order: o++,
       section: sec1,
     });
-
   }
 
   // ── 8C.2 Sistema de riego ──
@@ -256,7 +297,6 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       { text: `Sistema recirculante` },
       { text: `NFT (Nutrient Film Technique)` },
     ]);
-
   }
 
   // ── 8C.3 Extracción, secado y poscosecha ──
@@ -278,7 +318,9 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       { text: `Báscula de precisión (gramos)` },
       { text: `Área de trimming / despalillado` },
       { text: `Cuarto de curado` },
-      { text: `Cuarto de secado con control de temperatura y humedad relativa` },
+      {
+        text: `Cuarto de secado con control de temperatura y humedad relativa`,
+      },
       { text: `Equipo de extracción (prensa, CO₂, etanol, etc.)` },
     ]);
 
@@ -390,7 +432,6 @@ export async function seedInstrumentoS8cInfraestructuraDeProduccionCannabis(mana
       { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
-
   }
 
   console.log(`[seed] "${NAME}" insertado (22 preguntas).`);

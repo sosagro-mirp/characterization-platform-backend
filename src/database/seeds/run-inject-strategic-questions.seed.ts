@@ -353,15 +353,20 @@ async function injectStrategicQuestions(manager: EntityManager): Promise<void> {
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
   const likertType = await typeRepo.findOne({ where: { name: 'likert' } });
-  if (!likertType) throw new Error('[inject] TypeOfQuestion "likert" no encontrado.');
+  if (!likertType)
+    throw new Error('[inject] TypeOfQuestion "likert" no encontrado.');
 
   let totalInserted = 0;
 
   for (const entry of INSTRUMENT_QUESTIONS) {
     // Find instrument (any active version)
-    const instrument = await instrumentRepo.findOne({ where: { name: entry.name } });
+    const instrument = await instrumentRepo.findOne({
+      where: { name: entry.name },
+    });
     if (!instrument) {
-      console.warn(`[inject] Instrumento "${entry.name}" no encontrado — omitido.`);
+      console.warn(
+        `[inject] Instrumento "${entry.name}" no encontrado — omitido.`,
+      );
       continue;
     }
 
@@ -384,7 +389,9 @@ async function injectStrategicQuestions(manager: EntityManager): Promise<void> {
       },
     });
     if (existing > 0) {
-      console.log(`[inject] "${entry.name}" ya tiene preguntas estratégicas — omitido.`);
+      console.log(
+        `[inject] "${entry.name}" ya tiene preguntas estratégicas — omitido.`,
+      );
       continue;
     }
 
@@ -392,7 +399,9 @@ async function injectStrategicQuestions(manager: EntityManager): Promise<void> {
     const maxOrderResult = await questionRepo
       .createQueryBuilder('q')
       .select('MAX(q.order)', 'maxOrder')
-      .where('"q"."section_id" = :sectionId', { sectionId: lastSection.sectionId })
+      .where('"q"."section_id" = :sectionId', {
+        sectionId: lastSection.sectionId,
+      })
       .getRawOne<{ maxOrder: number | null }>();
     let nextOrder = (maxOrderResult?.maxOrder ?? 0) + 1;
 
@@ -424,10 +433,14 @@ async function injectStrategicQuestions(manager: EntityManager): Promise<void> {
       totalInserted++;
     }
 
-    console.log(`[inject] "${entry.name}" — ${entry.questions.length} preguntas insertadas en sección "${lastSection.name}".`);
+    console.log(
+      `[inject] "${entry.name}" — ${entry.questions.length} preguntas insertadas en sección "${lastSection.name}".`,
+    );
   }
 
-  console.log(`[inject] Total insertadas: ${totalInserted} preguntas estratégicas.`);
+  console.log(
+    `[inject] Total insertadas: ${totalInserted} preguntas estratégicas.`,
+  );
 }
 
 async function run(): Promise<void> {
