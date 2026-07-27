@@ -71,6 +71,11 @@ export class CampaignSessionsService {
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
 
+    // CONTRACT (spec 49): the mobile client compares these messages verbatim
+    // to discriminate a stale-farmer 404 from other errors and invalidate
+    // its local cache (mobile/src/sync/SyncQueueService.ts,
+    // mobile/app/campaign/[id]/pre-survey.tsx). Changing the wording breaks
+    // that comparison silently.
     if (dto.farmerId) {
       const farmer = await this.farmersRepository.findOne({
         where: { id: dto.farmerId },
