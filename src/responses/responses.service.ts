@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
@@ -30,7 +30,47 @@ export class ResponsesService {
   async create(createResponseDto: CreateResponseDto): Promise<Response> {
     return await this.responsesRepository.manager.transaction(
       async (manager) => {
-        return await this.buildAndSaveResponse(createResponseDto, manager);
+        const survey = await manager.getRepository(Survey).findOne({
+          where: { surveyId: createResponseDto.surveyId },
+        });
+
+        if (!survey) {
+          throw new NotFoundException('Survey not found');
+        }
+
+        const question = await manager.getRepository(Question).findOne({
+          where: { questionId: createResponseDto.questionId },
+          relations: { type: true },
+        });
+
+        if (!question) {
+          throw new NotFoundException('Question not found');
+        }
+
+        const questionsById = new Map([[question.questionId, question]]);
+
+        let optionsById = new Map<string, OptionQuestion>();
+
+        if (createResponseDto.optionId) {
+          const option = await manager.getRepository(OptionQuestion).findOne({
+            where: { optionId: createResponseDto.optionId },
+            relations: { question: true },
+          });
+
+          if (!option) {
+            throw new NotFoundException('Option not found');
+          }
+
+          optionsById = new Map([[option.optionId, option]]);
+        }
+
+        return await this.buildAndSaveResponse(
+          createResponseDto,
+          survey,
+          questionsById,
+          optionsById,
+          manager,
+        );
       },
     );
   }
@@ -64,11 +104,53 @@ export class ResponsesService {
 
     return await this.responsesRepository.manager.transaction(
       async (manager) => {
+        const survey = await manager.getRepository(Survey).findOne({
+          where: { surveyId },
+        });
+
+        if (!survey) {
+          throw new NotFoundException('Survey not found');
+        }
+
+        const questionIds = [
+          ...new Set(createResponseDtos.map((d) => d.questionId)),
+        ];
+        const optionIds = [
+          ...new Set(
+            createResponseDtos
+              .map((d) => d.optionId)
+              .filter((optionId): optionId is string => !!optionId),
+          ),
+        ];
+
+        const questions = questionIds.length
+          ? await manager.getRepository(Question).find({
+              where: { questionId: In(questionIds) },
+              relations: { type: true },
+            })
+          : [];
+        const questionsById = new Map(
+          questions.map((question) => [question.questionId, question]),
+        );
+
+        const options = optionIds.length
+          ? await manager.getRepository(OptionQuestion).find({
+              where: { optionId: In(optionIds) },
+              relations: { question: true },
+            })
+          : [];
+        const optionsById = new Map(
+          options.map((option) => [option.optionId, option]),
+        );
+
         const responses: Response[] = [];
 
         for (const createResponseDto of createResponseDtos) {
           const response = await this.buildAndSaveResponse(
             createResponseDto,
+            survey,
+            questionsById,
+            optionsById,
             manager,
           );
           responses.push(response);
@@ -81,10 +163,12 @@ export class ResponsesService {
 
   private async buildAndSaveResponse(
     createResponseDto: CreateResponseDto,
+    survey: Survey,
+    questionsById: Map<string, Question>,
+    optionsById: Map<string, OptionQuestion>,
     manager: EntityManager,
   ): Promise<Response> {
     const {
-      surveyId,
       questionId,
       optionId,
       textValue,
@@ -105,18 +189,7 @@ export class ResponsesService {
       );
     }
 
-    const survey = await manager.getRepository(Survey).findOne({
-      where: { surveyId },
-    });
-
-    if (!survey) {
-      throw new NotFoundException('Survey not found');
-    }
-
-    const question = await manager.getRepository(Question).findOne({
-      where: { questionId },
-      relations: { type: true },
-    });
+    const question = questionsById.get(questionId);
 
     if (!question) {
       throw new NotFoundException('Question not found');
@@ -134,10 +207,7 @@ export class ResponsesService {
     let option: OptionQuestion | null = null;
 
     if (optionId) {
-      option = await manager.getRepository(OptionQuestion).findOne({
-        where: { optionId },
-        relations: { question: true },
-      });
+      option = optionsById.get(optionId) ?? null;
 
       if (!option) {
         throw new NotFoundException('Option not found');
