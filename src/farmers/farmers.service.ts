@@ -1,13 +1,44 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { Farmer } from './entities/farmer.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
+import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
+import { Survey } from 'src/surveys/entities/survey.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 
 const FARMER_RELATIONS = ['farm', 'farm.town', 'farm.crops'];
+
+/** Código Postgres de `foreign_key_violation`. */
+const POSTGRES_FK_VIOLATION = '23503';
+
+interface BlockedByEntry {
+  resource: string;
+  count: number;
+}
+
+/**
+ * Cuerpo del 409 de `remove()`. Se construye explícitamente con
+ * `statusCode`/`error` (en vez de dejar que `ConflictException` los agregue,
+ * como hace cuando se le pasa un string) para que el cuerpo tenga la misma
+ * forma sin importar el mensaje pasado — y `blockedBy` siempre está presente,
+ * aunque vacío, para que un cliente que haga `body.blockedBy.map(...)` (según
+ * el contrato del criterio 3 del spec 50) nunca reciba `undefined`.
+ */
+function conflictBody(blockedBy: BlockedByEntry[] = []) {
+  return {
+    statusCode: 409,
+    error: 'Conflict',
+    message: 'Farmer has related records and cannot be deleted',
+    blockedBy,
+  };
+}
 
 @Injectable()
 export class FarmersService {
@@ -18,6 +49,10 @@ export class FarmersService {
     private readonly farmsRepository: Repository<Farm>,
     @InjectRepository(Town)
     private readonly townsRepository: Repository<Town>,
+    @InjectRepository(CampaignSession)
+    private readonly sessionsRepository: Repository<CampaignSession>,
+    @InjectRepository(Survey)
+    private readonly surveysRepository: Repository<Survey>,
   ) {}
 
   async create(dto: CreateFarmerDto): Promise<Farmer> {
@@ -111,6 +146,47 @@ export class FarmersService {
 
   async remove(id: string): Promise<void> {
     const farmer = await this.findOne(id);
-    await this.farmersRepository.remove(farmer);
+
+    const [sessionsCount, surveysCount] = await Promise.all([
+      this.sessionsRepository.count({ where: { farmer: { id } } }),
+      this.surveysRepository.count({ where: { farmer: { id } } }),
+    ]);
+
+    const blockedBy: BlockedByEntry[] = [];
+    if (sessionsCount > 0) {
+      blockedBy.push({ resource: 'campaign_sessions', count: sessionsCount });
+    }
+    if (surveysCount > 0) {
+      blockedBy.push({ resource: 'surveys', count: surveysCount });
+    }
+
+    if (blockedBy.length > 0) {
+      throw new ConflictException(conflictBody(blockedBy));
+    }
+
+    try {
+      await this.farmersRepository.remove(farmer);
+    } catch (error) {
+      // Red de seguridad: si en el futuro una tabla nueva referencia
+      // `farmers` y nadie la suma al conteo de arriba, esto evita que el bug
+      // reaparezca como un 500 sin manejar (ver spec 50). `blockedBy` queda
+      // vacío porque no sabemos qué tabla lo bloqueó — no se contó arriba.
+      if (this.isForeignKeyViolation(error)) {
+        throw new ConflictException(conflictBody());
+      }
+      throw error;
+    }
+  }
+
+  private isForeignKeyViolation(error: unknown): boolean {
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'driverError' in error &&
+      typeof (error as { driverError?: unknown }).driverError === 'object' &&
+      (error as { driverError?: { code?: unknown } }).driverError !== null &&
+      (error as { driverError: { code?: unknown } }).driverError.code ===
+        POSTGRES_FK_VIOLATION
+    );
   }
 }

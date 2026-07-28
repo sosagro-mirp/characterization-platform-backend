@@ -7,6 +7,7 @@ import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { User } from 'src/users/entities/user.entity';
+import { Survey } from 'src/surveys/entities/survey.entity';
 import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
 
 /**
@@ -92,6 +93,7 @@ describe('CampaignSessionsService.create — validación de FK (spec 49)', () =>
         { provide: getRepositoryToken(TypeOfCrop), useValue: cropsRepository },
         { provide: getRepositoryToken(Farmer), useValue: farmersRepository },
         { provide: getRepositoryToken(User), useValue: usersRepository },
+        { provide: getRepositoryToken(Survey), useValue: { count: jest.fn() } },
       ],
     }).compile();
 
