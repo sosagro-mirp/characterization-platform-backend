@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
@@ -10,6 +14,7 @@ import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { User } from 'src/users/entities/user.entity';
+import { Survey } from 'src/surveys/entities/survey.entity';
 
 interface NextStepInstrument {
   instrumentId: string;
@@ -38,6 +43,8 @@ export class CampaignSessionsService {
     private readonly farmersRepository: Repository<Farmer>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Survey)
+    private readonly surveysRepository: Repository<Survey>,
   ) {}
 
   async getLastFarmer(userId: string): Promise<{
@@ -261,5 +268,39 @@ export class CampaignSessionsService {
     }
 
     return null;
+  }
+
+  /**
+   * Borrado acotado a sesiones sin encuestas asociadas (spec 50). La guarda
+   * de encuestas NO es opcional: `surveys.campaign_session_id` es CASCADE, y
+   * `responses.survey_id` también, así que sin ella un DELETE de sesión
+   * borraría encuestas y respuestas de campo en silencio.
+   */
+  async remove(sessionId: string): Promise<void> {
+    await this.sessionsRepository.manager.transaction(async (manager) => {
+      // Lock pesimista sobre la sesión: una fila bajo FOR UPDATE bloquea a
+      // cualquier INSERT concurrente en `surveys` que la referencie (la FK
+      // toma un lock KEY SHARE sobre el padre, incompatible con FOR UPDATE).
+      // Sin este lock, una encuesta podría crearse entre el count() y el
+      // remove() de abajo, y el CASCADE de surveys/responses la borraría en
+      // silencio — justo lo que esta guarda existe para impedir.
+      const session = await manager
+        .createQueryBuilder(CampaignSession, 'session')
+        .setLock('pessimistic_write')
+        .where('session.sessionId = :sessionId', { sessionId })
+        .getOne();
+      if (!session) throw new NotFoundException('Campaign session not found');
+
+      const surveysCount = await manager.getRepository(Survey).count({
+        where: { campaignSession: { sessionId } },
+      });
+      if (surveysCount > 0) {
+        throw new ConflictException(
+          'Campaign session has surveys and cannot be deleted',
+        );
+      }
+
+      await manager.remove(session);
+    });
   }
 }

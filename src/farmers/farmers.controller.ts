@@ -88,6 +88,11 @@ export class FarmersController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Farmer deleted.' })
   @ApiResponse({ status: 404, description: 'Farmer not found.' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'Farmer has related records (campaign sessions and/or surveys) and cannot be deleted.',
+  })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.farmersService.remove(id);
   }
