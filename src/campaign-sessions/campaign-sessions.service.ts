@@ -83,6 +83,14 @@ export class CampaignSessionsService {
     // its local cache (mobile/src/sync/SyncQueueService.ts,
     // mobile/app/campaign/[id]/pre-survey.tsx). Changing the wording breaks
     // that comparison silently.
+    //
+    // CONTRACT (spec 51): `farmerId` is optional by design, not just
+    // schema-level nullability. When the mobile client's stale-farmer retry
+    // (the 404 path above) succeeds without a farmerId, the session is
+    // created deliberately without one — the alternative would be blocking
+    // the pollster mid-survey or losing the session outright. A session
+    // with no farmer is a legitimate, expected state produced by that retry
+    // path, not corrupted data. See backend/docs/data-notes.md.
     if (dto.farmerId) {
       const farmer = await this.farmersRepository.findOne({
         where: { id: dto.farmerId },
