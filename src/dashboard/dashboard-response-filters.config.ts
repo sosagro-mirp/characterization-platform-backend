@@ -33,18 +33,22 @@ export type ResponseFilterKey =
   | 'tenure'
   | 'chainStage';
 
-interface BySystemField {
+/** Compartido con `dashboard-kpis.config.ts` (Fase 4): dos formas de ubicar una
+ * pregunta fuente sin depender de su UUID (distinto por entorno). */
+export interface BySystemField {
   locate: 'systemField';
   systemField: string;
 }
 
-interface ByInstrumentAndText {
+export interface ByInstrumentAndText {
   locate: 'instrumentAndText';
   instrumentCode: string;
   questionText: string;
 }
 
-export type ResponseFilterSource = (BySystemField | ByInstrumentAndText) & {
+export type QuestionLocator = BySystemField | ByInstrumentAndText;
+
+export type ResponseFilterSource = QuestionLocator & {
   key: ResponseFilterKey;
   /** 'range' = numérico por bucket; 'option' = un solo valor; 'multiOption' = lista OR. */
   matchType: 'range' | 'option' | 'multiOption';

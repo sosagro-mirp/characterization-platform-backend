@@ -23,6 +23,7 @@ import {
   AggregationChoicesDto,
   AggregationLikertDto,
   AggregationNumericDto,
+  AggregationOptionDto,
   AggregationYesNoDto,
   DashboardAggregation,
   DashboardQuestionDto,
@@ -35,10 +36,26 @@ import {
 } from './dashboard-categories.config';
 import {
   AGE_RANGE_BOUNDS,
+  AGE_RANGE_BUCKETS,
   AgeRangeBucket,
+  QuestionLocator,
   RESPONSE_FILTER_SOURCES,
   ResponseFilterSource,
 } from './dashboard-response-filters.config';
+import {
+  C15_KPIS,
+  DIGITAL_DEMAND_SOURCES,
+  KpiDefinition,
+  OVERVIEW_KPIS,
+} from './dashboard-kpis.config';
+import { DashboardKpiDto } from './dto/dashboard-kpis.dto';
+import {
+  BarriersRadarDto,
+  DashboardDigitalDemandDto,
+  IndexByCutBucketDto,
+  InstitutionTrustItemDto,
+  LikertRankingItemDto,
+} from './dto/dashboard-digital-demand.dto';
 
 const MIN_SAMPLE_THRESHOLD = 5;
 
@@ -522,15 +539,7 @@ export class DashboardService {
     const resolved: ResolvedResponseFilter[] = [];
 
     for (const source of present) {
-      const question =
-        source.locate === 'systemField'
-          ? await this.questionRepo.findOne({
-              where: { systemField: source.systemField },
-            })
-          : await this.findQuestionByInstrumentAndText(
-              source.instrumentCode,
-              source.questionText,
-            );
+      const question = await this.resolveQuestionByLocator(source);
 
       if (!question) return 'impossible';
 
@@ -570,8 +579,9 @@ export class DashboardService {
   private async findQuestionByInstrumentAndText(
     instrumentCode: string,
     text: string,
+    opts: { withOptions?: boolean; withType?: boolean } = {},
   ): Promise<Question | null> {
-    return this.questionRepo
+    const qb = this.questionRepo
       .createQueryBuilder('question')
       .innerJoin('question.section', 'section')
       .innerJoin(
@@ -580,8 +590,40 @@ export class DashboardService {
         'instrument.code = :instrumentCode',
         { instrumentCode },
       )
-      .where('question.text = :text', { text })
-      .getOne();
+      .where('question.text = :text', { text });
+    if (opts.withOptions) qb.leftJoinAndSelect('question.options', 'options');
+    if (opts.withType) qb.leftJoinAndSelect('question.type', 'type');
+    return qb.getOne();
+  }
+
+  /**
+   * Spec 43 (Fase 4): resuelve un `QuestionLocator` (mismo tipo que usa
+   * Fase 3 para los filtros) a su `Question`. `withOptions` precarga
+   * `question.options` — necesaria para enumerar los cortes de
+   * `getDigitalDemand` (educación/conectividad). `withType` precarga
+   * `question.type` — necesaria cuando el KPI opera sobre single_choice o
+   * multiple_choice indistintamente (`choiceAcceptedPercentage`,
+   * `topChoiceOption`). Ninguna de las dos hace falta para las agregaciones
+   * en sí (que resuelven opciones vía `response.option`, no vía esta relación).
+   */
+  private async resolveQuestionByLocator(
+    locator: QuestionLocator,
+    opts: { withOptions?: boolean; withType?: boolean } = {},
+  ): Promise<Question | null> {
+    if (locator.locate === 'systemField') {
+      const relations: string[] = [];
+      if (opts.withOptions) relations.push('options');
+      if (opts.withType) relations.push('type');
+      return this.questionRepo.findOne({
+        where: { systemField: locator.systemField },
+        relations: relations.length ? relations : undefined,
+      });
+    }
+    return this.findQuestionByInstrumentAndText(
+      locator.instrumentCode,
+      locator.questionText,
+      opts,
+    );
   }
 
   /**
@@ -1182,6 +1224,739 @@ export class DashboardService {
       max: toNumberOrNull(stats?.max),
       stdDev: toNumberOrNull(stats?.stdDev),
       distribution,
+    };
+  }
+
+  // ─────────────────────────── Fase 4 (spec 43) ───────────────────────────
+
+  /**
+   * D5: tira de KPIs curados. Solo existen dos vistas curadas en el diseño
+   * (`categoryId=C15` → `C15_KPIS`; cualquier otro caso, incluida la vista
+   * de resumen general, → `OVERVIEW_KPIS`). `instrumentId`/`categoryId` se
+   * descartan de los filtros reales de cada KPI (cada uno ya declara su
+   * propia pregunta fuente — igual que `getOverview`, D2) y solo se usa
+   * `categoryId` para elegir qué catálogo de KPIs devolver.
+   */
+  async getKpis(filters: DashboardFiltersDto): Promise<DashboardKpiDto[]> {
+    const { categoryId, instrumentId: _instrumentId, ...rest } = filters;
+    await this.validateFilters(rest);
+    const responseFilters = await this.resolveResponseFilters(rest);
+    const definitions = categoryId === 'C15' ? C15_KPIS : OVERVIEW_KPIS;
+
+    const kpis: DashboardKpiDto[] = [];
+    for (const definition of definitions) {
+      kpis.push(await this.computeKpi(definition, rest, responseFilters));
+    }
+    return kpis;
+  }
+
+  private async computeKpi(
+    definition: KpiDefinition,
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<DashboardKpiDto> {
+    const base = {
+      key: definition.key,
+      label: definition.label,
+      unit: definition.unit,
+    };
+    const operation = definition.operation;
+
+    switch (operation.type) {
+      case 'acceptanceIndex': {
+        const { acceptanceIndex } = await this.computeAcceptanceConsolidation(
+          filters,
+          responseFilters,
+        );
+        return {
+          ...base,
+          value: acceptanceIndex,
+          suppressed: acceptanceIndex === null,
+        };
+      }
+
+      case 'distinctFarmerCount': {
+        const value = await this.countDistinctFarmers(filters, responseFilters);
+        return { ...base, value, suppressed: value < MIN_SAMPLE_THRESHOLD };
+      }
+
+      case 'distinctFarmCount': {
+        const value = await this.countDistinctFarms(filters, responseFilters);
+        return { ...base, value, suppressed: value < MIN_SAMPLE_THRESHOLD };
+      }
+
+      case 'instrumentCatalog': {
+        const value = await this.instrumentRepo.count({
+          where: { isActive: true },
+        });
+        return { ...base, value, suppressed: false };
+      }
+
+      case 'yesPercentage': {
+        const question = await this.resolveQuestionByLocator(operation.source);
+        if (!question) return { ...base, value: null, suppressed: true };
+        const answeredCount = await this.countAnswered(
+          question,
+          'yes_no',
+          filters,
+          responseFilters,
+        );
+        if (answeredCount < MIN_SAMPLE_THRESHOLD) {
+          return { ...base, value: null, suppressed: true };
+        }
+        const aggregation = await this.aggregateYesNo(
+          question,
+          filters,
+          answeredCount,
+          responseFilters,
+        );
+        return { ...base, value: aggregation.yesPercentage, suppressed: false };
+      }
+
+      case 'likertAgreePercentage': {
+        const question = await this.resolveQuestionByLocator(operation.source);
+        if (!question) return { ...base, value: null, suppressed: true };
+        const answeredCount = await this.countAnswered(
+          question,
+          'likert',
+          filters,
+          responseFilters,
+        );
+        if (answeredCount < MIN_SAMPLE_THRESHOLD) {
+          return { ...base, value: null, suppressed: true };
+        }
+        const isInverted = (question.systemField ?? '').startsWith('inverted:');
+        const agreeCount = await this.countLikertAtOrAbove(
+          question,
+          filters,
+          responseFilters,
+          operation.minScore,
+          isInverted,
+        );
+        return {
+          ...base,
+          value: round2((agreeCount / answeredCount) * 100),
+          suppressed: false,
+        };
+      }
+
+      case 'choiceAcceptedPercentage': {
+        const question = await this.resolveQuestionByLocator(operation.source, {
+          withType: true,
+        });
+        if (!question) return { ...base, value: null, suppressed: true };
+        const typeName = question.type.name;
+        const answeredCount = await this.countAnswered(
+          question,
+          typeName,
+          filters,
+          responseFilters,
+        );
+        if (answeredCount < MIN_SAMPLE_THRESHOLD) {
+          return { ...base, value: null, suppressed: true };
+        }
+        const acceptedCount = await this.buildResponseBaseQuery(
+          question.questionId,
+          filters,
+          responseFilters,
+        )
+          .innerJoin('response.option', 'option')
+          .andWhere('option.text IN (:...acceptedOptionTexts)', {
+            acceptedOptionTexts: operation.acceptedOptionTexts,
+          })
+          .getCount();
+        return {
+          ...base,
+          value: round2((acceptedCount / answeredCount) * 100),
+          suppressed: false,
+        };
+      }
+
+      case 'topChoiceOption': {
+        const question = await this.resolveQuestionByLocator(operation.source, {
+          withType: true,
+        });
+        if (!question) return { ...base, value: null, suppressed: true };
+        const typeName = question.type.name;
+        const answeredCount = await this.countAnswered(
+          question,
+          typeName,
+          filters,
+          responseFilters,
+        );
+        if (answeredCount < MIN_SAMPLE_THRESHOLD) {
+          return { ...base, value: null, suppressed: true };
+        }
+        const aggregation = await this.aggregateChoices(
+          question,
+          filters,
+          typeName,
+          answeredCount,
+          responseFilters,
+        );
+        const top = aggregation.options[0] as
+          | { text: string; percentage: number }
+          | undefined;
+        return {
+          ...base,
+          value: top?.percentage ?? null,
+          optionText: top?.text ?? null,
+          suppressed: !top,
+        };
+      }
+
+      default:
+        throw new Error(
+          `Operación de KPI no soportada: ${(operation as { type: string }).type}`,
+        );
+    }
+  }
+
+  /** % de respuestas likert con puntaje (ya invertido si aplica) >= minScore. */
+  private async countLikertAtOrAbove(
+    question: Question,
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+    minScore: number,
+    isInverted: boolean,
+  ): Promise<number> {
+    return this.buildResponseBaseQuery(
+      question.questionId,
+      filters,
+      responseFilters,
+    )
+      .innerJoin('response.option', 'option')
+      .andWhere(
+        isInverted
+          ? '(6 - option.value) >= :minScore'
+          : 'option.value >= :minScore',
+        { minScore },
+      )
+      .getCount();
+  }
+
+  private async countDistinctFarmers(
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<number> {
+    const raw = await this.buildFilteredSurveyQuery(
+      filters,
+      undefined,
+      responseFilters,
+    )
+      .andWhere('survey.farmer IS NOT NULL')
+      .select('COUNT(DISTINCT survey.farmer)', 'count')
+      .getRawOne<{ count: string }>();
+    return Number(raw?.count ?? 0);
+  }
+
+  private async countDistinctFarms(
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<number> {
+    const raw = await this.buildFilteredSurveyQuery(
+      filters,
+      undefined,
+      responseFilters,
+    )
+      .innerJoin('survey.farmer', 'farmerForFarmCount')
+      .andWhere('farmerForFarmCount.farm IS NOT NULL')
+      .select('COUNT(DISTINCT farmerForFarmCount.farm)', 'count')
+      .getRawOne<{ count: string }>();
+    return Number(raw?.count ?? 0);
+  }
+
+  /** Preguntas Likert ★ (D4): todo instrumento, `systemField` = tag estratégico. */
+  private async getStrategicLikertQuestions(): Promise<Question[]> {
+    return this.questionRepo
+      .createQueryBuilder('question')
+      .leftJoinAndSelect('question.section', 'section')
+      .innerJoin('question.type', 'type')
+      .where('type.name = :typeName', { typeName: 'likert' })
+      .andWhere('question.systemField = :systemField', {
+        systemField: DIGITAL_DEMAND_SOURCES.strategicSystemField,
+      })
+      .orderBy('question.order', 'ASC')
+      .getMany();
+  }
+
+  /**
+   * D4: consolida todos los ítems Likert ★ de la muestra filtrada — media
+   * de acuerdo por ítem (reutilizando `aggregateLikert`, con inversión si
+   * aplica) y el índice global (promedio de esas medias). Los ítems sin
+   * muestra suficiente se excluyen del ranking, no se muestran con media
+   * null (no se puede ordenar por null). Reutilizado por el KPI "Índice de
+   * aceptación" y por `getDigitalDemand` (ranking + cortes).
+   */
+  private async computeAcceptanceConsolidation(
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<{
+    acceptanceIndex: number | null;
+    items: LikertRankingItemDto[];
+  }> {
+    const questions = await this.getStrategicLikertQuestions();
+    const meansByQuestion = await this.batchAggregateLikertMeans(
+      questions,
+      filters,
+      responseFilters,
+    );
+
+    const items: LikertRankingItemDto[] = [];
+    for (const question of questions) {
+      const result = meansByQuestion.get(question.questionId);
+      if (!result) continue;
+      items.push({
+        questionId: question.questionId,
+        questionText: question.text,
+        sectionName: question.section.name,
+        meanScore: result.meanScore,
+        bands: result.bands,
+        answeredCount: result.answeredCount,
+      });
+    }
+
+    items.sort((a, b) => b.meanScore - a.meanScore);
+
+    const acceptanceIndex = items.length
+      ? round2(
+          items.reduce((sum, item) => sum + item.meanScore, 0) / items.length,
+        )
+      : null;
+
+    return { acceptanceIndex, items };
+  }
+
+  /**
+   * Performance (hallazgo de verificación, spec 43 Fase 4): `computeIndexByCut`
+   * llama a esta consolidación una vez **por valor de corte** (hasta 16 en total
+   * entre edad/educación/conectividad). Resolverla pregunta por pregunta —como
+   * hacía la primera versión, reutilizando `countAnswered`+`aggregateLikert`—
+   * multiplicaba ~130 preguntas ★ × 16 cortes en consultas secuenciales
+   * (~4.000) y tardó más de 120 s contra la base de desarrollo (túnel SSH a
+   * `mirp-lab`). Esta versión resuelve **todas** las preguntas ★ en una sola
+   * consulta agrupada por `(question_id, option_id)` — 2 consultas totales por
+   * corte en vez de ~260 — reimplementando el cálculo de `aggregateLikert`
+   * (media ponderada + inversión) sobre el resultado agrupado; si esa fórmula
+   * cambia, actualizar también aquí.
+   */
+  private async batchAggregateLikertMeans(
+    questions: Question[],
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<
+    Map<
+      string,
+      {
+        meanScore: number;
+        bands: AggregationOptionDto[];
+        answeredCount: number;
+      }
+    >
+  > {
+    const result = new Map<
+      string,
+      {
+        meanScore: number;
+        bands: AggregationOptionDto[];
+        answeredCount: number;
+      }
+    >();
+    if (questions.length === 0) return result;
+
+    const questionIds = questions.map((question) => question.questionId);
+    const qb = this.responseRepo
+      .createQueryBuilder('response')
+      .innerJoin('response.survey', 'survey')
+      .innerJoin('response.option', 'option')
+      .where('response.question IN (:...questionIds)', { questionIds })
+      .andWhere('survey.sincronized = true');
+    this.applySurveyFilters(qb, filters, undefined, responseFilters);
+
+    const rows = await qb
+      .select('response.question', 'questionId')
+      .addSelect('option.optionId', 'optionId')
+      .addSelect('option.text', 'text')
+      .addSelect('option.value', 'value')
+      .addSelect('COUNT(response.responseId)', 'count')
+      .groupBy('response.question')
+      .addGroupBy('option.optionId')
+      .addGroupBy('option.text')
+      .addGroupBy('option.value')
+      .getRawMany<{
+        questionId: string;
+        optionId: string;
+        text: string;
+        value: string | null;
+        count: string;
+      }>();
+
+    const rowsByQuestion = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const list = rowsByQuestion.get(row.questionId) ?? [];
+      list.push(row);
+      rowsByQuestion.set(row.questionId, list);
+    }
+
+    for (const question of questions) {
+      const questionRows = rowsByQuestion.get(question.questionId) ?? [];
+      const answeredCount = questionRows.reduce(
+        (sum, row) => sum + Number(row.count),
+        0,
+      );
+      if (answeredCount < MIN_SAMPLE_THRESHOLD) continue;
+
+      const isInverted = (question.systemField ?? '').startsWith('inverted:');
+      let weightedSum = 0;
+      let scoredCount = 0;
+
+      const bands = questionRows
+        .map((row) => {
+          const rawValue =
+            row.value !== null ? Number(row.value) : parseFloat(row.text);
+          const count = Number(row.count);
+          const hasScore = Number.isFinite(rawValue);
+          if (hasScore) {
+            const score = isInverted ? 6 - rawValue : rawValue;
+            weightedSum += score * count;
+            scoredCount += count;
+          }
+          return {
+            optionId: row.optionId,
+            text: row.text,
+            value: hasScore ? rawValue : null,
+            count,
+            percentage: round2((count / answeredCount) * 100),
+          };
+        })
+        .sort((a, b) => (a.value ?? 0) - (b.value ?? 0));
+
+      const meanScore =
+        scoredCount > 0 ? round2(weightedSum / scoredCount) : null;
+      if (meanScore === null) continue;
+
+      result.set(question.questionId, { meanScore, bands, answeredCount });
+    }
+
+    return result;
+  }
+
+  /**
+   * Cortes del índice de aceptación (D4): recalcula `computeAcceptanceConsolidation`
+   * fijando el filtro global correspondiente a cada valor del corte, reaplicando el
+   * resto de filtros ya activos (spec 43, D3/D4). `'impossible'` en la resolución de
+   * un corte puntual (no debería ocurrir si el corte usa una fuente ya validada,
+   * pero se maneja igual que en cualquier otro filtro) se traduce en "sin datos".
+   */
+  private async computeIndexByCut(
+    baseFilters: DashboardFiltersDto,
+    filterKey: 'ageRange' | 'educationLevel' | 'connectivity',
+    buckets: string[],
+  ): Promise<IndexByCutBucketDto[]> {
+    const results: IndexByCutBucketDto[] = [];
+
+    for (const bucket of buckets) {
+      const cutFilters: DashboardFiltersDto = {
+        ...baseFilters,
+        [filterKey]: bucket,
+      };
+      const cutResponseFilters = await this.resolveResponseFilters(cutFilters);
+      const acceptanceIndex =
+        cutResponseFilters === 'impossible'
+          ? null
+          : (
+              await this.computeAcceptanceConsolidation(
+                cutFilters,
+                cutResponseFilters,
+              )
+            ).acceptanceIndex;
+
+      results.push({
+        label: bucket,
+        meanScore: acceptanceIndex,
+        suppressed: acceptanceIndex === null,
+      });
+    }
+
+    return results;
+  }
+
+  private async computeIndexByEducationCut(
+    baseFilters: DashboardFiltersDto,
+  ): Promise<IndexByCutBucketDto[]> {
+    const question = await this.resolveQuestionByLocator(
+      DIGITAL_DEMAND_SOURCES.cutSources.education,
+      { withOptions: true },
+    );
+    if (!question) return [];
+    const buckets = [...new Set(question.options.map((option) => option.text))];
+    return this.computeIndexByCut(baseFilters, 'educationLevel', buckets);
+  }
+
+  private async computeIndexByConnectivityCut(
+    baseFilters: DashboardFiltersDto,
+  ): Promise<IndexByCutBucketDto[]> {
+    const question = await this.resolveQuestionByLocator(
+      DIGITAL_DEMAND_SOURCES.cutSources.connectivity,
+      { withOptions: true },
+    );
+    if (!question) return [];
+    const buckets = [...new Set(question.options.map((option) => option.text))];
+    return this.computeIndexByCut(baseFilters, 'connectivity', buckets);
+  }
+
+  /** Radar de barreras S_DCU (B1/B2/B3): media de las medias Likert de cada sección. */
+  private async computeBarriersRadar(
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<BarriersRadarDto> {
+    const [b1, b2, b3] = await Promise.all([
+      this.computeBarrierSectionMean(
+        DIGITAL_DEMAND_SOURCES.barrierSections.b1,
+        filters,
+        responseFilters,
+      ),
+      this.computeBarrierSectionMean(
+        DIGITAL_DEMAND_SOURCES.barrierSections.b2,
+        filters,
+        responseFilters,
+      ),
+      this.computeBarrierSectionMean(
+        DIGITAL_DEMAND_SOURCES.barrierSections.b3,
+        filters,
+        responseFilters,
+      ),
+    ]);
+    return { b1, b2, b3 };
+  }
+
+  private async computeBarrierSectionMean(
+    sectionName: string,
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<number | null> {
+    const questions = await this.questionRepo
+      .createQueryBuilder('question')
+      .innerJoin('question.section', 'section')
+      .innerJoin(
+        'section.instrument',
+        'instrument',
+        'instrument.code = :instrumentCode',
+        { instrumentCode: DIGITAL_DEMAND_SOURCES.sDcuInstrumentCode },
+      )
+      .innerJoin('question.type', 'type')
+      .where('type.name = :typeName', { typeName: 'likert' })
+      .andWhere('section.name = :sectionName', { sectionName })
+      .getMany();
+
+    const means: number[] = [];
+    for (const question of questions) {
+      const answeredCount = await this.countAnswered(
+        question,
+        'likert',
+        filters,
+        responseFilters,
+      );
+      if (answeredCount < MIN_SAMPLE_THRESHOLD) continue;
+
+      const isInverted = (question.systemField ?? '').startsWith('inverted:');
+      const aggregation = await this.aggregateLikert(
+        question,
+        filters,
+        isInverted,
+        answeredCount,
+        responseFilters,
+      );
+      if (aggregation.meanScore !== null) means.push(aggregation.meanScore);
+    }
+
+    return means.length
+      ? round2(means.reduce((sum, mean) => sum + mean, 0) / means.length)
+      : null;
+  }
+
+  private async computeInstitutionTrust(
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<InstitutionTrustItemDto[]> {
+    const questions = await this.questionRepo
+      .createQueryBuilder('question')
+      .innerJoin('question.section', 'section')
+      .innerJoin(
+        'section.instrument',
+        'instrument',
+        'instrument.code = :instrumentCode',
+        { instrumentCode: DIGITAL_DEMAND_SOURCES.sDcuInstrumentCode },
+      )
+      .where('section.name = :sectionName', {
+        sectionName: DIGITAL_DEMAND_SOURCES.institutionTrustSection,
+      })
+      .orderBy('question.order', 'ASC')
+      .getMany();
+
+    const items: InstitutionTrustItemDto[] = [];
+    for (const question of questions) {
+      const answeredCount = await this.countAnswered(
+        question,
+        'likert',
+        filters,
+        responseFilters,
+      );
+      if (answeredCount < MIN_SAMPLE_THRESHOLD) {
+        items.push({
+          questionId: question.questionId,
+          label: question.text,
+          meanScore: null,
+          bands: [],
+          suppressed: true,
+        });
+        continue;
+      }
+
+      const isInverted = (question.systemField ?? '').startsWith('inverted:');
+      const aggregation = await this.aggregateLikert(
+        question,
+        filters,
+        isInverted,
+        answeredCount,
+        responseFilters,
+      );
+      items.push({
+        questionId: question.questionId,
+        label: question.text,
+        meanScore: aggregation.meanScore,
+        bands: aggregation.options,
+        suppressed: false,
+      });
+    }
+
+    return items;
+  }
+
+  /** Agregación de una pregunta de selección (única o múltiple) localizada por `QuestionLocator`. */
+  private async aggregateChoicesByLocator(
+    locator: QuestionLocator,
+    filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters,
+  ): Promise<AggregationOptionDto[]> {
+    const question = await this.resolveQuestionByLocator(locator, {
+      withType: true,
+    });
+    if (!question) return [];
+
+    const typeName = question.type.name;
+    const answeredCount = await this.countAnswered(
+      question,
+      typeName,
+      filters,
+      responseFilters,
+    );
+    if (answeredCount < MIN_SAMPLE_THRESHOLD) return [];
+
+    const aggregation = await this.aggregateChoices(
+      question,
+      filters,
+      typeName,
+      answeredCount,
+      responseFilters,
+    );
+    return aggregation.options;
+  }
+
+  /**
+   * D4: vista consolidada "Demanda digital" (C15). `instrumentId`/`categoryId`
+   * se descartan de los filtros reales (esta consolidación siempre cruza los
+   * mismos instrumentos — S_DCU, S11 y las baterías ★ transversales — nunca
+   * "otro" instrumento; mismo criterio D2 que `getOverview`/`getKpis`).
+   */
+  async getDigitalDemand(
+    filters: DashboardFiltersDto,
+  ): Promise<DashboardDigitalDemandDto> {
+    const {
+      categoryId: _categoryId,
+      instrumentId: _instrumentId,
+      ...rest
+    } = filters;
+    await this.validateFilters(rest);
+    const responseFilters = await this.resolveResponseFilters(rest);
+
+    const totalCount = await this.buildFilteredSurveyQuery(
+      rest,
+      undefined,
+      responseFilters,
+    ).getCount();
+
+    if (totalCount < MIN_SAMPLE_THRESHOLD) {
+      return {
+        suppressed: true,
+        reason: `La muestra de encuestas con estos filtros es insuficiente para mostrar datos (${totalCount} encuestas, se requieren al menos ${MIN_SAMPLE_THRESHOLD}).`,
+        acceptanceIndex: null,
+        likertRanking: [],
+        indexByCut: { age: [], education: [], connectivity: [] },
+        barriersRadar: { b1: null, b2: null, b3: null },
+        adoptionBarriers: [],
+        institutionTrust: [],
+        digitalSkills: [],
+        platforms: [],
+        preferredChannel: [],
+      };
+    }
+
+    const [
+      { acceptanceIndex, items: likertRanking },
+      indexByAge,
+      indexByEducation,
+      indexByConnectivity,
+      barriersRadar,
+      adoptionBarriers,
+      institutionTrust,
+      digitalSkills,
+      platforms,
+      preferredChannel,
+    ] = await Promise.all([
+      this.computeAcceptanceConsolidation(rest, responseFilters),
+      this.computeIndexByCut(rest, 'ageRange', [...AGE_RANGE_BUCKETS]),
+      this.computeIndexByEducationCut(rest),
+      this.computeIndexByConnectivityCut(rest),
+      this.computeBarriersRadar(rest, responseFilters),
+      this.aggregateChoicesByLocator(
+        DIGITAL_DEMAND_SOURCES.adoptionBarriers,
+        rest,
+        responseFilters,
+      ),
+      this.computeInstitutionTrust(rest, responseFilters),
+      this.aggregateChoicesByLocator(
+        DIGITAL_DEMAND_SOURCES.digitalSkills,
+        rest,
+        responseFilters,
+      ),
+      this.aggregateChoicesByLocator(
+        DIGITAL_DEMAND_SOURCES.platforms,
+        rest,
+        responseFilters,
+      ),
+      this.aggregateChoicesByLocator(
+        DIGITAL_DEMAND_SOURCES.preferredChannel,
+        rest,
+        responseFilters,
+      ),
+    ]);
+
+    return {
+      suppressed: false,
+      acceptanceIndex,
+      likertRanking,
+      indexByCut: {
+        age: indexByAge,
+        education: indexByEducation,
+        connectivity: indexByConnectivity,
+      },
+      barriersRadar,
+      adoptionBarriers,
+      institutionTrust,
+      digitalSkills,
+      platforms,
+      preferredChannel,
     };
   }
 }

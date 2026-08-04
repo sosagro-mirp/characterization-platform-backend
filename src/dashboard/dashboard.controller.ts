@@ -7,6 +7,8 @@ import { DashboardResponseDto } from './dto/dashboard-response.dto';
 import { DashboardDepartmentCountDto } from './dto/dashboard-department-count.dto';
 import { DashboardOverviewDto } from './dto/dashboard-overview.dto';
 import { DashboardCategoryDto } from './dto/dashboard-category.dto';
+import { DashboardKpiDto } from './dto/dashboard-kpis.dto';
+import { DashboardDigitalDemandDto } from './dto/dashboard-digital-demand.dto';
 
 @ApiTags('Dashboard')
 @Public()
@@ -92,5 +94,31 @@ export class DashboardController {
     @Query() filters: DashboardFiltersDto,
   ): Promise<DashboardOverviewDto> {
     return this.dashboardService.getOverview(filters);
+  }
+
+  @Get('kpis')
+  @Header('Cache-Control', 'public, max-age=300')
+  @ApiOperation({
+    summary: 'Tira de KPIs curados (spec 43, D5)',
+    description:
+      'Con categoryId=C15 devuelve la tira de "Demanda digital"; en cualquier otro caso (incluida la vista de resumen general), la tira general. Cada KPI declara su unidad y se marca suppressed cuando su pregunta fuente no alcanza el umbral de privacidad — nunca un número inventado.',
+  })
+  @ApiResponse({ status: 200, type: [DashboardKpiDto] })
+  getKpis(@Query() filters: DashboardFiltersDto): Promise<DashboardKpiDto[]> {
+    return this.dashboardService.getKpis(filters);
+  }
+
+  @Get('digital-demand')
+  @Header('Cache-Control', 'public, max-age=300')
+  @ApiOperation({
+    summary: 'Vista consolidada "Demanda digital" (C15, spec 43, D4)',
+    description:
+      'Consolida todos los ítems Likert ★ (interés en app) de la muestra filtrada: ranking con bandas y media, índice global de aceptación, cortes por edad/nivel educativo/conectividad, radar de barreras S_DCU (B1/B2/B3), confianza en instituciones, habilidades digitales, plataformas y canal preferido. Ignora instrumentId/categoryId (consolidación fija, cruza siempre los mismos instrumentos).',
+  })
+  @ApiResponse({ status: 200, type: DashboardDigitalDemandDto })
+  getDigitalDemand(
+    @Query() filters: DashboardFiltersDto,
+  ): Promise<DashboardDigitalDemandDto> {
+    return this.dashboardService.getDigitalDemand(filters);
   }
 }
