@@ -377,17 +377,30 @@ export class DashboardService {
     // D2 (spec 43): instrumentId y categoryId son mutuamente excluyentes
     // (validado en validateFilters), así que a lo sumo uno de los dos ramales
     // siguientes se ejecuta.
-    const questions = instrument
-      ? await this.getEligibleQuestions(instrument.instrumentId)
-      : await this.getEligibleQuestionsForCategory(
+    let questions: Question[];
+    let instrumentByQuestionId: Map<string, Instrument>;
+    if (instrument) {
+      questions = await this.getEligibleQuestions(instrument.instrumentId);
+      instrumentByQuestionId = new Map(
+        questions.map((q) => [q.questionId, instrument]),
+      );
+    } else {
+      ({ questions, instrumentByQuestionId } =
+        await this.getEligibleQuestionsForCategory(
           category!,
           categoryInstruments,
-        );
+        ));
+    }
 
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
       dashboardQuestions.push(
-        await this.aggregateQuestion(question, filters, responseFilters),
+        await this.aggregateQuestion(
+          question,
+          filters,
+          responseFilters,
+          instrumentByQuestionId.get(question.questionId),
+        ),
       );
     }
 
@@ -403,30 +416,35 @@ export class DashboardService {
   private async getEligibleQuestionsForCategory(
     category: DashboardCategoryConfig,
     activeInstruments: Instrument[],
-  ): Promise<Question[]> {
+  ): Promise<{
+    questions: Question[];
+    instrumentByQuestionId: Map<string, Instrument>;
+  }> {
     const mappingByCode = new Map(
       category.instruments.map((mapping) => [mapping.instrumentCode, mapping]),
     );
 
     const seen = new Set<string>();
-    const result: Question[] = [];
+    const questions: Question[] = [];
+    const instrumentByQuestionId = new Map<string, Instrument>();
 
     for (const instrument of activeInstruments) {
       const mapping = instrument.code
         ? mappingByCode.get(instrument.code)
         : undefined;
-      const questions = await this.getEligibleQuestions(
+      const instrumentQuestions = await this.getEligibleQuestions(
         instrument.instrumentId,
         mapping?.sectionNames,
       );
-      for (const question of questions) {
+      for (const question of instrumentQuestions) {
         if (seen.has(question.questionId)) continue;
         seen.add(question.questionId);
-        result.push(question);
+        questions.push(question);
+        instrumentByQuestionId.set(question.questionId, instrument);
       }
     }
 
-    return result;
+    return { questions, instrumentByQuestionId };
   }
 
   private async validateFilters(filters: DashboardFiltersDto): Promise<{
@@ -916,6 +934,7 @@ export class DashboardService {
     question: Question,
     filters: DashboardFiltersDto,
     responseFilters: ResolvedResponseFilters = [],
+    instrument?: Instrument,
   ): Promise<DashboardQuestionDto> {
     const typeName = question.type.name;
     const isInverted = (question.systemField ?? '').startsWith('inverted:');
@@ -935,6 +954,11 @@ export class DashboardService {
       systemField: question.systemField ?? null,
       isInverted,
       answeredCount,
+      // D9 (spec 43, Fase 7): procedencia por pregunta — necesaria para que
+      // una vista de categoría (que agrega varios instrumentos) pueda
+      // etiquetar de dónde viene cada tarjeta.
+      instrumentId: instrument?.instrumentId,
+      instrumentName: instrument?.name,
     };
 
     if (answeredCount < MIN_SAMPLE_THRESHOLD) {
