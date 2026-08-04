@@ -28,7 +28,8 @@ export class DashboardController {
   })
   @ApiResponse({
     status: 404,
-    description: 'Alguno de los filtros UUID no existe, o categoryId no es una categoría válida.',
+    description:
+      'Alguno de los filtros UUID no existe, o categoryId no es una categoría válida.',
   })
   getAnalytics(
     @Query() filters: DashboardFiltersDto,

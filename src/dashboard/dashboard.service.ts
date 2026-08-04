@@ -114,7 +114,10 @@ export class DashboardService {
       categoryInstruments,
     );
 
-    const rows = await this.buildFilteredSurveyQuery(rest, categoryInstrumentIds)
+    const rows = await this.buildFilteredSurveyQuery(
+      rest,
+      categoryInstrumentIds,
+    )
       .innerJoin('survey.department', 'department')
       .select('department.departmentId', 'departmentId')
       .addSelect('department.name', 'departmentName')
@@ -318,10 +321,7 @@ export class DashboardService {
     activeInstruments: Instrument[],
   ): Promise<Question[]> {
     const mappingByCode = new Map(
-      category.instruments.map((mapping) => [
-        mapping.instrumentCode,
-        mapping,
-      ]),
+      category.instruments.map((mapping) => [mapping.instrumentCode, mapping]),
     );
 
     const seen = new Set<string>();
@@ -376,8 +376,7 @@ export class DashboardService {
 
     if (filters.categoryId) {
       category =
-        DASHBOARD_CATEGORIES.find((c) => c.id === filters.categoryId) ??
-        null;
+        DASHBOARD_CATEGORIES.find((c) => c.id === filters.categoryId) ?? null;
       if (!category) {
         throw new NotFoundException('Categoría no encontrada.');
       }
@@ -523,7 +522,10 @@ export class DashboardService {
     filters: DashboardFiltersDto,
     categoryInstrumentIds?: string[],
   ): Promise<{ from: string; to: string } | null> {
-    const raw = await this.buildFilteredSurveyQuery(filters, categoryInstrumentIds)
+    const raw = await this.buildFilteredSurveyQuery(
+      filters,
+      categoryInstrumentIds,
+    )
       .select('MIN(survey.createdAt)', 'from')
       .addSelect('MAX(survey.createdAt)', 'to')
       .getRawOne<{ from: string | null; to: string | null }>();
