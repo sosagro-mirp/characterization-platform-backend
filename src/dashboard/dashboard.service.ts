@@ -33,8 +33,31 @@ import {
   DASHBOARD_CATEGORIES,
   DashboardCategoryConfig,
 } from './dashboard-categories.config';
+import {
+  AGE_RANGE_BOUNDS,
+  AgeRangeBucket,
+  RESPONSE_FILTER_SOURCES,
+  ResponseFilterSource,
+} from './dashboard-response-filters.config';
 
 const MIN_SAMPLE_THRESHOLD = 5;
+
+/**
+ * Spec 43 (Fase 3): filtros globales derivados de respuestas, ya resueltos a
+ * un `questionId` concreto. `'impossible'` señala que al menos un filtro
+ * solicitado no tiene pregunta fuente en esta base (instrumento no
+ * sembrado) — en ese caso ninguna encuesta puede satisfacerlo, así que
+ * `applySurveyFilters` fuerza cero resultados en vez de ignorar el filtro
+ * (mismo criterio que `categoryInstrumentIds` vacío).
+ */
+type ResolvedResponseFilter = {
+  key: string;
+  questionId: string;
+  matchType: ResponseFilterSource['matchType'];
+  range?: { min?: number; max?: number };
+  optionTexts?: string[];
+};
+type ResolvedResponseFilters = ResolvedResponseFilter[] | 'impossible';
 
 const EXCLUDED_QUESTION_TYPES = [
   'open_text',
@@ -90,9 +113,11 @@ export class DashboardService {
       filters,
       categoryInstruments,
     );
+    const responseFilters = await this.resolveResponseFilters(filters);
     const count = await this.buildFilteredSurveyQuery(
       filters,
       categoryInstrumentIds,
+      responseFilters,
     ).getCount();
     return { count, suppressed: count < MIN_SAMPLE_THRESHOLD };
   }
@@ -103,9 +128,14 @@ export class DashboardService {
    * departamento mientras se filtra por uno específico no tiene sentido; el
    * mapa solo se muestra en el frontend cuando no hay departamento activo).
    * Aplica el mismo umbral de privacidad por bucket que el resto del dashboard.
+   *
+   * `responseFilters` es opcional para permitir que `getOverview` reutilice
+   * su propia resolución (evita resolver los mismos filtros dos veces por
+   * request); cuando se llama directamente (ruta pública), se resuelve aquí.
    */
   async getDepartmentCounts(
     filters: DashboardFiltersDto,
+    responseFilters?: ResolvedResponseFilters,
   ): Promise<DashboardDepartmentCountDto[]> {
     const { departmentId: _departmentId, townId: _townId, ...rest } = filters;
     const { categoryInstruments } = await this.validateFilters(rest);
@@ -113,10 +143,13 @@ export class DashboardService {
       rest,
       categoryInstruments,
     );
+    const resolvedResponseFilters =
+      responseFilters ?? (await this.resolveResponseFilters(rest));
 
     const rows = await this.buildFilteredSurveyQuery(
       rest,
       categoryInstrumentIds,
+      resolvedResponseFilters,
     )
       .innerJoin('survey.department', 'department')
       .select('department.departmentId', 'departmentId')
@@ -161,8 +194,13 @@ export class DashboardService {
       ...rest
     } = filters;
     await this.validateFilters(rest);
+    const responseFilters = await this.resolveResponseFilters(rest);
 
-    const totalCount = await this.buildFilteredSurveyQuery(rest).getCount();
+    const totalCount = await this.buildFilteredSurveyQuery(
+      rest,
+      undefined,
+      responseFilters,
+    ).getCount();
     const suppressed = totalCount < MIN_SAMPLE_THRESHOLD;
 
     if (suppressed) {
@@ -179,17 +217,26 @@ export class DashboardService {
 
     const [byActorType, byCrop, byDepartment, age, experienceYears] =
       await Promise.all([
-        this.groupSurveysByRelation(rest, 'actorType', 'actorTypeId'),
-        this.groupSurveysByRelation(rest, 'crop', 'cropId'),
-        this.getDepartmentCounts(rest).then((rows) =>
+        this.groupSurveysByRelation(
+          rest,
+          'actorType',
+          'actorTypeId',
+          responseFilters,
+        ),
+        this.groupSurveysByRelation(rest, 'crop', 'cropId', responseFilters),
+        this.getDepartmentCounts(rest, responseFilters).then((rows) =>
           rows.map((r) => ({
             id: r.departmentId,
             name: r.departmentName,
             count: r.count,
           })),
         ),
-        this.getSystemFieldNumericStats(rest, 'farmer.age'),
-        this.getSystemFieldNumericStats(rest, 'farmer.experienceYears'),
+        this.getSystemFieldNumericStats(rest, 'farmer.age', responseFilters),
+        this.getSystemFieldNumericStats(
+          rest,
+          'farmer.experienceYears',
+          responseFilters,
+        ),
       ]);
 
     return {
@@ -207,8 +254,13 @@ export class DashboardService {
     filters: DashboardFiltersDto,
     relation: 'actorType' | 'crop',
     idField: string,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<DashboardOverviewBucketDto[]> {
-    const rows = await this.buildFilteredSurveyQuery(filters)
+    const rows = await this.buildFilteredSurveyQuery(
+      filters,
+      undefined,
+      responseFilters,
+    )
       .innerJoin(`survey.${relation}`, relation)
       .select(`${relation}.${idField}`, 'id')
       .addSelect(`${relation}.name`, 'name')
@@ -225,6 +277,7 @@ export class DashboardService {
   private async getSystemFieldNumericStats(
     filters: DashboardFiltersDto,
     systemField: string,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationNumericDto | null> {
     const question = await this.questionRepo.findOne({
       where: { systemField },
@@ -235,10 +288,16 @@ export class DashboardService {
       question,
       'numeric',
       filters,
+      responseFilters,
     );
     if (answeredCount < MIN_SAMPLE_THRESHOLD) return null;
 
-    return this.aggregateNumeric(question, filters, answeredCount);
+    return this.aggregateNumeric(
+      question,
+      filters,
+      answeredCount,
+      responseFilters,
+    );
   }
 
   async getAnalytics(
@@ -257,14 +316,20 @@ export class DashboardService {
       filters,
       categoryInstruments,
     );
+    const responseFilters = await this.resolveResponseFilters(filters);
 
     const totalCount = await this.buildFilteredSurveyQuery(
       filters,
       categoryInstrumentIds,
+      responseFilters,
     ).getCount();
     const dateRange =
       totalCount > 0
-        ? await this.getDateRange(filters, categoryInstrumentIds)
+        ? await this.getDateRange(
+            filters,
+            categoryInstrumentIds,
+            responseFilters,
+          )
         : null;
 
     const metadata = {
@@ -304,7 +369,9 @@ export class DashboardService {
 
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
-      dashboardQuestions.push(await this.aggregateQuestion(question, filters));
+      dashboardQuestions.push(
+        await this.aggregateQuestion(question, filters, responseFilters),
+      );
     }
 
     return { metadata, suppressed: false, questions: dashboardQuestions };
@@ -438,6 +505,86 @@ export class DashboardService {
   }
 
   /**
+   * Spec 43 (Fase 3, D3): resuelve, una sola vez por request, la pregunta
+   * fuente de cada filtro global derivado de respuestas presente en
+   * `filters`. Se resuelve por separado de `applySurveyFilters` (que se
+   * llama muchas veces por request, una por pregunta agregada) para no
+   * repetir estas consultas de catálogo en cada llamada.
+   */
+  private async resolveResponseFilters(
+    filters: DashboardFiltersDto,
+  ): Promise<ResolvedResponseFilters> {
+    const present = RESPONSE_FILTER_SOURCES.filter(
+      (source) => filters[source.key] !== undefined,
+    );
+    if (present.length === 0) return [];
+
+    const resolved: ResolvedResponseFilter[] = [];
+
+    for (const source of present) {
+      const question =
+        source.locate === 'systemField'
+          ? await this.questionRepo.findOne({
+              where: { systemField: source.systemField },
+            })
+          : await this.findQuestionByInstrumentAndText(
+              source.instrumentCode,
+              source.questionText,
+            );
+
+      if (!question) return 'impossible';
+
+      if (source.matchType === 'range') {
+        const bucket = filters[source.key] as AgeRangeBucket;
+        resolved.push({
+          key: source.key,
+          questionId: question.questionId,
+          matchType: 'range',
+          range: AGE_RANGE_BOUNDS[bucket],
+        });
+      } else if (source.matchType === 'multiOption') {
+        const optionTexts = (filters[source.key] as string)
+          .split(',')
+          .map((text) => text.trim())
+          .filter(Boolean);
+        resolved.push({
+          key: source.key,
+          questionId: question.questionId,
+          matchType: 'multiOption',
+          optionTexts,
+        });
+      } else {
+        resolved.push({
+          key: source.key,
+          questionId: question.questionId,
+          matchType: 'option',
+          optionTexts: [(filters[source.key] as string).trim()],
+        });
+      }
+    }
+
+    return resolved;
+  }
+
+  /** Localiza una pregunta sin `systemField` dedicado por instrumento + texto exacto (D3). */
+  private async findQuestionByInstrumentAndText(
+    instrumentCode: string,
+    text: string,
+  ): Promise<Question | null> {
+    return this.questionRepo
+      .createQueryBuilder('question')
+      .innerJoin('question.section', 'section')
+      .innerJoin(
+        'section.instrument',
+        'instrument',
+        'instrument.code = :instrumentCode',
+        { instrumentCode },
+      )
+      .where('question.text = :text', { text })
+      .getOne();
+  }
+
+  /**
    * `undefined` cuando `filters.categoryId` no se pidió (sin filtro de
    * instrumento); un array — posiblemente vacío — cuando sí se pidió, para
    * que `applySurveyFilters` distinga "sin categoría" de "categoría sin
@@ -469,6 +616,7 @@ export class DashboardService {
     qb: SelectQueryBuilder<T>,
     filters: DashboardFiltersDto,
     categoryInstrumentIds?: string[],
+    responseFilters: ResolvedResponseFilters = [],
   ): void {
     if (filters.instrumentId) {
       qb.innerJoin(
@@ -505,26 +653,109 @@ export class DashboardService {
         actorTypeId: filters.actorTypeId,
       });
     }
+    if (filters.campaignId) {
+      qb.innerJoin(
+        'survey.campaignSession',
+        'campaignSession',
+        'campaignSession.campaign = :campaignId',
+        { campaignId: filters.campaignId },
+      );
+    }
+    if (filters.dateFrom) {
+      qb.andWhere('survey.createdAt >= :dateFrom', {
+        dateFrom: new Date(filters.dateFrom),
+      });
+    }
+    if (filters.dateTo) {
+      // Límite superior exclusivo del día siguiente: dateTo es inclusivo del
+      // día calendario completo, no solo de su medianoche.
+      const dateToExclusive = new Date(filters.dateTo);
+      dateToExclusive.setDate(dateToExclusive.getDate() + 1);
+      qb.andWhere('survey.createdAt < :dateToExclusive', { dateToExclusive });
+    }
+
+    this.applyResponseFilters(qb, responseFilters);
+  }
+
+  /**
+   * Spec 43 (Fase 3, D3): aplica los filtros globales ya resueltos por
+   * `resolveResponseFilters` como subconsultas independientes sobre
+   * `responses` — una por filtro presente, unidas por AND entre filtros
+   * distintos y por OR entre los valores de un mismo filtro múltiple
+   * (`multiOption`). `'impossible'` fuerza cero resultados: al menos un
+   * filtro solicitado no tiene pregunta fuente en esta base.
+   */
+  private applyResponseFilters<T extends object>(
+    qb: SelectQueryBuilder<T>,
+    responseFilters: ResolvedResponseFilters,
+  ): void {
+    if (responseFilters === 'impossible') {
+      qb.andWhere('1 = 0');
+      return;
+    }
+
+    responseFilters.forEach((filter, index) => {
+      const questionParam = `respFilter${index}QuestionId`;
+
+      if (filter.matchType === 'range') {
+        const { min, max } = filter.range ?? {};
+        const conditions = ['r.question_id = :' + questionParam];
+        const params: Record<string, unknown> = {
+          [questionParam]: filter.questionId,
+        };
+        if (min !== undefined) {
+          const minParam = `respFilter${index}Min`;
+          conditions.push(`r.numeric_value >= :${minParam}`);
+          params[minParam] = min;
+        }
+        if (max !== undefined) {
+          const maxParam = `respFilter${index}Max`;
+          conditions.push(`r.numeric_value < :${maxParam}`);
+          params[maxParam] = max;
+        }
+        qb.andWhere(
+          `survey.surveyId IN (SELECT r.survey_id FROM responses r WHERE ${conditions.join(' AND ')})`,
+          params,
+        );
+      } else {
+        const optionsParam = `respFilter${index}Options`;
+        qb.andWhere(
+          `survey.surveyId IN (SELECT r.survey_id FROM responses r INNER JOIN options_question o ON o.option_id = r.option_id WHERE r.question_id = :${questionParam} AND o.text IN (:...${optionsParam}))`,
+          {
+            [questionParam]: filter.questionId,
+            [optionsParam]: filter.optionTexts ?? [],
+          },
+        );
+      }
+    });
   }
 
   private buildFilteredSurveyQuery(
     filters: DashboardFiltersDto,
     categoryInstrumentIds?: string[],
+    responseFilters: ResolvedResponseFilters = [],
   ): SelectQueryBuilder<Survey> {
     const qb = this.surveyRepo
       .createQueryBuilder('survey')
       .where('survey.sincronized = true');
-    this.applySurveyFilters(qb, filters, categoryInstrumentIds);
+    this.applySurveyFilters(
+      qb,
+      filters,
+      categoryInstrumentIds,
+      responseFilters,
+    );
     return qb;
   }
 
   private async getDateRange(
     filters: DashboardFiltersDto,
     categoryInstrumentIds?: string[],
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<{ from: string; to: string } | null> {
     const raw = await this.buildFilteredSurveyQuery(
       filters,
       categoryInstrumentIds,
+      responseFilters,
     )
       .select('MIN(survey.createdAt)', 'from')
       .addSelect('MAX(survey.createdAt)', 'to')
@@ -541,13 +772,14 @@ export class DashboardService {
   private buildResponseBaseQuery(
     questionId: string,
     filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters = [],
   ): SelectQueryBuilder<Response> {
     const qb = this.responseRepo
       .createQueryBuilder('response')
       .innerJoin('response.survey', 'survey')
       .where('response.question = :questionId', { questionId })
       .andWhere('survey.sincronized = true');
-    this.applySurveyFilters(qb, filters);
+    this.applySurveyFilters(qb, filters, undefined, responseFilters);
     return qb;
   }
 
@@ -641,11 +873,17 @@ export class DashboardService {
   private async aggregateQuestion(
     question: Question,
     filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<DashboardQuestionDto> {
     const typeName = question.type.name;
     const isInverted = (question.systemField ?? '').startsWith('inverted:');
 
-    const answeredCount = await this.countAnswered(question, typeName, filters);
+    const answeredCount = await this.countAnswered(
+      question,
+      typeName,
+      filters,
+      responseFilters,
+    );
 
     const base = {
       questionId: question.questionId,
@@ -667,6 +905,7 @@ export class DashboardService {
       filters,
       isInverted,
       answeredCount,
+      responseFilters,
     );
 
     return { ...base, suppressed: false, aggregation };
@@ -676,8 +915,13 @@ export class DashboardService {
     question: Question,
     typeName: string,
     filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<number> {
-    const qb = this.buildResponseBaseQuery(question.questionId, filters);
+    const qb = this.buildResponseBaseQuery(
+      question.questionId,
+      filters,
+      responseFilters,
+    );
 
     if (typeName === 'numeric') {
       qb.andWhere('response.numericValue IS NOT NULL');
@@ -705,18 +949,30 @@ export class DashboardService {
     filters: DashboardFiltersDto,
     isInverted: boolean,
     answeredCount: number,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<DashboardAggregation> {
     switch (typeName) {
       case 'yes_no':
-        return this.aggregateYesNo(question, filters, answeredCount);
+        return this.aggregateYesNo(
+          question,
+          filters,
+          answeredCount,
+          responseFilters,
+        );
       case 'numeric':
-        return this.aggregateNumeric(question, filters, answeredCount);
+        return this.aggregateNumeric(
+          question,
+          filters,
+          answeredCount,
+          responseFilters,
+        );
       case 'likert':
         return this.aggregateLikert(
           question,
           filters,
           isInverted,
           answeredCount,
+          responseFilters,
         );
       case 'single_choice':
       case 'multiple_choice':
@@ -726,6 +982,7 @@ export class DashboardService {
           filters,
           typeName,
           answeredCount,
+          responseFilters,
         );
       default:
         throw new Error(`Tipo de pregunta no soportado: ${typeName}`);
@@ -736,8 +993,13 @@ export class DashboardService {
     question: Question,
     filters: DashboardFiltersDto,
     answeredCount: number,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationYesNoDto> {
-    const raw = await this.buildResponseBaseQuery(question.questionId, filters)
+    const raw = await this.buildResponseBaseQuery(
+      question.questionId,
+      filters,
+      responseFilters,
+    )
       .andWhere('response.booleanValue = true')
       .getCount();
 
@@ -758,13 +1020,18 @@ export class DashboardService {
     filters: DashboardFiltersDto,
     typeName: string,
     answeredCount: number,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationChoicesDto> {
     const countExpression =
       typeName === 'multiple_choice'
         ? 'COUNT(DISTINCT response.survey)'
         : 'COUNT(response.responseId)';
 
-    const rows = await this.buildResponseBaseQuery(question.questionId, filters)
+    const rows = await this.buildResponseBaseQuery(
+      question.questionId,
+      filters,
+      responseFilters,
+    )
       .innerJoin('response.option', 'option')
       .select('option.optionId', 'optionId')
       .addSelect('option.text', 'text')
@@ -803,8 +1070,13 @@ export class DashboardService {
     filters: DashboardFiltersDto,
     isInverted: boolean,
     answeredCount: number,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationLikertDto> {
-    const rows = await this.buildResponseBaseQuery(question.questionId, filters)
+    const rows = await this.buildResponseBaseQuery(
+      question.questionId,
+      filters,
+      responseFilters,
+    )
       .innerJoin('response.option', 'option')
       .select('option.optionId', 'optionId')
       .addSelect('option.text', 'text')
@@ -858,10 +1130,12 @@ export class DashboardService {
     question: Question,
     filters: DashboardFiltersDto,
     answeredCount: number,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationNumericDto> {
     const stats = await this.buildResponseBaseQuery(
       question.questionId,
       filters,
+      responseFilters,
     )
       .andWhere('response.numericValue IS NOT NULL')
       .select('AVG(response.numericValue)', 'average')
@@ -889,6 +1163,7 @@ export class DashboardService {
       const valueRows = await this.buildResponseBaseQuery(
         question.questionId,
         filters,
+        responseFilters,
       )
         .andWhere('response.numericValue IS NOT NULL')
         .select('response.numericValue', 'value')
