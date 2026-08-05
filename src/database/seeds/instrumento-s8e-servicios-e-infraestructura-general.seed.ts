@@ -101,6 +101,7 @@ export async function seedInstrumentoS8eServiciosEInfraestructuraGeneral(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S8E',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

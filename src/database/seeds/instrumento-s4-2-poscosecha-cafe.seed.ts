@@ -101,6 +101,7 @@ export async function seedInstrumentoS42PoscosechaCafe(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S4.2',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

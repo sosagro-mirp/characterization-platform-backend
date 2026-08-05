@@ -101,7 +101,7 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(
       version: VERSION,
       publishDate: '2026-06-25',
       isActive: false,
-      code: 'S2',
+      code: 'S1b',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

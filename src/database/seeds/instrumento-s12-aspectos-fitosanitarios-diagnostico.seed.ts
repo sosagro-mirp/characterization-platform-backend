@@ -101,6 +101,7 @@ export async function seedInstrumentoS12AspectosFitosanitariosDiagnostico(
       version: VERSION,
       publishDate: '2026-06-19',
       isActive: false,
+      code: 'S12',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

@@ -95,6 +95,7 @@ export async function seedInstrumentoS26BloqueCannabis(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S2.6',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
