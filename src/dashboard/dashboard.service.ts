@@ -56,8 +56,12 @@ import {
   InstitutionTrustItemDto,
   LikertRankingItemDto,
 } from './dto/dashboard-digital-demand.dto';
-
-const MIN_SAMPLE_THRESHOLD = 5;
+import {
+  DENIED_SYSTEM_FIELDS,
+  EXCLUDED_QUESTION_TYPES,
+  MIN_SAMPLE_THRESHOLD,
+  suppressCell,
+} from './dashboard-privacy.config';
 
 /**
  * Spec 43 (Fase 3): filtros globales derivados de respuestas, ya resueltos a
@@ -75,21 +79,6 @@ type ResolvedResponseFilter = {
   optionTexts?: string[];
 };
 type ResolvedResponseFilters = ResolvedResponseFilter[] | 'impossible';
-
-const EXCLUDED_QUESTION_TYPES = [
-  'open_text',
-  'image',
-  'voice_recording',
-  'document',
-  'video',
-];
-
-const DENIED_SYSTEM_FIELDS = [
-  'farm.latitude',
-  'farm.longitude',
-  'farm.name',
-  'farm.vereda',
-];
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
@@ -1114,14 +1103,22 @@ export class DashboardService {
       }>();
 
     const options = rows
-      .map((row) => ({
-        optionId: row.optionId,
-        text: row.text,
-        value: row.value !== null ? Number(row.value) : null,
-        count: Number(row.count),
-        percentage: round2((Number(row.count) / answeredCount) * 100),
-      }))
-      .sort((a, b) => b.count - a.count);
+      .map((row) => {
+        const rawCount = Number(row.count);
+        const rawPercentage = round2((rawCount / answeredCount) * 100);
+        return {
+          optionId: row.optionId,
+          text: row.text,
+          value: row.value !== null ? Number(row.value) : null,
+          // D2 (spec 66): orden y "top" se deciden sobre el conteo real, no
+          // sobre el valor ya suprimido — una celda suprimida no deja de
+          // existir, solo deja de mostrarse. `_rawCount` no viaja al DTO.
+          _rawCount: rawCount,
+          ...suppressCell(rawCount, rawPercentage),
+        };
+      })
+      .sort((a, b) => b._rawCount - a._rawCount)
+      .map(({ _rawCount: _discard, ...option }) => option);
 
     return {
       type: typeName as 'single_choice' | 'multiple_choice' | 'compliance',
@@ -1173,12 +1170,15 @@ export class DashboardService {
         scoredCount += count;
       }
 
+      // D2 (spec 66): meanScore arriba ya usó el conteo real (count, no
+      // suprimido) — es un agregado único legítimo sobre toda la muestra.
+      // Lo que se suprime es la exposición por nivel individual.
+      const percentage = round2((count / answeredCount) * 100);
       return {
         optionId: row.optionId,
         text: row.text,
         value: hasScore ? rawValue : null,
-        count,
-        percentage: round2((count / answeredCount) * 100),
+        ...suppressCell(count, percentage),
       };
     });
 
@@ -1645,12 +1645,15 @@ export class DashboardService {
             weightedSum += score * count;
             scoredCount += count;
           }
+          // D2 (spec 66): meanScore arriba ya usó el conteo real; solo se
+          // suprime la exposición por banda individual (mismo criterio que
+          // aggregateLikert, que esta función reimplementa en batch).
+          const percentage = round2((count / answeredCount) * 100);
           return {
             optionId: row.optionId,
             text: row.text,
             value: hasScore ? rawValue : null,
-            count,
-            percentage: round2((count / answeredCount) * 100),
+            ...suppressCell(count, percentage),
           };
         })
         .sort((a, b) => (a.value ?? 0) - (b.value ?? 0));

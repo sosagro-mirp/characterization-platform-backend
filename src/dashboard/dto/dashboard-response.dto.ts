@@ -65,9 +65,32 @@ export class DashboardMetadataDto {
 export class AggregationOptionDto {
   @ApiProperty() optionId: string;
   @ApiProperty() text: string;
-  @ApiProperty() count: number;
-  @ApiProperty() percentage: number;
+
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      'null si suppressed=true (spec 66, D2): la celda tiene menos de MIN_CELL_SIZE ' +
+      'respondientes y no se expone, aunque la muestra total supere el umbral global.',
+  })
+  count: number | null;
+
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null si suppressed=true, mismo criterio que count.',
+  })
+  percentage: number | null;
+
   @ApiProperty({ nullable: true, type: Number }) value: number | null;
+
+  @ApiProperty({
+    description:
+      'true si esta opción tiene menos de MIN_CELL_SIZE respondientes (spec 66, D2) ' +
+      'y por lo tanto count/percentage vienen en null. Nunca se representa como 0 ' +
+      'ni se omite del listado en silencio.',
+  })
+  suppressed: boolean;
 }
 
 export class AggregationYesNoDto {
