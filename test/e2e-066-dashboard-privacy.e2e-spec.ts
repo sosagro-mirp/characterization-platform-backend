@@ -228,7 +228,9 @@ describe('e2e-066 — Privacidad del dashboard público', () => {
       // ver `dashboard-filters.dto.ts`) y un `departmentId` inexistente
       // devuelve 404, no una respuesta suprimida — se usa en su lugar una
       // categoría con cero encuestas reales hoy en el entorno de desarrollo
-      // (C4, verificado antes de este test).
+      // (C4 "Suelo, clima y fertilización" — S3, todavía inactivo en dev —,
+      // verificado antes de este test; era "Cultivos y variedades" antes de
+      // la renumeración en cascada de spec 66, Fase 3, D7, 2026-08-10).
       const res = await request(server)
         .get('/api/dashboard/analytics')
         .query({ categoryId: 'C4' })
