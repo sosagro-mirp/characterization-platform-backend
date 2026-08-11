@@ -189,6 +189,16 @@ export class DashboardQuestionDto {
   systemField: string | null;
 
   @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Gráfica curada explícitamente para esta pregunta (spec 66, D3), ' +
+      'p. ej. "harvest-calendar". Null si no se curó ninguna — el frontend ' +
+      'cae al comportamiento por tipo de pregunta.',
+  })
+  chartHint: string | null;
+
+  @ApiProperty({
     description:
       'true si systemField empieza por "inverted:" (escala likert invertida).',
   })
