@@ -21,13 +21,16 @@ export class DashboardFiltersDto {
 
   @ApiPropertyOptional({
     description:
-      'Filtra por categoría temática (C1–C15, spec 43). Agrega las preguntas de todos los instrumentos activos de la categoría. Mutuamente excluyente con instrumentId.',
-    example: 'C15',
+      // Spec 66 (Fase 3, D7, 2026-08-10): C1–C14, no C1–C15 — fusión de
+      // "Perfil del productor" + "La finca" en una sola categoría (C1) y
+      // renumeración en cascada de las siguientes.
+      'Filtra por categoría temática (C1–C14, spec 43/66). Agrega las preguntas de todos los instrumentos activos de la categoría. Mutuamente excluyente con instrumentId.',
+    example: 'C1',
   })
   @IsOptional()
   @IsString()
-  @Matches(/^C([1-9]|1[0-5])$/, {
-    message: 'categoryId debe tener el formato C1..C15.',
+  @Matches(/^C([1-9]|1[0-4])$/, {
+    message: 'categoryId debe tener el formato C1..C14.',
   })
   categoryId?: string;
 

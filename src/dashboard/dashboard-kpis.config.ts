@@ -6,10 +6,16 @@ import { QuestionLocator } from './dashboard-response-filters.config';
  * operación — nunca un valor hardcodeado del mockup, que era ilustrativo.
  *
  * Solo existen dos vistas curadas en el diseño (`1a` Resumen general, `2a`
- * Categoría C15): `getKpis` devuelve `OVERVIEW_KPIS` salvo que
- * `filters.categoryId === 'C15'`, en cuyo caso devuelve `C15_KPIS`. Ninguna
- * otra categoría tiene tira de KPIs propia todavía (fuera de alcance de esta
- * fase; ver nota en el spec).
+ * Categoría de demanda digital): `getKpis` devuelve `OVERVIEW_KPIS` salvo
+ * que `filters.categoryId === 'C14'`, en cuyo caso devuelve
+ * `DIGITAL_DEMAND_KPIS`. Ninguna otra categoría tiene tira de KPIs propia
+ * todavía (fuera de alcance de esta fase; ver nota en el spec).
+ *
+ * Nota (spec 66, Fase 3, D7, 2026-08-10): la categoría de demanda digital
+ * era `C15` antes de fusionar "Perfil del productor" + "La finca" en una
+ * sola categoría (C1) — la renumeración en cascada la dejó en `C14`. La
+ * constante se renombró de `C15_KPIS` a `DIGITAL_DEMAND_KPIS` para no
+ * mentir sobre a qué categoría corresponde.
  *
  * "Avance campaña" (KPI del mockup de `1a`) se **excluye**: `Campaign` no
  * tiene un campo de meta/objetivo en el esquema actual y este spec no agrega
@@ -75,7 +81,7 @@ export const OVERVIEW_KPIS: KpiDefinition[] = [
   ACCEPTANCE_INDEX,
 ];
 
-export const C15_KPIS: KpiDefinition[] = [
+export const DIGITAL_DEMAND_KPIS: KpiDefinition[] = [
   ACCEPTANCE_INDEX,
   {
     key: 'hasSmartphone',
@@ -140,7 +146,7 @@ export const C15_KPIS: KpiDefinition[] = [
   },
 ];
 
-/** Fase 4: preguntas fuente de la vista "Demanda digital" (C15), fuera del
+/** Fase 4: preguntas fuente de la vista "Demanda digital" (C14), fuera del
  * catálogo de filtros de Fase 3 porque no son filtros sino agregados. */
 export const DIGITAL_DEMAND_SOURCES = {
   strategicSystemField: 'Pregunta estratégica de caracterización tecnológica',

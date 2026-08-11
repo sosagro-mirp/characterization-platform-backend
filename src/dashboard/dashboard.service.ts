@@ -43,7 +43,7 @@ import {
   ResponseFilterSource,
 } from './dashboard-response-filters.config';
 import {
-  C15_KPIS,
+  DIGITAL_DEMAND_KPIS,
   DIGITAL_DEMAND_SOURCES,
   KpiDefinition,
   OVERVIEW_KPIS,
@@ -62,6 +62,10 @@ import {
   MIN_SAMPLE_THRESHOLD,
   suppressCell,
 } from './dashboard-privacy.config';
+import {
+  isQuestionHidden,
+  resolveCuratedChartHint,
+} from './dashboard-question-curation.config';
 
 /**
  * Spec 43 (Fase 3): filtros globales derivados de respuestas, ya resueltos a
@@ -380,6 +384,18 @@ export class DashboardService {
           categoryInstruments,
         ));
     }
+
+    // D4 (spec 66): curaduría editorial — una pregunta oculta sigue siendo
+    // elegible por privacidad/tipo, pero se decidió con el usuario que no
+    // aporta valor analítico al dashboard público (ver
+    // dashboard-question-curation.config.ts).
+    questions = questions.filter(
+      (question) =>
+        !isQuestionHidden(
+          instrumentByQuestionId.get(question.questionId)?.code,
+          question.text,
+        ),
+    );
 
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
@@ -943,6 +959,9 @@ export class DashboardService {
       systemField: question.systemField ?? null,
       isInverted,
       answeredCount,
+      // D3 (spec 66): gráfica curada explícitamente para esta pregunta, si
+      // la hay — el frontend cae al comportamiento por tipo cuando es null.
+      chartHint: resolveCuratedChartHint(instrument?.code, question.text),
       // D9 (spec 43, Fase 7): procedencia por pregunta — necesaria para que
       // una vista de categoría (que agrega varios instrumentos) pueda
       // etiquetar de dónde viene cada tarjeta.
@@ -1255,17 +1274,22 @@ export class DashboardService {
 
   /**
    * D5: tira de KPIs curados. Solo existen dos vistas curadas en el diseño
-   * (`categoryId=C15` → `C15_KPIS`; cualquier otro caso, incluida la vista
-   * de resumen general, → `OVERVIEW_KPIS`). `instrumentId`/`categoryId` se
-   * descartan de los filtros reales de cada KPI (cada uno ya declara su
-   * propia pregunta fuente — igual que `getOverview`, D2) y solo se usa
-   * `categoryId` para elegir qué catálogo de KPIs devolver.
+   * (`categoryId=C14` → `DIGITAL_DEMAND_KPIS`; cualquier otro caso,
+   * incluida la vista de resumen general, → `OVERVIEW_KPIS`).
+   * `instrumentId`/`categoryId` se descartan de los filtros reales de cada
+   * KPI (cada uno ya declara su propia pregunta fuente — igual que
+   * `getOverview`, D2) y solo se usa `categoryId` para elegir qué catálogo
+   * de KPIs devolver.
+   *
+   * Nota (spec 66, Fase 3, D7, 2026-08-10): era `categoryId=C15` antes de la
+   * renumeración en cascada al fusionar C1+C3.
    */
   async getKpis(filters: DashboardFiltersDto): Promise<DashboardKpiDto[]> {
     const { categoryId, instrumentId: _instrumentId, ...rest } = filters;
     await this.validateFilters(rest);
     const responseFilters = await this.resolveResponseFilters(rest);
-    const definitions = categoryId === 'C15' ? C15_KPIS : OVERVIEW_KPIS;
+    const definitions =
+      categoryId === 'C14' ? DIGITAL_DEMAND_KPIS : OVERVIEW_KPIS;
 
     const kpis: DashboardKpiDto[] = [];
     for (const definition of definitions) {
@@ -1891,7 +1915,7 @@ export class DashboardService {
   }
 
   /**
-   * D4: vista consolidada "Demanda digital" (C15). `instrumentId`/`categoryId`
+   * D4: vista consolidada "Demanda digital" (C14). `instrumentId`/`categoryId`
    * se descartan de los filtros reales (esta consolidación siempre cruza los
    * mismos instrumentos — S_DCU, S11 y las baterías ★ transversales — nunca
    * "otro" instrumento; mismo criterio D2 que `getOverview`/`getKpis`).
