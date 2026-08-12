@@ -317,6 +317,14 @@ export const QUESTION_CURATION: QuestionCurationEntry[] = [
       '2026-08-11): decisión del usuario — no va en el dashboard público.',
   },
   {
+    instrumentCode: 'S2.6',
+    questionText: '¿Cuenta con alguna certificación o está en proceso?',
+    hidden: true,
+    note:
+      'C3 · Cultivos y variedades, Bloque Cannabis (spec 66, Fase 5, ' +
+      '2026-08-11): decisión del usuario — no va en el dashboard público.',
+  },
+  {
     instrumentCode: 'S2.5',
     questionText: '¿Tiene registros productivos históricos?',
     hidden: true,
