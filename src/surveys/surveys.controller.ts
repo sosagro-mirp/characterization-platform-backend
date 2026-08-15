@@ -171,12 +171,14 @@ export class SurveysController {
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({
-    summary: 'Sobrescribir survey anterior y crear uno nuevo vacío',
+    summary: 'Descartar un survey duplicado',
     description:
-      'Elimina el survey duplicado (y sus respuestas en cascada), crea un survey nuevo vacío ' +
-      'con el mismo instrumento y stepOrder en la sesión activa. Retorna { surveyId } del nuevo survey.',
+      'Elimina el survey duplicado (y sus respuestas en cascada). No crea ningún survey de ' +
+      'reemplazo — el cliente inicia el nuevo con POST /api/surveys recién cuando exista al ' +
+      'menos una respuesta (spec 70: evita dejar una fila vacía huérfana si el encuestador ' +
+      'abandona después de sobrescribir). Retorna { discardedSurveyId } del survey eliminado.',
   })
-  @ApiResponse({ status: 201, description: '{ surveyId: string }' })
+  @ApiResponse({ status: 201, description: '{ discardedSurveyId: string }' })
   @ApiResponse({
     status: 400,
     description: 'El survey no pertenece a la misma campaña que la sesión.',

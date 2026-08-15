@@ -444,9 +444,15 @@ export class SurveysService {
     return { hasDuplicate: true, surveyId: row.surveyId };
   }
 
+  // Spec 70, Fase 4 — solo descarta el duplicado; ya no crea la encuesta de
+  // reemplazo. Crearla aquí, vacía, era uno de los vectores que dejaban
+  // encuestas huérfanas cuando el encuestador abandonaba tras sobrescribir.
+  // El cliente inicia el reemplazo con `beginSurvey()` (mobile), igual que
+  // cualquier otro inicio de instrumento — el registro real solo se crea al
+  // sincronizar, cuando exista al menos una respuesta.
   async overwriteSurvey(
     dto: OverwriteSurveyDto,
-  ): Promise<{ surveyId: string }> {
+  ): Promise<{ discardedSurveyId: string }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId: dto.surveyId },
       relations: ['instruments', 'campaignSession', 'campaignSession.campaign'],
@@ -469,23 +475,12 @@ export class SurveysService {
       );
     }
 
-    const instrument = await this.instrumentsRepository.findOne({
-      where: { instrumentId: dto.instrumentId },
-    });
-    if (!instrument) throw new NotFoundException('Instrument not found');
-
     // Clear pivot table rows before removing to avoid FK constraint violations
     survey.instruments = [];
     await this.surveysRepository.save(survey);
     await this.surveysRepository.remove(survey);
 
-    const newSurvey = this.surveysRepository.create({
-      campaignSession: targetSession,
-      instruments: [instrument],
-      stepOrder: dto.stepOrder,
-    });
-    const saved = await this.surveysRepository.save(newSurvey);
-    return { surveyId: saved.surveyId };
+    return { discardedSurveyId: dto.surveyId };
   }
 
   async skipStep(dto: SkipStepDto): Promise<{ surveyId: string }> {
