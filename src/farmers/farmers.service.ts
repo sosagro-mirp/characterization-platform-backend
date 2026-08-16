@@ -174,10 +174,18 @@ export class FarmersService {
   async remove(id: string): Promise<void> {
     const farmer = await this.findOne(id);
 
-    const [sessionsCount, surveysCount] = await Promise.all([
-      this.sessionsRepository.count({ where: { farmer: { id } } }),
-      this.surveysRepository.count({ where: { farmer: { id } } }),
-    ]);
+    const [sessionsCount, surveysCount, documentCollisionsCount] =
+      await Promise.all([
+        this.sessionsRepository.count({ where: { farmer: { id } } }),
+        this.surveysRepository.count({ where: { farmer: { id } } }),
+        // Spec 68 — farmer_document_collisions.existing_farmer_id también
+        // referencia a farmers con ON DELETE RESTRICT; sin este conteo caía en
+        // la red de seguridad genérica de abajo (409 con blockedBy vacío) en
+        // vez de decir explícitamente qué lo bloquea.
+        this.documentCollisionsRepository.count({
+          where: { existingFarmer: { id } },
+        }),
+      ]);
 
     const blockedBy: BlockedByEntry[] = [];
     if (sessionsCount > 0) {
@@ -185,6 +193,12 @@ export class FarmersService {
     }
     if (surveysCount > 0) {
       blockedBy.push({ resource: 'surveys', count: surveysCount });
+    }
+    if (documentCollisionsCount > 0) {
+      blockedBy.push({
+        resource: 'farmer_document_collisions',
+        count: documentCollisionsCount,
+      });
     }
 
     if (blockedBy.length > 0) {

@@ -34,6 +34,8 @@ const DOC_COLLISION = '9068000001';
 const DOC_SAME_PERSON = '9068000002';
 const DOC_SEPARATE = '9068000003';
 const DOC_BATTERY = '9068000004';
+const DOC_SEPARATE_THIRD_PARTY = '9068000005';
+const DOC_SEPARATE_REGRESSION = '9068000006';
 
 const NAME_P1 = 'Santiago Suarez Cortes';
 const NAME_P2 = 'Karol Vanessa Quintero Marin';
@@ -105,6 +107,7 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
   let sectionId: string;
   let questionNameId: string;
   let questionDocumentId: string;
+  let questionPhoneId: string;
 
   const surveyIdsCreated: string[] = [];
   const documentsUsed: string[] = [
@@ -112,6 +115,8 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
     DOC_SAME_PERSON,
     DOC_SEPARATE,
     DOC_BATTERY,
+    DOC_SEPARATE_THIRD_PARTY,
+    DOC_SEPARATE_REGRESSION,
   ];
 
   async function createSurvey(): Promise<string> {
@@ -123,19 +128,24 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
     return surveyId;
   }
 
-  /** Crea una encuesta S1a-like con nombre + documento ya respondidos. */
+  /** Crea una encuesta S1a-like con nombre + documento (+ teléfono opcional) ya respondidos. */
   async function createIdentificationSurvey(
     name: string,
     documentId: string,
+    phone?: string,
   ): Promise<string> {
     const surveyId = await createSurvey();
+    const responses = [
+      { surveyId, questionId: questionNameId, textValue: name },
+      { surveyId, questionId: questionDocumentId, textValue: documentId },
+      ...(phone
+        ? [{ surveyId, questionId: questionPhoneId, textValue: phone }]
+        : []),
+    ];
     await request(app.getHttpServer())
       .post('/api/responses/batch')
       .set('Authorization', `Bearer ${pollsterToken}`)
-      .send([
-        { surveyId, questionId: questionNameId, textValue: name },
-        { surveyId, questionId: questionDocumentId, textValue: documentId },
-      ])
+      .send(responses)
       .expect(201);
     return surveyId;
   }
@@ -226,6 +236,14 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
       [sectionId, openTextTypeId],
     );
     questionDocumentId = qDoc[0].question_id;
+
+    const qPhone = await ds.query<{ question_id: string }[]>(
+      `INSERT INTO questions (question_id, section_id, text, type_id, is_required, "order", system_field)
+       VALUES (gen_random_uuid(), $1, 'E2E 068 Teléfono', $2, false, 3, 'farmer.phone')
+       RETURNING question_id`,
+      [sectionId, openTextTypeId],
+    );
+    questionPhoneId = qPhone[0].question_id;
   }, 60_000);
 
   afterAll(async () => {
@@ -392,6 +410,46 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
       expect(rows).toHaveLength(2);
       expect(rows[0].name).toBe(NAME_P1);
       expect(rows[1].name).toBe(NAME_P2);
+    });
+
+    // Regresión — hallazgo del @reviewer (docs/reports/auditorias/24-auditoria-backend-spec68.md):
+    // el nivel 2 de dedup (nombre + teléfono) corría igual dentro de la rama
+    // `separate_person`, así que si la respuesta traía un teléfono que
+    // coincidía por casualidad con OTRO farmer preexistente, ese farmer se
+    // reutilizaba (`existed: true`) en silencio en vez de crear uno nuevo —
+    // contradiciendo la decisión explícita del encuestador (criterio 5).
+    it('nunca reutiliza otro farmer por coincidencia de nombre+teléfono, ni con ese resolution', async () => {
+      const sharedPhone = '3009998877';
+      const thirdPartySurvey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_SEPARATE_THIRD_PARTY,
+        sharedPhone,
+      );
+      const thirdParty = await extractFarmer(thirdPartySurvey).expect(201);
+      const thirdPartyId = farmerIdOf(
+        (thirdParty.body as ExtractFarmerBody).farmer,
+      );
+
+      const surveyP1 = await createIdentificationSurvey(
+        NAME_P1,
+        DOC_SEPARATE_REGRESSION,
+      );
+      await extractFarmer(surveyP1).expect(201);
+
+      const surveyCollision = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_SEPARATE_REGRESSION,
+        sharedPhone,
+      );
+      await extractFarmer(surveyCollision).expect(409);
+
+      const res = await extractFarmer(surveyCollision, {
+        resolution: 'separate_person',
+      }).expect(201);
+      const body = res.body as ExtractFarmerBody;
+
+      expect(body.existed).toBe(false);
+      expect(farmerIdOf(body.farmer)).not.toBe(thirdPartyId);
     });
   });
 

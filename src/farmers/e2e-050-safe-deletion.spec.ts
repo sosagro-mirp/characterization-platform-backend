@@ -60,6 +60,7 @@ describe('FarmersService.remove — borrado seguro (spec 50)', () => {
   };
   let sessionsRepository: { count: jest.Mock };
   let surveysRepository: { count: jest.Mock };
+  let documentCollisionsRepository: { count: jest.Mock };
 
   const farmerFixture = { id: FARMER_ID, name: 'Rosalba TEST' };
 
@@ -70,6 +71,7 @@ describe('FarmersService.remove — borrado seguro (spec 50)', () => {
     };
     sessionsRepository = { count: jest.fn().mockResolvedValue(0) };
     surveysRepository = { count: jest.fn().mockResolvedValue(0) };
+    documentCollisionsRepository = { count: jest.fn().mockResolvedValue(0) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -82,7 +84,10 @@ describe('FarmersService.remove — borrado seguro (spec 50)', () => {
           useValue: sessionsRepository,
         },
         { provide: getRepositoryToken(Survey), useValue: surveysRepository },
-        { provide: getRepositoryToken(FarmerDocumentCollision), useValue: {} },
+        {
+          provide: getRepositoryToken(FarmerDocumentCollision),
+          useValue: documentCollisionsRepository,
+        },
       ],
     }).compile();
 
@@ -158,6 +163,30 @@ describe('FarmersService.remove — borrado seguro (spec 50)', () => {
     await expect(service.remove(FARMER_ID)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  // Regresión — hallazgo del @reviewer sobre spec 68
+  // (docs/reports/auditorias/24-auditoria-backend-spec68.md): la nueva FK de
+  // farmer_document_collisions.existing_farmer_id (ON DELETE RESTRICT) caía
+  // antes en la red de seguridad genérica de más abajo (409 con blockedBy
+  // vacío) en vez de nombrar explícitamente el recurso bloqueante.
+  it('spec 68: bloquea también por colisiones de documentId registradas, con el recurso nombrado', async () => {
+    documentCollisionsRepository.count.mockResolvedValue(1);
+
+    try {
+      await service.remove(FARMER_ID);
+      fail('se esperaba un ConflictException');
+    } catch (error) {
+      const response = (error as ConflictException).getResponse() as {
+        blockedBy?: { resource: string; count: number }[];
+      };
+      expect(response.blockedBy).toEqual(
+        expect.arrayContaining([
+          { resource: 'farmer_document_collisions', count: 1 },
+        ]),
+      );
+    }
+    expect(farmersRepository.remove).not.toHaveBeenCalled();
   });
 
   it('red de seguridad: traduce una violación de FK inesperada a ConflictException', async () => {

@@ -364,7 +364,9 @@ export class SurveysService {
             farmer = existingByDocument;
             existed = true;
           } else if (dto.resolution === 'separate_person') {
-            // Force the creation path below with this same documentId.
+            // Force the creation path below with this same documentId — the
+            // level 2 (name+phone) dedup right below is also skipped for
+            // this resolution, so this always creates a brand new farmer.
             farmer = null;
             existed = false;
           } else {
@@ -393,8 +395,15 @@ export class SurveysService {
       }
     }
 
-    // Level 2: dedup by name + phone (heuristic fallback when no documentId)
-    if (!farmer && farmerPhone) {
+    // Level 2: dedup by name + phone (heuristic fallback when no documentId).
+    // Spec 68 — skipped when `separate_person` forced the creation path
+    // above: that resolution means "always create a new farmer with this
+    // documentId", and letting this heuristic silently reuse a different
+    // pre-existing farmer instead (matched by name+phone) would contradict
+    // the encuestador's explicit decision and criterion 5, undetected —
+    // the collision would still get recorded as "separate_person" even
+    // though no new farmer was actually created.
+    if (!farmer && farmerPhone && dto.resolution !== 'separate_person') {
       farmer = await this.farmersRepository.findOne({
         where: { name: farmerName, phone: farmerPhone },
       });

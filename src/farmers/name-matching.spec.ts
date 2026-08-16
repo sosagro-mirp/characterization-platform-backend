@@ -1,8 +1,9 @@
 /**
  * Spec 68, Fase 1 — cobertura completa de la § "Batería de casos de nombres".
  * Fuente de verdad: `spec/68_colision_documentid_entre_agricultores.md`.
- * Esta misma tabla se replica en `mobile/src/__tests__/nameMatching.test.ts`
- * (el móvil reimplementa `isSameFarmerName` sin paquete compartido).
+ * Esta misma tabla se replica en `mobile/src/__tests__/e2e-068-documentIdCollision.test.ts`
+ * (el móvil reimplementa `isSameFarmerName` en `src/lib/nameMatching.ts`,
+ * sin paquete compartido entre los repositorios).
  */
 import { isSameFarmerName } from './name-matching';
 
@@ -55,20 +56,17 @@ describe('isSameFarmerName — batería de casos de nombres (spec 68)', () => {
       submitted: 'Santiago Suarez Marin',
       sameName: true,
     },
-    {
-      label: '11. puntuación',
-      submitted: 'Santiago Suarez Cortes.',
-      sameName: true,
-    },
-    {
-      label: '14. nombres cortos idénticos',
-      submitted: 'Santiago Suarez Cortes',
-      sameName: true,
-    },
   ];
 
   it.each(cases)('$label → $submitted', ({ submitted, sameName }) => {
     expect(isSameFarmerName(REGISTERED, submitted)).toBe(sameName);
+  });
+
+  // Caso 11 usa un par de nombres distinto al resto de la tabla (spec 68,
+  // fila 11: "Ana Maria Lopez" / "ana maria lopez.") — no encaja en el
+  // arreglo parametrizado de arriba, que compara siempre contra REGISTERED.
+  it('11. puntuación y mayúsculas', () => {
+    expect(isSameFarmerName('Ana Maria Lopez', 'ana maria lopez.')).toBe(true);
   });
 
   it('6. subconjunto en el sentido inverso', () => {
