@@ -10,17 +10,61 @@ const REGISTERED = 'Santiago Suarez Cortes';
 
 describe('isSameFarmerName — batería de casos de nombres (spec 68)', () => {
   const cases: { label: string; submitted: string; sameName: boolean }[] = [
-    { label: '1. persona distinta', submitted: 'Karol Vanessa Quintero Marin', sameName: false },
-    { label: '2. idéntico', submitted: 'Santiago Suarez Cortes', sameName: true },
-    { label: '3. tildes y mayúsculas', submitted: 'SANTIAGO SUAREZ CORTES', sameName: true },
-    { label: '4. espacios repetidos', submitted: 'Santiago  Suarez   Cortes', sameName: true },
-    { label: '5. subconjunto (apellido omitido)', submitted: 'Santiago Suarez', sameName: true },
-    { label: '7. error de tipeo dentro del umbral', submitted: 'Santigo Suarez Cortes', sameName: true },
-    { label: '8. otro primer nombre', submitted: 'Maria Suarez Cortes', sameName: false },
-    { label: '9. ningún apellido en común', submitted: 'Santiago Quintero Marin', sameName: false },
-    { label: '10. primer nombre + un apellido en común', submitted: 'Santiago Suarez Marin', sameName: true },
-    { label: '11. puntuación', submitted: 'Santiago Suarez Cortes.', sameName: true },
-    { label: '14. nombres cortos idénticos', submitted: 'Santiago Suarez Cortes', sameName: true },
+    {
+      label: '1. persona distinta',
+      submitted: 'Karol Vanessa Quintero Marin',
+      sameName: false,
+    },
+    {
+      label: '2. idéntico',
+      submitted: 'Santiago Suarez Cortes',
+      sameName: true,
+    },
+    {
+      label: '3. tildes y mayúsculas',
+      submitted: 'SANTIAGO SUAREZ CORTES',
+      sameName: true,
+    },
+    {
+      label: '4. espacios repetidos',
+      submitted: 'Santiago  Suarez   Cortes',
+      sameName: true,
+    },
+    {
+      label: '5. subconjunto (apellido omitido)',
+      submitted: 'Santiago Suarez',
+      sameName: true,
+    },
+    {
+      label: '7. error de tipeo dentro del umbral',
+      submitted: 'Santigo Suarez Cortes',
+      sameName: true,
+    },
+    {
+      label: '8. otro primer nombre',
+      submitted: 'Maria Suarez Cortes',
+      sameName: false,
+    },
+    {
+      label: '9. ningún apellido en común',
+      submitted: 'Santiago Quintero Marin',
+      sameName: false,
+    },
+    {
+      label: '10. primer nombre + un apellido en común',
+      submitted: 'Santiago Suarez Marin',
+      sameName: true,
+    },
+    {
+      label: '11. puntuación',
+      submitted: 'Santiago Suarez Cortes.',
+      sameName: true,
+    },
+    {
+      label: '14. nombres cortos idénticos',
+      submitted: 'Santiago Suarez Cortes',
+      sameName: true,
+    },
   ];
 
   it.each(cases)('$label → $submitted', ({ submitted, sameName }) => {
@@ -38,7 +82,9 @@ describe('isSameFarmerName — batería de casos de nombres (spec 68)', () => {
   it('13. sin nombre registrado no hay con qué comparar → conservador', () => {
     expect(isSameFarmerName('', 'Karol Vanessa Quintero Marin')).toBe(false);
     expect(isSameFarmerName(null, 'Karol Vanessa Quintero Marin')).toBe(false);
-    expect(isSameFarmerName(undefined, 'Karol Vanessa Quintero Marin')).toBe(false);
+    expect(isSameFarmerName(undefined, 'Karol Vanessa Quintero Marin')).toBe(
+      false,
+    );
     expect(isSameFarmerName(REGISTERED, '')).toBe(false);
   });
 

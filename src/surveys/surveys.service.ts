@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -11,6 +12,8 @@ import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session
 import { Department } from 'src/departments/entities/department.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
+import { FarmerDocumentCollision } from 'src/farmers/entities/farmer-document-collision.entity';
+import { isSameFarmerName } from 'src/farmers/name-matching';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
@@ -18,6 +21,7 @@ import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
 import { In, Repository } from 'typeorm';
 import { CreateSurveyDto } from './dto/create-survey.dto';
+import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
@@ -57,6 +61,8 @@ export class SurveysService {
     private readonly campaignSessionsRepository: Repository<CampaignSession>,
     @InjectRepository(Response)
     private readonly responsesRepository: Repository<Response>,
+    @InjectRepository(FarmerDocumentCollision)
+    private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
   ) {}
 
   async create(
@@ -237,6 +243,7 @@ export class SurveysService {
 
   async extractFarmer(
     surveyId: string,
+    dto: ExtractFarmerDto = {},
   ): Promise<{ farmer: Farmer; existed: boolean }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
@@ -332,13 +339,58 @@ export class SurveysService {
     // Dedup by two levels when Q9=false and producerDocumentId absent
     let farmer: Farmer | null = null;
     let existed = false;
+    // Farmer this documentId already belonged to, set only when a
+    // collision was detected — used below to record/resolve it.
+    let collisionWithFarmer: Farmer | null = null;
 
-    // Level 1: dedup by documentId (solid)
+    // Level 1: dedup by documentId. Spec 68 — a shared documentId is no
+    // longer treated as absolute identity ("solid"): if an existing farmer
+    // has that document but a name that doesn't reasonably match, this is a
+    // documentId collision (typo, reused test data, two different people),
+    // not automatically the same person. See farmers/name-matching.ts.
     if (farmerDocumentId) {
-      farmer = await this.farmersRepository.findOne({
+      const existingByDocument = await this.farmersRepository.findOne({
         where: { documentId: farmerDocumentId },
       });
-      if (farmer) existed = true;
+
+      if (existingByDocument) {
+        if (isSameFarmerName(existingByDocument.name, farmerName)) {
+          farmer = existingByDocument;
+          existed = true;
+        } else {
+          collisionWithFarmer = existingByDocument;
+
+          if (dto.resolution === 'same_person') {
+            farmer = existingByDocument;
+            existed = true;
+          } else if (dto.resolution === 'separate_person') {
+            // Force the creation path below with this same documentId.
+            farmer = null;
+            existed = false;
+          } else {
+            // No resolution declared — never fuse in silence. Record the
+            // (still-pending) collision and reject without mutating
+            // anything else (no farmer created/modified, no CampaignSession
+            // linked).
+            await this.upsertDocumentCollision({
+              documentId: farmerDocumentId,
+              submittedName: farmerName,
+              existingFarmer: existingByDocument,
+              resolution: null,
+            });
+            throw new ConflictException({
+              message:
+                'El documento ya está registrado a nombre de otra persona',
+              documentId: farmerDocumentId,
+              submittedName: farmerName,
+              existingFarmer: {
+                farmerId: existingByDocument.id,
+                name: existingByDocument.name,
+              },
+            });
+          }
+        }
+      }
     }
 
     // Level 2: dedup by name + phone (heuristic fallback when no documentId)
@@ -412,7 +464,58 @@ export class SurveysService {
       );
     }
 
+    // A resolution was declared for a previously-detected collision — record
+    // it as resolved (creates the row if this is the first and only call,
+    // e.g. a resolution submitted without a prior 409 round-trip).
+    if (collisionWithFarmer && dto.resolution) {
+      await this.upsertDocumentCollision({
+        documentId: farmerDocumentId!,
+        submittedName: farmerName,
+        existingFarmer: collisionWithFarmer,
+        resolution: dto.resolution,
+      });
+    }
+
     return { farmer, existed };
+  }
+
+  // Spec 68 — one pending (unresolved) row per (documentId, submittedName,
+  // existingFarmer) combination: a retry without a resolution (e.g. the
+  // mobile sync queue retrying a deferred collision) updates the same row
+  // instead of piling up duplicates. Resolving it later updates that same
+  // row rather than inserting a second one.
+  private async upsertDocumentCollision(params: {
+    documentId: string;
+    submittedName: string;
+    existingFarmer: Farmer;
+    resolution: 'same_person' | 'separate_person' | null;
+  }): Promise<void> {
+    const existingRow = await this.documentCollisionsRepository.findOne({
+      where: {
+        documentId: params.documentId,
+        submittedName: params.submittedName,
+        existingFarmer: { id: params.existingFarmer.id },
+      },
+    });
+
+    if (existingRow) {
+      if (existingRow.resolution) return; // already resolved — leave as-is
+      existingRow.resolution = params.resolution;
+      existingRow.resolvedAt = params.resolution ? new Date() : null;
+      await this.documentCollisionsRepository.save(existingRow);
+      return;
+    }
+
+    await this.documentCollisionsRepository.save(
+      this.documentCollisionsRepository.create({
+        documentId: params.documentId,
+        submittedName: params.submittedName,
+        existingFarmer: params.existingFarmer,
+        existingFarmerName: params.existingFarmer.name,
+        resolution: params.resolution,
+        resolvedAt: params.resolution ? new Date() : null,
+      }),
+    );
   }
 
   async checkDuplicate(

@@ -11,6 +11,7 @@ import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { User } from 'src/users/entities/user.entity';
+import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 
 /**
  * Spec 50 — Borrado seguro de agricultores y sesiones de campaña.
@@ -81,6 +82,7 @@ describe('FarmersService.remove — borrado seguro (spec 50)', () => {
           useValue: sessionsRepository,
         },
         { provide: getRepositoryToken(Survey), useValue: surveysRepository },
+        { provide: getRepositoryToken(FarmerDocumentCollision), useValue: {} },
       ],
     }).compile();
 

@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { Farmer } from './entities/farmer.entity';
+import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
@@ -53,7 +54,33 @@ export class FarmersService {
     private readonly sessionsRepository: Repository<CampaignSession>,
     @InjectRepository(Survey)
     private readonly surveysRepository: Repository<Survey>,
+    @InjectRepository(FarmerDocumentCollision)
+    private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
   ) {}
+
+  // Spec 68 — colisiones de documentId detectadas por
+  // `SurveysService.extractFarmer()` (resueltas o pendientes), para revisión
+  // administrativa. Es la misma tabla que consulta la herramienta de
+  // solo lectura del MCP `sosagro-admin` (Fase 6).
+  async listDocumentCollisions() {
+    const rows = await this.documentCollisionsRepository.find({
+      relations: ['existingFarmer'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return rows.map((row) => ({
+      collisionId: row.collisionId,
+      documentId: row.documentId,
+      submittedName: row.submittedName,
+      existingFarmer: {
+        farmerId: row.existingFarmer?.id ?? null,
+        name: row.existingFarmerName,
+      },
+      resolution: row.resolution,
+      createdAt: row.createdAt,
+      resolvedAt: row.resolvedAt,
+    }));
+  }
 
   async create(dto: CreateFarmerDto): Promise<Farmer> {
     let town: Town | undefined;

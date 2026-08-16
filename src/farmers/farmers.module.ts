@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Farmer } from './entities/farmer.entity';
+import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
@@ -10,7 +11,14 @@ import { FarmersController } from './farmers.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Farmer, Farm, Town, CampaignSession, Survey]),
+    TypeOrmModule.forFeature([
+      Farmer,
+      FarmerDocumentCollision,
+      Farm,
+      Town,
+      CampaignSession,
+      Survey,
+    ]),
   ],
   controllers: [FarmersController],
   providers: [FarmersService],
