@@ -73,7 +73,8 @@ export class FarmersController {
     status: 200,
     description:
       'Array de { collisionId, documentId, submittedName, existingFarmer: { farmerId, name }, ' +
-      'resolution, createdAt, resolvedAt }.',
+      'surveyId, resolution, createdAt, resolvedAt }. `surveyId` es la encuesta (S1a) que ' +
+      'disparó la detección; puede ser null solo si esa encuesta ya no existe.',
   })
   listDocumentCollisions() {
     return this.farmersService.listDocumentCollisions();

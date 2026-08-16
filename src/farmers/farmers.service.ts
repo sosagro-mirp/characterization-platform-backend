@@ -64,7 +64,7 @@ export class FarmersService {
   // solo lectura del MCP `sosagro-admin` (Fase 6).
   async listDocumentCollisions() {
     const rows = await this.documentCollisionsRepository.find({
-      relations: ['existingFarmer'],
+      relations: ['existingFarmer', 'survey'],
       order: { createdAt: 'DESC' },
     });
 
@@ -76,6 +76,10 @@ export class FarmersService {
         farmerId: row.existingFarmer?.id ?? null,
         name: row.existingFarmerName,
       },
+      // La encuesta (S1a) de origen — null solo si esa encuesta ya no
+      // existe (SET NULL en la FK, ver el entity), nunca porque falte
+      // registrarla: extractFarmer() siempre la conoce al detectar.
+      surveyId: row.survey?.surveyId ?? null,
       resolution: row.resolution,
       createdAt: row.createdAt,
       resolvedAt: row.resolvedAt,

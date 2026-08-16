@@ -72,6 +72,7 @@ interface CollisionRecord {
   documentId: string;
   submittedName: string;
   existingFarmer?: { farmerId?: string; id?: string; name?: string };
+  surveyId: string | null;
   resolution: string | null;
 }
 
@@ -548,12 +549,17 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
         (r) => r.documentId === DOC_COLLISION && r.submittedName === NAME_P2,
       );
       expect(collision).toBeDefined();
+      // La encuesta de origen (S1a) queda registrada — pedida explícitamente
+      // por § "Evaluación MCP" del spec y por TC-MCP-068-01.
+      expect(collision?.surveyId).toEqual(expect.any(String));
 
       const sameP = rows.find((r) => r.documentId === DOC_SAME_PERSON);
       expect(sameP?.resolution).toBe('same_person');
+      expect(sameP?.surveyId).toEqual(expect.any(String));
 
       const separate = rows.find((r) => r.documentId === DOC_SEPARATE);
       expect(separate?.resolution).toBe('separate_person');
+      expect(separate?.surveyId).toEqual(expect.any(String));
     });
 
     it('la ruta de colisiones no colisiona con GET /api/farmers/:id', async () => {

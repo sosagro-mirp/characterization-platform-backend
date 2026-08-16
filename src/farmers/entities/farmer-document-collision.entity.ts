@@ -1,4 +1,5 @@
 import { Farmer } from './farmer.entity';
+import { Survey } from 'src/surveys/entities/survey.entity';
 import {
   Column,
   CreateDateColumn,
@@ -23,6 +24,15 @@ export class FarmerDocumentCollision {
 
   @Column({ name: 'submitted_name', type: 'varchar', length: 255 })
   submittedName: string;
+
+  // Encuesta (S1a) cuya extracción disparó la detección — la pide el spec
+  // ("Evaluación MCP" y TC-MCP-068-01) para poder auditar de qué captura
+  // vino cada colisión. `SET NULL`, no `RESTRICT`: este registro es un
+  // subproducto de auditoría, nunca debería impedir borrar la encuesta que
+  // lo originó si ese flujo llega a existir más adelante.
+  @ManyToOne(() => Survey, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'survey_id', referencedColumnName: 'surveyId' })
+  survey: Survey | null;
 
   @ManyToOne(() => Farmer, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'existing_farmer_id', referencedColumnName: 'id' })

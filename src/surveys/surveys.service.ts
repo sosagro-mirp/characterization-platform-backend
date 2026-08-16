@@ -379,6 +379,7 @@ export class SurveysService {
               submittedName: farmerName,
               existingFarmer: existingByDocument,
               resolution: null,
+              survey,
             });
             throw new ConflictException({
               message:
@@ -482,6 +483,7 @@ export class SurveysService {
         submittedName: farmerName,
         existingFarmer: collisionWithFarmer,
         resolution: dto.resolution,
+        survey,
       });
     }
 
@@ -498,6 +500,7 @@ export class SurveysService {
     submittedName: string;
     existingFarmer: Farmer;
     resolution: 'same_person' | 'separate_person' | null;
+    survey: Survey;
   }): Promise<void> {
     const existingRow = await this.documentCollisionsRepository.findOne({
       where: {
@@ -509,9 +512,15 @@ export class SurveysService {
 
     if (existingRow) {
       if (existingRow.resolution) return; // already resolved — leave as-is
-      existingRow.resolution = params.resolution;
-      existingRow.resolvedAt = params.resolution ? new Date() : null;
-      await this.documentCollisionsRepository.save(existingRow);
+      // `.update()`, not load-then-`.save()`: `existingRow` above doesn't
+      // fetch the `survey`/`existingFarmer` relations, and saving that
+      // partial entity back could null out `survey_id` on a repeated
+      // pending hit (e.g. a retried 409 without a resolution). `.update()`
+      // only touches the columns given here.
+      await this.documentCollisionsRepository.update(existingRow.collisionId, {
+        resolution: params.resolution,
+        resolvedAt: params.resolution ? new Date() : null,
+      });
       return;
     }
 
@@ -523,6 +532,7 @@ export class SurveysService {
         existingFarmerName: params.existingFarmer.name,
         resolution: params.resolution,
         resolvedAt: params.resolution ? new Date() : null,
+        survey: params.survey,
       }),
     );
   }
