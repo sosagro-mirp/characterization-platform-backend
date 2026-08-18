@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -444,9 +445,15 @@ export class SurveysService {
     return { hasDuplicate: true, surveyId: row.surveyId };
   }
 
+  // Spec 70, Fase 4 — solo descarta el duplicado; ya no crea la encuesta de
+  // reemplazo. Crearla aquí, vacía, era uno de los vectores que dejaban
+  // encuestas huérfanas cuando el encuestador abandonaba tras sobrescribir.
+  // El cliente inicia el reemplazo con `beginSurvey()` (mobile), igual que
+  // cualquier otro inicio de instrumento — el registro real solo se crea al
+  // sincronizar, cuando exista al menos una respuesta.
   async overwriteSurvey(
     dto: OverwriteSurveyDto,
-  ): Promise<{ surveyId: string }> {
+  ): Promise<{ discardedSurveyId: string }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId: dto.surveyId },
       relations: ['instruments', 'campaignSession', 'campaignSession.campaign'],
@@ -469,23 +476,101 @@ export class SurveysService {
       );
     }
 
-    const instrument = await this.instrumentsRepository.findOne({
-      where: { instrumentId: dto.instrumentId },
+    // Clear pivot table rows before removing to avoid FK constraint violations
+    survey.instruments = [];
+    await this.surveysRepository.save(survey);
+    await this.surveysRepository.remove(survey);
+
+    return { discardedSurveyId: dto.surveyId };
+  }
+
+  // Spec 70, Fase 6 — auditoría de solo lectura de las encuestas huérfanas
+  // vacías que dejaron los vectores 1-3 antes de la Fase 1-4 de este spec.
+  // El discriminador que hace segura esta lista (y el borrado que la usa) es
+  // la existencia de una encuesta HERMANA en la misma sesión y el mismo
+  // stepOrder que SÍ tiene respuestas: un marcador de paso saltado
+  // (`skipStep()`) es siempre la única encuesta de su paso, así que nunca
+  // tiene hermana y nunca puede aparecer aquí.
+  async findOrphanSurveys(): Promise<
+    Array<{
+      surveyId: string;
+      createdAt: Date;
+      stepOrder: number;
+      siblingSurveyId: string;
+    }>
+  > {
+    return this.surveysRepository
+      .createQueryBuilder('survey')
+      .leftJoin('survey.responses', 'response')
+      .innerJoin(
+        Survey,
+        'sibling',
+        'sibling.campaignSession = survey.campaignSession ' +
+          'AND sibling.stepOrder = survey.stepOrder ' +
+          'AND sibling.surveyId != survey.surveyId',
+      )
+      .innerJoin('sibling.responses', 'siblingResponse')
+      .where('survey.campaignSession IS NOT NULL')
+      .andWhere('survey.stepOrder IS NOT NULL')
+      .andWhere('response.responseId IS NULL')
+      .distinctOn(['survey.surveyId'])
+      .orderBy('survey.surveyId', 'ASC')
+      .addOrderBy('sibling.createdAt', 'ASC')
+      .select('survey.surveyId', 'surveyId')
+      .addSelect('survey.createdAt', 'createdAt')
+      .addSelect('survey.stepOrder', 'stepOrder')
+      .addSelect('sibling.surveyId', 'siblingSurveyId')
+      .getRawMany();
+  }
+
+  // Borrado acotado: solo acepta encuestas que aparecerían en
+  // `findOrphanSurveys()` — sin respuestas propias y con una hermana con
+  // respuestas en la misma sesión/paso. Nunca borra en cascada nada con
+  // datos de campo, y nunca acepta un marcador de paso saltado (siempre es
+  // la única encuesta de su paso, así que nunca tiene la hermana requerida).
+  async deleteOrphanSurvey(
+    surveyId: string,
+  ): Promise<{ deletedSurveyId: string }> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+      relations: ['instruments', 'campaignSession', 'responses'],
     });
-    if (!instrument) throw new NotFoundException('Instrument not found');
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    if (survey.responses && survey.responses.length > 0) {
+      throw new ConflictException('Cannot delete a survey that has responses');
+    }
+
+    if (!survey.campaignSession || survey.stepOrder == null) {
+      throw new ConflictException(
+        'Survey is not an auditable orphan candidate (missing session or stepOrder)',
+      );
+    }
+
+    const siblingWithResponses = await this.surveysRepository
+      .createQueryBuilder('sibling')
+      .innerJoin('sibling.responses', 'response')
+      .where('sibling.campaignSession = :sessionId', {
+        sessionId: survey.campaignSession.sessionId,
+      })
+      .andWhere('sibling.stepOrder = :stepOrder', {
+        stepOrder: survey.stepOrder,
+      })
+      .andWhere('sibling.surveyId != :surveyId', { surveyId })
+      .getOne();
+
+    if (!siblingWithResponses) {
+      throw new ConflictException(
+        'Survey has no sibling with responses in the same session/step — not a provable orphan',
+      );
+    }
 
     // Clear pivot table rows before removing to avoid FK constraint violations
     survey.instruments = [];
     await this.surveysRepository.save(survey);
     await this.surveysRepository.remove(survey);
 
-    const newSurvey = this.surveysRepository.create({
-      campaignSession: targetSession,
-      instruments: [instrument],
-      stepOrder: dto.stepOrder,
-    });
-    const saved = await this.surveysRepository.save(newSurvey);
-    return { surveyId: saved.surveyId };
+    return { deletedSurveyId: surveyId };
   }
 
   async skipStep(dto: SkipStepDto): Promise<{ surveyId: string }> {
