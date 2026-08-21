@@ -38,7 +38,10 @@ export class SurveysController {
   @ApiOperation({
     summary: 'Crear sesión de encuesta',
     description:
-      'Crea una nueva sesión de encuesta y retorna el surveyId. Acepta contexto geográfico y de actor de forma opcional.',
+      'Crea una nueva sesión de encuesta y retorna el surveyId. Acepta contexto geográfico y de actor de forma opcional. ' +
+      'Es idempotente respecto de clientSurveyId (spec 70, Fase 9): reenviar el mismo clientSurveyId devuelve la ' +
+      'encuesta ya creada en vez de duplicarla, para que un cliente pueda reintentar con seguridad tras perder la ' +
+      'respuesta de un POST que sí llegó al servidor.',
   })
   @ApiResponse({
     status: 201,
@@ -219,7 +222,9 @@ export class SurveysController {
     summary: 'Marcar un paso como completado sin registrar respuestas',
     description:
       'Crea un survey vacío con el stepOrder indicado, actuando como marcador para que ' +
-      'getNextStep no vuelva a sugerir ese paso.',
+      'getNextStep no vuelva a sugerir ese paso. Idempotente por (sessionId, stepOrder) ' +
+      '(spec 70, Fase 10): si ya existe cualquier encuesta para ese paso —un marcador previo ' +
+      'o una completada de verdad— devuelve esa en vez de crear una segunda.',
   })
   @ApiResponse({ status: 201, description: '{ surveyId: string }' })
   @ApiResponse({
