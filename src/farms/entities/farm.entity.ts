@@ -2,6 +2,7 @@ import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Device } from 'src/devices/entities/device.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
+import { FarmPlot } from 'src/farm-plots/entities/farm-plot.entity';
 import {
   Column,
   CreateDateColumn,
@@ -128,6 +129,9 @@ export class Farm {
 
   @OneToMany(() => Farmer, (farmer) => farmer.farm)
   farmers: Farmer[];
+
+  @OneToMany(() => FarmPlot, (plot) => plot.farm)
+  plots: FarmPlot[];
 
   @ManyToMany(() => TypeOfCrop, (crop: TypeOfCrop) => crop.farms)
   @JoinTable({

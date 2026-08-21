@@ -12,6 +12,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { FarmersModule } from './farmers/farmers.module';
+import { FarmPlotsModule } from './farm-plots/farm-plots.module';
 import { FarmsModule } from './farms/farms.module';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
 import { TownsModule } from './towns/towns.module';
@@ -111,6 +112,7 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
       },
     }),
     FarmersModule,
+    FarmPlotsModule,
     FarmsModule,
     CooperativesModule,
     TownsModule,
