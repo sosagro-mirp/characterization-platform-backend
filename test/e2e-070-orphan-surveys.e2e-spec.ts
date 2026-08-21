@@ -348,4 +348,190 @@ describe('spec-070 — encuestas huérfanas vacías: auditoría y borrado acotad
       expect(rows.some((r) => r.surveyId === orphanSurveyId)).toBe(false);
     });
   });
+
+  // ── POST /api/surveys — idempotencia por clientSurveyId (Fase 9) ──────────
+  //
+  // NACE EN ROJO junto con la Fase 9: antes de implementarla, dos POST con el
+  // mismo clientSurveyId creaban dos encuestas distintas.
+
+  describe('POST /api/surveys — idempotencia (Fase 9)', () => {
+    it('TC-070-R · reenviar el mismo clientSurveyId devuelve la encuesta ya creada, sin duplicarla', async () => {
+      const clientSurveyId = `e2e-070-idem-${Date.now()}`;
+
+      const first = await request(app.getHttpServer())
+        .post('/api/surveys')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send({
+          instrumentIds: [instrumentId],
+          campaignSessionId: sessionId,
+          stepOrder: 3,
+          clientSurveyId,
+        })
+        .expect(201);
+      surveyIdsCreated.push((first.body as { surveyId: string }).surveyId);
+
+      const second = await request(app.getHttpServer())
+        .post('/api/surveys')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send({
+          instrumentIds: [instrumentId],
+          campaignSessionId: sessionId,
+          stepOrder: 3,
+          clientSurveyId,
+        })
+        .expect(201);
+
+      expect((second.body as { surveyId: string }).surveyId).toBe(
+        (first.body as { surveyId: string }).surveyId,
+      );
+
+      const rows = await ds.query<{ count: string }[]>(
+        `SELECT COUNT(*)::text AS count FROM surveys WHERE client_survey_id = $1`,
+        [clientSurveyId],
+      );
+      expect(Number(rows[0].count)).toBe(1);
+    });
+
+    it('TC-070-S · dos creaciones concurrentes con el mismo clientSurveyId no duplican la fila (carrera real)', async () => {
+      const clientSurveyId = `e2e-070-race-${Date.now()}`;
+      const payload = {
+        instrumentIds: [instrumentId],
+        campaignSessionId: sessionId,
+        stepOrder: 3,
+        clientSurveyId,
+      };
+
+      const [a, b] = await Promise.all([
+        request(app.getHttpServer())
+          .post('/api/surveys')
+          .set('Authorization', `Bearer ${pollsterToken}`)
+          .send(payload),
+        request(app.getHttpServer())
+          .post('/api/surveys')
+          .set('Authorization', `Bearer ${pollsterToken}`)
+          .send(payload),
+      ]);
+
+      expect(a.status).toBe(201);
+      expect(b.status).toBe(201);
+      const aId = (a.body as { surveyId: string }).surveyId;
+      const bId = (b.body as { surveyId: string }).surveyId;
+      surveyIdsCreated.push(aId);
+      if (bId !== aId) surveyIdsCreated.push(bId);
+
+      expect(bId).toBe(aId);
+
+      const rows = await ds.query<{ count: string }[]>(
+        `SELECT COUNT(*)::text AS count FROM surveys WHERE client_survey_id = $1`,
+        [clientSurveyId],
+      );
+      expect(Number(rows[0].count)).toBe(1);
+    });
+
+    it('sin clientSurveyId, el comportamiento no cambia: cada POST crea una fila distinta', async () => {
+      const a = await request(app.getHttpServer())
+        .post('/api/surveys')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send({
+          instrumentIds: [instrumentId],
+          campaignSessionId: sessionId,
+          stepOrder: 3,
+        })
+        .expect(201);
+      const b = await request(app.getHttpServer())
+        .post('/api/surveys')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send({
+          instrumentIds: [instrumentId],
+          campaignSessionId: sessionId,
+          stepOrder: 3,
+        })
+        .expect(201);
+
+      const aId = (a.body as { surveyId: string }).surveyId;
+      const bId = (b.body as { surveyId: string }).surveyId;
+      surveyIdsCreated.push(aId, bId);
+
+      expect(aId).not.toBe(bId);
+    });
+  });
+
+  // ── POST /api/surveys/skip-step — idempotencia (Fase 10) ───────────────────
+  //
+  // NACE EN ROJO junto con la Fase 10: antes de implementarla, un doble salto
+  // (o un salto offline sobre un paso que otro dispositivo ya completó)
+  // producía una segunda fila para el mismo (sesión, stepOrder), que
+  // aparecería como falso positivo en GET /api/surveys/orphans (tendría un
+  // hermano con respuestas o un hermano marcador en su mismo paso).
+
+  describe('POST /api/surveys/skip-step — idempotencia (Fase 10)', () => {
+    it('TC-070-T · saltar el mismo paso dos veces devuelve el mismo marcador, sin crear un segundo', async () => {
+      const first = await request(app.getHttpServer())
+        .post('/api/surveys/skip-step')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send({ sessionId, instrumentId, stepOrder: 5 })
+        .expect(201);
+      surveyIdsCreated.push((first.body as { surveyId: string }).surveyId);
+
+      const second = await request(app.getHttpServer())
+        .post('/api/surveys/skip-step')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send({ sessionId, instrumentId, stepOrder: 5 })
+        .expect(201);
+
+      expect((second.body as { surveyId: string }).surveyId).toBe(
+        (first.body as { surveyId: string }).surveyId,
+      );
+
+      const rows = await ds.query<{ count: string }[]>(
+        `SELECT COUNT(*)::text AS count FROM surveys WHERE campaign_session_id = $1 AND step_order = $2`,
+        [sessionId, 5],
+      );
+      expect(Number(rows[0].count)).toBe(1);
+
+      // Ese único marcador no debe aparecer nunca en la auditoría.
+      const orphans = await request(app.getHttpServer())
+        .get('/api/surveys/orphans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      const orphanRows = orphans.body as OrphanRow[];
+      expect(
+        orphanRows.some(
+          (r) => r.surveyId === (first.body as { surveyId: string }).surveyId,
+        ),
+      ).toBe(false);
+    });
+
+    it('TC-070-U · saltar un paso ya completado de verdad devuelve la encuesta real, sin crear un marcador vacío', async () => {
+      const realStepOrder = 6;
+      const completedSurveyId = await insertSurvey(realStepOrder);
+      await insertResponse(completedSurveyId);
+
+      const res = await request(app.getHttpServer())
+        .post('/api/surveys/skip-step')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send({ sessionId, instrumentId, stepOrder: realStepOrder })
+        .expect(201);
+
+      expect((res.body as { surveyId: string }).surveyId).toBe(
+        completedSurveyId,
+      );
+
+      const rows = await ds.query<{ count: string }[]>(
+        `SELECT COUNT(*)::text AS count FROM surveys WHERE campaign_session_id = $1 AND step_order = $2`,
+        [sessionId, realStepOrder],
+      );
+      expect(Number(rows[0].count)).toBe(1);
+
+      // No debe haber aparecido como huérfana: no se creó ningún hermano vacío.
+      const orphans = await request(app.getHttpServer())
+        .get('/api/surveys/orphans')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      const orphanRows = orphans.body as OrphanRow[];
+      expect(orphanRows.some((r) => r.surveyId === completedSurveyId)).toBe(
+        false,
+      );
+    });
+  });
 });
