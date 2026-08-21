@@ -16,7 +16,9 @@ export class FarmPlotsService {
   ) {}
 
   async create(dto: CreateFarmPlotDto): Promise<FarmPlot> {
-    const farm = await this.farmsRepository.findOne({ where: { farmId: dto.farmId } });
+    const farm = await this.farmsRepository.findOne({
+      where: { farmId: dto.farmId },
+    });
     if (!farm) throw new NotFoundException('Farm not found');
 
     const plot = this.farmPlotsRepository.create({
@@ -54,15 +56,19 @@ export class FarmPlotsService {
     const plot = await this.findOne(farmPlotId);
 
     if (dto.farmId && dto.farmId !== plot.farm.farmId) {
-      const farm = await this.farmsRepository.findOne({ where: { farmId: dto.farmId } });
+      const farm = await this.farmsRepository.findOne({
+        where: { farmId: dto.farmId },
+      });
       if (!farm) throw new NotFoundException('Farm not found');
       plot.farm = farm;
     }
 
     if (dto.name !== undefined) plot.name = dto.name;
-    if (dto.description !== undefined) plot.description = dto.description ?? null;
+    if (dto.description !== undefined)
+      plot.description = dto.description ?? null;
     if (dto.area !== undefined) plot.area = dto.area ?? null;
-    if (dto.capturedOffline !== undefined) plot.capturedOffline = dto.capturedOffline;
+    if (dto.capturedOffline !== undefined)
+      plot.capturedOffline = dto.capturedOffline;
     if (dto.polygon !== undefined) plot.polygon = dto.polygon ?? null;
 
     return this.farmPlotsRepository.save(plot);

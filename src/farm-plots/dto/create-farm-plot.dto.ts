@@ -14,7 +14,10 @@ import {
 import { PolygonDto } from './polygon.dto';
 
 export class CreateFarmPlotDto {
-  @ApiProperty({ format: 'uuid', description: 'ID de la finca a la que pertenece el lote' })
+  @ApiProperty({
+    format: 'uuid',
+    description: 'ID de la finca a la que pertenece el lote',
+  })
   @IsUUID()
   farmId: string;
 
@@ -24,13 +27,19 @@ export class CreateFarmPlotDto {
   @MaxLength(100)
   name: string;
 
-  @ApiPropertyOptional({ example: 'Zona de café arábigo junto al río', maxLength: 255 })
+  @ApiPropertyOptional({
+    example: 'Zona de café arábigo junto al río',
+    maxLength: 255,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(255)
   description?: string;
 
-  @ApiPropertyOptional({ example: 2.5, description: 'Área del lote en hectáreas' })
+  @ApiPropertyOptional({
+    example: 2.5,
+    description: 'Área del lote en hectáreas',
+  })
   @IsNumber()
   @IsOptional()
   @Min(0)

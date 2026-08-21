@@ -142,7 +142,8 @@ describe('spec-070 — encuestas huérfanas vacías: auditoría y borrado acotad
     const roles = await ds.query<RoleRow[]>(
       `SELECT role_id, name FROM roles WHERE name IN ('admin', 'pollster')`,
     );
-    const roleId = (name: string) => roles.find((r) => r.name === name)!.role_id;
+    const roleId = (name: string) =>
+      roles.find((r) => r.name === name)!.role_id;
 
     const hash = await bcrypt.hash(TEST_PASSWORD, 10);
     for (const role of ['admin', 'pollster']) {
@@ -214,9 +215,10 @@ describe('spec-070 — encuestas huérfanas vacías: auditoría y borrado acotad
 
   afterAll(async () => {
     if (surveyIdsCreated.length) {
-      await ds.query(`DELETE FROM responses WHERE survey_id = ANY($1::uuid[])`, [
-        surveyIdsCreated,
-      ]);
+      await ds.query(
+        `DELETE FROM responses WHERE survey_id = ANY($1::uuid[])`,
+        [surveyIdsCreated],
+      );
       await ds.query(
         `DELETE FROM surveys_instruments WHERE survey_id = ANY($1::uuid[])`,
         [surveyIdsCreated],
@@ -228,7 +230,9 @@ describe('spec-070 — encuestas huérfanas vacías: auditoría y borrado acotad
     await ds.query(`DELETE FROM campaign_sessions WHERE session_id = $1`, [
       sessionId,
     ]);
-    await ds.query(`DELETE FROM campaigns WHERE campaign_id = $1`, [campaignId]);
+    await ds.query(`DELETE FROM campaigns WHERE campaign_id = $1`, [
+      campaignId,
+    ]);
     await ds.query(`DELETE FROM questions WHERE section_id = $1`, [sectionId]);
     await ds.query(`DELETE FROM sections WHERE instrument_id = $1`, [
       instrumentId,

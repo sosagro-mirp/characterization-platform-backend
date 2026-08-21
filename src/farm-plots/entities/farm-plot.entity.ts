@@ -29,13 +29,24 @@ export class FarmPlot {
   @Column({ name: 'captured_offline', type: 'boolean', default: false })
   capturedOffline: boolean;
 
-  @ManyToOne(() => Farm, (farm) => farm.plots, { onDelete: 'CASCADE', nullable: false })
+  @ManyToOne(() => Farm, (farm) => farm.plots, {
+    onDelete: 'CASCADE',
+    nullable: false,
+  })
   @JoinColumn({ name: 'farm_id', referencedColumnName: 'farmId' })
   farm: Farm;
 
-  @CreateDateColumn({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @CreateDateColumn({
+    name: 'created_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn({
+    name: 'updated_at',
+    type: 'timestamp',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   updatedAt: Date;
 }
