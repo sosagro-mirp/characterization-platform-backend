@@ -16,19 +16,18 @@ import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
  * Cubre los criterios de aceptación 1-7 de
  * `spec/53_visibilidad_auditoria_creado_actualizado_por.md`.
  *
- * ARRANCA EN ROJO. La captura del spec 26 funciona (los valores están en la
- * base), pero las lecturas nunca cargan las relaciones:
+ * NOTA (2026-08-21): la implementación real (commit `84eebc4`,
+ * 2026-07-29) usa `createQueryBuilder` con `leftJoin` + `addSelect` en vez de
+ * `.find({ relations })`, precisamente para proyectar solo
+ * `userId`/`name`/`lastName` del autor sin un segundo roundtrip (evita N+1).
+ * Esta suite se corrigió el 2026-08-21, al mergear la rama a `development`,
+ * para reflejar esa implementación — el diseño original de esta suite (mock
+ * `.find()/.findOne()` con `relations`) nunca se había corrido contra el
+ * código real desde que se escribió, y no coincidía con él. El
+ * comportamiento verificado es el mismo; solo cambia cómo se lo observa.
  *
- *   InstrumentsService.findOne()  → relations: { actorTypes: true }   (línea 106)
- *   InstrumentsService.findAll()  → relations: { actorTypes: true }   (línea 65)
- *   CampaignsService.findOne()    → relations: ['steps', 'steps.instrument', …]
- *
- * Sin `createdBy`/`updatedBy` en `relations`, `GET /api/instruments/:id` nunca
- * los devuelve y el panel web no tiene dónde mostrarlos. Eso bloqueó la
- * verificación de TC-048-04 desde la UI durante la ronda del spec 48.
- *
- * `change-requests.service.ts` (líneas 43, 76, 94) ya hace lo correcto y es la
- * referencia a seguir.
+ * `change-requests.service.ts` (líneas 43, 76, 94) ya hacía lo correcto y fue
+ * la referencia original para el criterio de proyección explícita.
  *
  * NOTA DE SEGURIDAD: `User.password` tiene `select: false`
  * (user.entity.ts:48-50), así que no viaja aunque se cargue la relación
@@ -46,21 +45,47 @@ const AUTOR = {
   lastName: 'Spec53',
 };
 
-/** Campos del usuario que NO deben aparecer en la respuesta de auditoría. */
+/** Campos del usuario que NO deben aparecer en la proyección de auditoría. */
 const CAMPOS_PROHIBIDOS = ['password', 'email', 'mustChangePassword', 'role'];
 
-interface FindOptions {
-  relations?: Record<string, unknown> | string[];
-  select?: Record<string, unknown>;
+/** Aplana los argumentos de `addSelect(['a', 'b'])` / `addSelect('a')` a un solo array de strings. */
+function columnasSeleccionadas(mockFn: jest.Mock): string[] {
+  return (mockFn.mock.calls as unknown[][]).flatMap((call) => {
+    const arg = call[0];
+    return Array.isArray(arg) ? arg.map(String) : [String(arg)];
+  });
 }
 
-function relacionaAuditoria(options: FindOptions | undefined): boolean {
-  if (!options?.relations) return false;
-  const { relations } = options;
-  if (Array.isArray(relations)) {
-    return relations.includes('createdBy') && relations.includes('updatedBy');
-  }
-  return Boolean(relations.createdBy) && Boolean(relations.updatedBy);
+interface QueryBuilderMock {
+  leftJoinAndSelect: jest.Mock;
+  leftJoin: jest.Mock;
+  innerJoin: jest.Mock;
+  addSelect: jest.Mock;
+  where: jest.Mock;
+  andWhere: jest.Mock;
+  orderBy: jest.Mock;
+  addOrderBy: jest.Mock;
+  getOne: jest.Mock;
+  getMany: jest.Mock;
+}
+
+function crearQueryBuilderMock(
+  overrides: Partial<QueryBuilderMock> = {},
+): QueryBuilderMock {
+  const qb: QueryBuilderMock = {
+    leftJoinAndSelect: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    innerJoin: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    addOrderBy: jest.fn().mockReturnThis(),
+    getOne: jest.fn(),
+    getMany: jest.fn(),
+    ...overrides,
+  };
+  return qb;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,10 +95,10 @@ function relacionaAuditoria(options: FindOptions | undefined): boolean {
 describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
   let service: InstrumentsService;
   let instrumentsRepository: {
-    find: jest.Mock<Promise<unknown[]>, [FindOptions]>;
-    findOne: jest.Mock<Promise<unknown>, [FindOptions]>;
+    find: jest.Mock<Promise<unknown[]>, [unknown]>;
     createQueryBuilder: jest.Mock;
   };
+  let qb: QueryBuilderMock;
 
   const instrumentoConAutor = {
     instrumentId: INSTRUMENT_ID,
@@ -84,14 +109,16 @@ describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
   };
 
   beforeEach(async () => {
+    qb = crearQueryBuilderMock({
+      getOne: jest.fn().mockResolvedValue(instrumentoConAutor),
+      getMany: jest.fn().mockResolvedValue([instrumentoConAutor]),
+    });
+
     instrumentsRepository = {
       find: jest
-        .fn<Promise<unknown[]>, [FindOptions]>()
+        .fn<Promise<unknown[]>, [unknown]>()
         .mockResolvedValue([instrumentoConAutor]),
-      findOne: jest
-        .fn<Promise<unknown>, [FindOptions]>()
-        .mockResolvedValue(instrumentoConAutor),
-      createQueryBuilder: jest.fn(),
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -110,19 +137,26 @@ describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
     service = module.get<InstrumentsService>(InstrumentsService);
   });
 
-  it('criterio 1: findOne carga las relaciones createdBy y updatedBy', async () => {
+  it('criterio 1: findOne carga createdBy y updatedBy vía createQueryBuilder', async () => {
     await service.findOne(INSTRUMENT_ID);
 
-    const options = instrumentsRepository.findOne.mock.calls[0][0];
-    expect(relacionaAuditoria(options)).toBe(true);
+    expect(qb.leftJoin).toHaveBeenCalledWith(
+      'instrument.createdBy',
+      'createdBy',
+    );
+    expect(qb.leftJoin).toHaveBeenCalledWith(
+      'instrument.updatedBy',
+      'updatedBy',
+    );
   });
 
-  it('criterio 1: findOne no pierde las relaciones que ya cargaba (no regresión)', async () => {
+  it('criterio 1: findOne no pierde la relación que ya cargaba (no regresión)', async () => {
     await service.findOne(INSTRUMENT_ID);
 
-    const options = instrumentsRepository.findOne.mock.calls[0][0];
-    const relations = options.relations as Record<string, unknown>;
-    expect(relations.actorTypes).toBeTruthy();
+    expect(qb.leftJoinAndSelect).toHaveBeenCalledWith(
+      'instrument.actorTypes',
+      'actorType',
+    );
   });
 
   it('criterio 1: devuelve el autor con la forma { userId, name, lastName }', async () => {
@@ -132,7 +166,7 @@ describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
   });
 
   it('criterio 2: devuelve null cuando la fila no tiene autor (instrumento de seed)', async () => {
-    instrumentsRepository.findOne.mockResolvedValue({
+    qb.getOne.mockResolvedValue({
       ...instrumentoConAutor,
       createdBy: null,
       updatedBy: null,
@@ -147,48 +181,62 @@ describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
   it('criterio 3: proyecta solo userId, name y lastName del usuario', async () => {
     await service.findOne(INSTRUMENT_ID);
 
-    const options = instrumentsRepository.findOne.mock.calls[0][0];
-    const select = JSON.stringify(options.select ?? {});
-
-    // La proyección debe ser explícita; ningún campo sensible del usuario debe
-    // aparecer en la selección.
-    expect(options.select).toBeDefined();
-    for (const campo of CAMPOS_PROHIBIDOS) {
-      expect(select).not.toContain(campo);
+    const columnas = columnasSeleccionadas(qb.addSelect);
+    expect(columnas.length).toBeGreaterThan(0);
+    for (const columna of columnas) {
+      for (const campo of CAMPOS_PROHIBIDOS) {
+        expect(columna.toLowerCase()).not.toContain(campo.toLowerCase());
+      }
     }
+    expect(columnas).toEqual(
+      expect.arrayContaining([
+        'createdBy.userId',
+        'createdBy.name',
+        'createdBy.lastName',
+        'updatedBy.userId',
+        'updatedBy.name',
+        'updatedBy.lastName',
+      ]),
+    );
   });
 
   it('criterio 4: findAll incluye las mismas relaciones de auditoría', async () => {
     await service.findAll();
 
-    const options = instrumentsRepository.find.mock.calls[0][0];
-    expect(relacionaAuditoria(options)).toBe(true);
+    expect(qb.leftJoin).toHaveBeenCalledWith(
+      'instrument.createdBy',
+      'createdBy',
+    );
+    expect(qb.leftJoin).toHaveBeenCalledWith(
+      'instrument.updatedBy',
+      'updatedBy',
+    );
   });
 
   it('criterio 4: findAll resuelve en una sola consulta (sin N+1)', async () => {
     await service.findAll();
 
-    expect(instrumentsRepository.find).toHaveBeenCalledTimes(1);
-    expect(instrumentsRepository.findOne).not.toHaveBeenCalled();
+    expect(instrumentsRepository.createQueryBuilder).toHaveBeenCalledTimes(1);
+    expect(qb.getMany).toHaveBeenCalledTimes(1);
   });
 
   it('criterio 6: findOneForRender NO carga auditoría (payload de la app móvil intacto)', async () => {
-    const qb = {
-      leftJoinAndSelect: jest.fn().mockReturnThis(),
-      where: jest.fn().mockReturnThis(),
-      orderBy: jest.fn().mockReturnThis(),
-      addOrderBy: jest.fn().mockReturnThis(),
+    const qbRender = crearQueryBuilderMock({
       getOne: jest.fn().mockResolvedValue(instrumentoConAutor),
-    };
-    instrumentsRepository.createQueryBuilder.mockReturnValue(qb);
+    });
+    instrumentsRepository.createQueryBuilder.mockReturnValueOnce(qbRender);
 
     await service.findOneForRender(INSTRUMENT_ID);
 
-    const joins = (qb.leftJoinAndSelect.mock.calls as unknown[][]).map((c) =>
-      String(c[0]),
+    const joins = (qbRender.leftJoinAndSelect.mock.calls as unknown[][]).map(
+      (c) => String(c[0]),
     );
     expect(joins).not.toContain('instrument.createdBy');
     expect(joins).not.toContain('instrument.updatedBy');
+    expect(qbRender.leftJoin).not.toHaveBeenCalledWith(
+      'instrument.createdBy',
+      'createdBy',
+    );
   });
 
   it('criterio 7: findAllPublic no expone datos de auditoría', async () => {
@@ -196,8 +244,12 @@ describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
 
     await service.findAllPublic();
 
-    const options = instrumentsRepository.find.mock.calls[0][0];
-    expect(relacionaAuditoria(options)).toBe(false);
+    const options = instrumentsRepository.find.mock.calls[0][0] as {
+      select?: unknown;
+    };
+    const select = JSON.stringify(options?.select ?? {});
+    expect(select).not.toContain('createdBy');
+    expect(select).not.toContain('updatedBy');
   });
 });
 
@@ -208,9 +260,9 @@ describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
 describe('CampaignsService — exposición de auditoría (spec 53)', () => {
   let service: CampaignsService;
   let campaignsRepository: {
-    find: jest.Mock<Promise<unknown[]>, [FindOptions]>;
-    findOne: jest.Mock<Promise<unknown>, [FindOptions]>;
+    createQueryBuilder: jest.Mock;
   };
+  let qb: QueryBuilderMock;
 
   const campanaConAutor = {
     campaignId: CAMPAIGN_ID,
@@ -221,13 +273,12 @@ describe('CampaignsService — exposición de auditoría (spec 53)', () => {
   };
 
   beforeEach(async () => {
+    qb = crearQueryBuilderMock({
+      getOne: jest.fn().mockResolvedValue(campanaConAutor),
+    });
+
     campaignsRepository = {
-      find: jest
-        .fn<Promise<unknown[]>, [FindOptions]>()
-        .mockResolvedValue([campanaConAutor]),
-      findOne: jest
-        .fn<Promise<unknown>, [FindOptions]>()
-        .mockResolvedValue(campanaConAutor),
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -249,17 +300,18 @@ describe('CampaignsService — exposición de auditoría (spec 53)', () => {
   it('criterio 5: findOne carga createdBy y updatedBy', async () => {
     await service.findOne(CAMPAIGN_ID);
 
-    const options = campaignsRepository.findOne.mock.calls[0][0];
-    expect(relacionaAuditoria(options)).toBe(true);
+    expect(qb.leftJoin).toHaveBeenCalledWith('campaign.createdBy', 'createdBy');
+    expect(qb.leftJoin).toHaveBeenCalledWith('campaign.updatedBy', 'updatedBy');
   });
 
   it('criterio 5: findOne conserva las relaciones de pasos y condiciones (no regresión)', async () => {
     await service.findOne(CAMPAIGN_ID);
 
-    const options = campaignsRepository.findOne.mock.calls[0][0];
-    const relations = options.relations as string[];
-    expect(relations).toEqual(
-      expect.arrayContaining(['steps', 'steps.instrument']),
+    const joins = (qb.leftJoinAndSelect.mock.calls as unknown[][]).map((c) =>
+      String(c[0]),
+    );
+    expect(joins).toEqual(
+      expect.arrayContaining(['campaign.steps', 'steps.instrument']),
     );
   });
 
@@ -270,7 +322,7 @@ describe('CampaignsService — exposición de auditoría (spec 53)', () => {
   });
 
   it('criterio 5: devuelve null cuando la campaña no tiene autor', async () => {
-    campaignsRepository.findOne.mockResolvedValue({
+    qb.getOne.mockResolvedValue({
       ...campanaConAutor,
       createdBy: null,
       updatedBy: null,
