@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -167,16 +168,38 @@ export class SurveysController {
     );
   }
 
+  @Get('orphans')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Auditar encuestas vacías huérfanas',
+    description:
+      'Lista encuestas sin respuestas que tienen una encuesta hermana en la misma sesión y ' +
+      'el mismo stepOrder que SÍ tiene respuestas — ese es el discriminador que la distingue ' +
+      'de un marcador de paso saltado (POST /api/surveys/skip-step), que siempre es la única ' +
+      'encuesta de su paso y por eso nunca aparece en esta lista. Solo lectura. Spec 70.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Array de { surveyId, createdAt, stepOrder, siblingSurveyId } — candidatas a borrado.',
+  })
+  findOrphanSurveys() {
+    return this.surveysService.findOrphanSurveys();
+  }
+
   @Post('overwrite')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({
-    summary: 'Sobrescribir survey anterior y crear uno nuevo vacío',
+    summary: 'Descartar un survey duplicado',
     description:
-      'Elimina el survey duplicado (y sus respuestas en cascada), crea un survey nuevo vacío ' +
-      'con el mismo instrumento y stepOrder en la sesión activa. Retorna { surveyId } del nuevo survey.',
+      'Elimina el survey duplicado (y sus respuestas en cascada). No crea ningún survey de ' +
+      'reemplazo — el cliente inicia el nuevo con POST /api/surveys recién cuando exista al ' +
+      'menos una respuesta (spec 70: evita dejar una fila vacía huérfana si el encuestador ' +
+      'abandona después de sobrescribir). Retorna { discardedSurveyId } del survey eliminado.',
   })
-  @ApiResponse({ status: 201, description: '{ surveyId: string }' })
+  @ApiResponse({ status: 201, description: '{ discardedSurveyId: string }' })
   @ApiResponse({
     status: 400,
     description: 'El survey no pertenece a la misma campaña que la sesión.',
@@ -205,6 +228,29 @@ export class SurveysController {
   })
   skipStep(@Body() dto: SkipStepDto) {
     return this.surveysService.skipStep(dto);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Borrar una encuesta huérfana candidata',
+    description:
+      'Borrado acotado: solo acepta encuestas que aparecerían en GET /api/surveys/orphans ' +
+      '— sin respuestas propias y con una hermana con respuestas en la misma sesión y ' +
+      'stepOrder. Rechaza con 409 cualquier encuesta con respuestas o que sea la única de su ' +
+      'paso (incluye marcadores de paso saltado). Nunca borra en cascada datos de campo. Spec 70.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta' })
+  @ApiResponse({ status: 200, description: '{ deletedSurveyId: string }' })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'La encuesta tiene respuestas, o no tiene una hermana con respuestas en el mismo paso.',
+  })
+  deleteOrphanSurvey(@Param('id', ParseUUIDPipe) id: string) {
+    return this.surveysService.deleteOrphanSurvey(id);
   }
 
   @Get(':id/responses')

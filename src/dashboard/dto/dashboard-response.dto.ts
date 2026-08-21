@@ -15,6 +15,12 @@ export class DashboardMetadataDto {
 
   @ApiProperty({
     required: false,
+    description: 'Nombre de la categoría seleccionada, si aplica (spec 43).',
+  })
+  categoryName?: string;
+
+  @ApiProperty({
+    required: false,
     description: 'Nombre del departamento filtrado, si aplica.',
   })
   departmentName?: string;
@@ -145,6 +151,16 @@ export class DashboardQuestionDto {
   @ApiProperty() questionText: string;
   @ApiProperty() questionType: string;
   @ApiProperty() sectionName: string;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Instrumento de origen de la pregunta (spec 43, D9). Presente siempre — se agrega para que una vista de categoría (que agrega varios instrumentos) pueda etiquetar la procedencia de cada tarjeta.',
+  })
+  instrumentId?: string;
+
+  @ApiProperty({ required: false })
+  instrumentName?: string;
 
   @ApiProperty({ required: false, nullable: true })
   systemField: string | null;

@@ -101,6 +101,7 @@ export async function seedInstrumentoS8bInfraestructuraDePoscosechaCafe(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S8B',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

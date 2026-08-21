@@ -63,6 +63,7 @@ export async function seedInstrumentoS13ValidacionesTecnico(
       version: VERSION,
       publishDate: '2026-07-06',
       isActive: true,
+      code: 'S13',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

@@ -102,6 +102,7 @@ export async function seedInstrumentoS41PoscosechaCacao(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S4.1',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
