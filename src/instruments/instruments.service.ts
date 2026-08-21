@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
@@ -60,10 +60,19 @@ export class InstrumentsService {
   }
 
   async findAll(excludeSystem = false): Promise<Instrument[]> {
-    return await this.instrumentsRepository.find({
-      where: excludeSystem ? { code: IsNull() } : undefined,
-      relations: { actorTypes: true },
-    });
+    const qb = this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoin('instrument.createdBy', 'createdBy')
+      .leftJoin('instrument.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName']);
+
+    if (excludeSystem) {
+      qb.where('instrument.code IS NULL');
+    }
+
+    return qb.getMany();
   }
 
   /** Fase 2 (Spec 30): catálogo público para el dashboard — solo instrumentos activos. */
@@ -101,10 +110,15 @@ export class InstrumentsService {
   }
 
   async findOne(id: string): Promise<Instrument> {
-    const instrument = await this.instrumentsRepository.findOne({
-      where: { instrumentId: id },
-      relations: { actorTypes: true },
-    });
+    const instrument = await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoin('instrument.createdBy', 'createdBy')
+      .leftJoin('instrument.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName'])
+      .where('instrument.instrumentId = :id', { id })
+      .getOne();
 
     if (!instrument) {
       throw new NotFoundException('Instrument not found');

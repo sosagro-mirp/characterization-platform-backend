@@ -66,8 +66,15 @@ export class CampaignsService {
     return this.campaignsRepository.save(campaign);
   }
 
-  findAll(): Promise<Campaign[]> {
-    return this.campaignsRepository.find({ order: { name: 'ASC' } });
+  async findAll(): Promise<Campaign[]> {
+    return await this.campaignsRepository
+      .createQueryBuilder('campaign')
+      .leftJoin('campaign.createdBy', 'createdBy')
+      .leftJoin('campaign.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName'])
+      .orderBy('campaign.name', 'ASC')
+      .getMany();
   }
 
   findActive(): Promise<Campaign[]> {
@@ -78,16 +85,20 @@ export class CampaignsService {
   }
 
   async findOne(campaignId: string): Promise<Campaign> {
-    const campaign = await this.campaignsRepository.findOne({
-      where: { campaignId },
-      relations: [
-        'steps',
-        'steps.instrument',
-        'steps.conditions',
-        'steps.conditions.conditionQuestion',
-        'steps.conditions.conditionCrop',
-      ],
-    });
+    const campaign = await this.campaignsRepository
+      .createQueryBuilder('campaign')
+      .leftJoinAndSelect('campaign.steps', 'steps')
+      .leftJoinAndSelect('steps.instrument', 'instrument')
+      .leftJoinAndSelect('steps.conditions', 'conditions')
+      .leftJoinAndSelect('conditions.conditionQuestion', 'conditionQuestion')
+      .leftJoinAndSelect('conditions.conditionCrop', 'conditionCrop')
+      .leftJoin('campaign.createdBy', 'createdBy')
+      .leftJoin('campaign.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName'])
+      .where('campaign.campaignId = :campaignId', { campaignId })
+      .getOne();
+
     if (!campaign) throw new NotFoundException('Campaign not found');
     campaign.steps = (campaign.steps ?? []).sort((a, b) => a.order - b.order);
     return campaign;
