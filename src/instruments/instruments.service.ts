@@ -1,9 +1,13 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
-import { In, IsNull, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
@@ -21,7 +25,10 @@ export class InstrumentsService {
     private readonly townsRepository: Repository<Town>,
   ) {}
 
-  async create(createInstrumentDto: CreateInstrumentDto, userId?: string): Promise<Instrument> {
+  async create(
+    createInstrumentDto: CreateInstrumentDto,
+    userId?: string,
+  ): Promise<Instrument> {
     const { actorTypeIds, ...rest } = createInstrumentDto;
 
     let actorTypes: ActorType[] = [];
@@ -37,7 +44,9 @@ export class InstrumentsService {
 
     let user: User | undefined;
     if (userId) {
-      user = await this.usersRepository.findOne({ where: { userId } }) ?? undefined;
+      user =
+        (await this.usersRepository.findOne({ where: { userId } })) ??
+        undefined;
     }
 
     const instrument = this.instrumentsRepository.create({
@@ -51,9 +60,29 @@ export class InstrumentsService {
   }
 
   async findAll(excludeSystem = false): Promise<Instrument[]> {
+    const qb = this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoin('instrument.createdBy', 'createdBy')
+      .leftJoin('instrument.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName']);
+
+    if (excludeSystem) {
+      qb.where('instrument.code IS NULL');
+    }
+
+    return qb.getMany();
+  }
+
+  /** Fase 2 (Spec 30): catálogo público para el dashboard — solo instrumentos activos. */
+  async findAllPublic(): Promise<
+    Pick<Instrument, 'instrumentId' | 'name' | 'code'>[]
+  > {
     return await this.instrumentsRepository.find({
-      where: excludeSystem ? { code: IsNull() } : undefined,
-      relations: { actorTypes: true },
+      where: { isActive: true },
+      select: ['instrumentId', 'name', 'code'],
+      order: { name: 'ASC' },
     });
   }
 
@@ -68,20 +97,28 @@ export class InstrumentsService {
       .getMany();
   }
 
-  async findByCode(code: string): Promise<{ instrumentId: string; name: string }> {
+  async findByCode(
+    code: string,
+  ): Promise<{ instrumentId: string; name: string }> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { code },
       select: ['instrumentId', 'name'],
     });
-    if (!instrument) throw new NotFoundException(`Instrument with code '${code}' not found`);
+    if (!instrument)
+      throw new NotFoundException(`Instrument with code '${code}' not found`);
     return { instrumentId: instrument.instrumentId, name: instrument.name };
   }
 
   async findOne(id: string): Promise<Instrument> {
-    const instrument = await this.instrumentsRepository.findOne({
-      where: { instrumentId: id },
-      relations: { actorTypes: true },
-    });
+    const instrument = await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoin('instrument.createdBy', 'createdBy')
+      .leftJoin('instrument.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName'])
+      .where('instrument.instrumentId = :id', { id })
+      .getOne();
 
     if (!instrument) {
       throw new NotFoundException('Instrument not found');
@@ -90,7 +127,11 @@ export class InstrumentsService {
     return instrument;
   }
 
-  async update(id: string, updateInstrumentDto: UpdateInstrumentDto, userId?: string): Promise<Instrument> {
+  async update(
+    id: string,
+    updateInstrumentDto: UpdateInstrumentDto,
+    userId?: string,
+  ): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
       relations: { actorTypes: true },
@@ -214,12 +255,24 @@ export class InstrumentsService {
                 name: question.type.name,
               }
             : null,
-          options: (question.options ?? []).map((option) => {
+          options: (question.type?.name === 'likert'
+            ? // Likert scales must render in a consistent direction (worst -> best);
+              // relying on createdAt (seed insertion order) let some questions come
+              // back reversed relative to others. `value` already encodes the
+              // intended scale position for every likert option, so it's a safe sort key.
+              [...(question.options ?? [])].sort(
+                (a, b) => (a.value ?? 0) - (b.value ?? 0),
+              )
+            : (question.options ?? [])
+          ).map((option) => {
             let departmentId: string | null = null;
             if (question.systemField === 'farm.department') {
               departmentId = option.metadataId ?? null;
             } else if (question.systemField === 'farm.town') {
-              departmentId = (option.metadataId && townToDepartment.get(option.metadataId)) || null;
+              departmentId =
+                (option.metadataId &&
+                  townToDepartment.get(option.metadataId)) ||
+                null;
             }
             return {
               optionId: option.optionId,

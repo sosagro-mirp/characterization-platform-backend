@@ -31,7 +31,9 @@ export class RegisterDto {
   @MaxLength(72)
   password: string;
 
-  @ApiProperty({ description: 'Código de validación compartido en la presentación' })
+  @ApiProperty({
+    description: 'Código de validación compartido en la presentación',
+  })
   @IsString()
   @IsNotEmpty()
   validationCode: string;

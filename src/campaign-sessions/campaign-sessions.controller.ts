@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -74,5 +76,26 @@ export class CampaignSessionsController {
   @ApiParam({ name: 'id', format: 'uuid' })
   markAsSynchronized(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.sessionsService.markAsSynchronized(id);
+  }
+
+  @Delete(':id')
+  @Roles(ROLES.ADMIN)
+  @HttpCode(204)
+  @ApiOperation({
+    summary: 'Eliminar sesión de campaña sin encuestas asociadas',
+    description:
+      'Acotado a sesiones sin surveys: existe para poder limpiar sesiones ' +
+      'vacías creadas al abandonar la pre-encuesta (ver spec 50), no para ' +
+      'borrar datos de campo.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 204, description: 'Sesión eliminada.' })
+  @ApiResponse({ status: 404, description: 'Sesión no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description: 'La sesión tiene encuestas asociadas y no puede borrarse.',
+  })
+  remove(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.sessionsService.remove(id);
   }
 }

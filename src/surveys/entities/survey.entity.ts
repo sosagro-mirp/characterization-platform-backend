@@ -87,7 +87,10 @@ export class Survey {
     nullable: true,
     onDelete: 'CASCADE',
   })
-  @JoinColumn({ name: 'campaign_session_id', referencedColumnName: 'sessionId' })
+  @JoinColumn({
+    name: 'campaign_session_id',
+    referencedColumnName: 'sessionId',
+  })
   campaignSession?: CampaignSession;
 
   @Column({ name: 'step_order', type: 'integer', nullable: true })

@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddRespondentFieldsToSurvey1781700000000
-  implements MigrationInterface
-{
+export class AddRespondentFieldsToSurvey1781700000000 implements MigrationInterface {
   name = 'AddRespondentFieldsToSurvey1781700000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

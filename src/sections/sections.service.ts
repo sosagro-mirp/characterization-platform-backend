@@ -75,7 +75,10 @@ export class SectionsService {
       throw new NotFoundException('Section not found');
     }
 
-    if (updateSectionDto.order !== undefined && updateSectionDto.order !== section.order) {
+    if (
+      updateSectionDto.order !== undefined &&
+      updateSectionDto.order !== section.order
+    ) {
       const sibling = await this.sectionsRepository.findOne({
         where: { instrument: { instrumentId }, order: updateSectionDto.order },
       });

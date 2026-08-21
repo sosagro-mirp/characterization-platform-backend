@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,27 @@ async function saveOptions(
 const NAME = `S10: Interés en Participar en el Proyecto`;
 const VERSION = 1;
 
-export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["likert", "multiple_choice", "open_text", "single_choice", "yes_no"];
+  const typeNames = [
+    'likert',
+    'multiple_choice',
+    'open_text',
+    'single_choice',
+    'yes_no',
+  ];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -82,14 +101,33 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S10',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `Socialización del proyecto`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Modalidad de participación deseada`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Condiciones de participación`, order: 3, instrument }))
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `Socialización del proyecto`,
+        order: 1,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `Modalidad de participación deseada`,
+        order: 2,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `Condiciones de participación`,
+        order: 3,
+        instrument,
+      }),
+    ),
   ]);
 
   // ── Socialización del proyecto ──
@@ -133,7 +171,6 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       order: o++,
       section: sec1,
     });
-
   }
 
   // ── Modalidad de participación deseada ──
@@ -150,15 +187,26 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       section: sec2,
     });
     await saveOptions(manager, q_9acaf637_2a45_4529_8788_244c1d18aaff, [
-      { text: `Unidad productiva para instalación de sensores (Objetivo 1 — tecnología de campo)` },
-      { text: `Unidad productiva para análisis de calidad en plataforma SOS AGRO (Objetivo 3)` },
-      { text: `Unidad productiva para valorización de residuos (Objetivo 2 — energía, materiales, agua)` },
-      { text: `Diagnóstico de la cadena (talleres, encuestas, grupos focales)` },
+      {
+        text: `Unidad productiva para instalación de sensores (Objetivo 1 — tecnología de campo)`,
+      },
+      {
+        text: `Unidad productiva para análisis de calidad en plataforma SOS AGRO (Objetivo 3)`,
+      },
+      {
+        text: `Unidad productiva para valorización de residuos (Objetivo 2 — energía, materiales, agua)`,
+      },
+      {
+        text: `Diagnóstico de la cadena (talleres, encuestas, grupos focales)`,
+      },
       { text: `No tengo interés en participar` },
-      { text: `Socialización de resultados y adopción de tecnologías exitosas` },
-      { text: `Capacitaciones en uso de la App de conectividad y plataforma digital` },
+      {
+        text: `Socialización de resultados y adopción de tecnologías exitosas`,
+      },
+      {
+        text: `Capacitaciones en uso de la App de conectividad y plataforma digital`,
+      },
     ]);
-
   }
 
   // ── Condiciones de participación ──
@@ -290,7 +338,6 @@ export async function seedInstrumentoS10InteresEnParticiparEnElProyecto(manager:
       { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
-
   }
 
   console.log(`[seed] "${NAME}" insertado (14 preguntas).`);

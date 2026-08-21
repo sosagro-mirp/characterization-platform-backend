@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,27 @@ async function saveOptions(
 const NAME = `S1b: Identificación de la unidad productiva`;
 const VERSION = 1;
 
-export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["multiple_choice", "numeric", "open_text", "single_choice", "yes_no"];
+  const typeNames = [
+    'multiple_choice',
+    'numeric',
+    'open_text',
+    'single_choice',
+    'yes_no',
+  ];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -82,13 +101,17 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       version: VERSION,
       publishDate: '2026-06-25',
       isActive: false,
-      code: 'S2',
+      code: 'S1b',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const sec1 = await sectionRepo.save(
-    sectionRepo.create({ name: `Identificación de la unidad productiva`, order: 1, instrument }),
+    sectionRepo.create({
+      name: `Identificación de la unidad productiva`,
+      order: 1,
+      instrument,
+    }),
   );
 
   // ── Identificación de la unidad productiva ──
@@ -113,16 +136,21 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       order: o++,
       section: sec1,
     });
-    const opts_2adaaca9_9d98_48e6_a043_b96ab98926b7 = await saveOptions(manager, q_2adaaca9_9d98_48e6_a043_b96ab98926b7, [
-      { text: `Comodato / Préstamo` },
-      { text: `Arrendatario(a)` },
-      { text: `Propietario(a) sin título formal` },
-      { text: `Tierra colectiva (resguardo / comunidad)` },
-      { text: `Propietario(a) con título formal` },
-      { text: `Aparcero(a) / Mediería` },
-      { text: `Otros`, isOther: true },
-    ]);
-    const opt_d258dab5_059c_480f_825a_a91a7ada6b64 = opts_2adaaca9_9d98_48e6_a043_b96ab98926b7.get(`Arrendatario(a)`)!;
+    const opts_2adaaca9_9d98_48e6_a043_b96ab98926b7 = await saveOptions(
+      manager,
+      q_2adaaca9_9d98_48e6_a043_b96ab98926b7,
+      [
+        { text: `Comodato / Préstamo` },
+        { text: `Arrendatario(a)` },
+        { text: `Propietario(a) sin título formal` },
+        { text: `Tierra colectiva (resguardo / comunidad)` },
+        { text: `Propietario(a) con título formal` },
+        { text: `Aparcero(a) / Mediería` },
+        { text: `Otros`, isOther: true },
+      ],
+    );
+    const opt_d258dab5_059c_480f_825a_a91a7ada6b64 =
+      opts_2adaaca9_9d98_48e6_a043_b96ab98926b7.get(`Arrendatario(a)`)!;
 
     await saveQuestion(manager, {
       text: `¿Por cuánto tiempo está arrendada?`,
@@ -323,7 +351,6 @@ export async function seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manag
       conditionQuestion: q_b1e6c1e0_53af_4fe7_8f3c_124cc4f3492f,
       conditionValue: 'true',
     });
-
   }
 
   console.log(`[seed] "${NAME}" insertado (21 preguntas).`);

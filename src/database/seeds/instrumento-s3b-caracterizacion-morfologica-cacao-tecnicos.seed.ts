@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,21 @@ async function saveOptions(
 const NAME = `S3B: Caracterización Morfológica Cacao (Técnicos)`;
 const VERSION = 1;
 
-export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["likert", "numeric", "open_text", "single_choice"];
+  const typeNames = ['likert', 'numeric', 'open_text', 'single_choice'];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -82,16 +95,27 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S3B',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3, sec4, sec5] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `Árbol`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Hoja`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Fruto`, order: 3, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Semilla`, order: 4, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Flor`, order: 5, instrument }))
+    sectionRepo.save(
+      sectionRepo.create({ name: `Árbol`, order: 1, instrument }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({ name: `Hoja`, order: 2, instrument }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({ name: `Fruto`, order: 3, instrument }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({ name: `Semilla`, order: 4, instrument }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({ name: `Flor`, order: 5, instrument }),
+    ),
   ]);
 
   // ── Árbol ──
@@ -196,7 +220,6 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       order: o++,
       section: sec1,
     });
-
   }
 
   // ── Hoja ──
@@ -290,7 +313,6 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       { text: `Rojo oscuro` },
       { text: `Rojo intermedio` },
     ]);
-
   }
 
   // ── Fruto ──
@@ -505,7 +527,6 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       order: o++,
       section: sec3,
     });
-
   }
 
   // ── Semilla ──
@@ -588,7 +609,6 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       order: o++,
       section: sec4,
     });
-
   }
 
   // ── Flor ──
@@ -759,7 +779,6 @@ export async function seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(
       { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
-
   }
 
   console.log(`[seed] "${NAME}" insertado (62 preguntas).`);

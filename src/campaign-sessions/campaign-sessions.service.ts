@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
@@ -8,6 +12,9 @@ import { CampaignSession } from './entities/campaign-session.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
+import { Farmer } from 'src/farmers/entities/farmer.entity';
+import { User } from 'src/users/entities/user.entity';
+import { Survey } from 'src/surveys/entities/survey.entity';
 
 interface NextStepInstrument {
   instrumentId: string;
@@ -32,6 +39,12 @@ export class CampaignSessionsService {
     private readonly campaignsRepository: Repository<Campaign>,
     @InjectRepository(TypeOfCrop)
     private readonly cropsRepository: Repository<TypeOfCrop>,
+    @InjectRepository(Farmer)
+    private readonly farmersRepository: Repository<Farmer>,
+    @InjectRepository(User)
+    private readonly usersRepository: Repository<User>,
+    @InjectRepository(Survey)
+    private readonly surveysRepository: Repository<Survey>,
   ) {}
 
   async getLastFarmer(userId: string): Promise<{
@@ -53,7 +66,9 @@ export class CampaignSessionsService {
     return {
       farmerId: session.farmer.id,
       name: session.farmer.name,
-      farm: session.farmer.farm ? { name: session.farmer.farm.name } : undefined,
+      farm: session.farmer.farm
+        ? { name: session.farmer.farm.name }
+        : undefined,
     };
   }
 
@@ -63,19 +78,44 @@ export class CampaignSessionsService {
     });
     if (!campaign) throw new NotFoundException('Campaign not found');
 
+    // CONTRACT (spec 49): the mobile client compares these messages verbatim
+    // to discriminate a stale-farmer 404 from other errors and invalidate
+    // its local cache (mobile/src/sync/SyncQueueService.ts,
+    // mobile/app/campaign/[id]/pre-survey.tsx). Changing the wording breaks
+    // that comparison silently.
+    //
+    // CONTRACT (spec 51): `farmerId` is optional by design, not just
+    // schema-level nullability. When the mobile client's stale-farmer retry
+    // (the 404 path above) succeeds without a farmerId, the session is
+    // created deliberately without one — the alternative would be blocking
+    // the pollster mid-survey or losing the session outright. A session
+    // with no farmer is a legitimate, expected state produced by that retry
+    // path, not corrupted data. See backend/docs/data-notes.md.
+    if (dto.farmerId) {
+      const farmer = await this.farmersRepository.findOne({
+        where: { id: dto.farmerId },
+      });
+      if (!farmer) throw new NotFoundException('Farmer not found');
+    }
+
+    if (dto.userId) {
+      const user = await this.usersRepository.findOne({
+        where: { userId: dto.userId },
+      });
+      if (!user) throw new NotFoundException('User not found');
+    }
+
     const session = this.sessionsRepository.create({
       campaign,
-      farmer: dto.farmerId ? ({ id: dto.farmerId } as any) : undefined,
-      user: dto.userId ? ({ userId: dto.userId } as any) : undefined,
-      actorType: dto.actorTypeId
-        ? ({ actorTypeId: dto.actorTypeId } as any)
-        : undefined,
+      farmer: dto.farmerId ? { id: dto.farmerId } : undefined,
+      user: dto.userId ? { userId: dto.userId } : undefined,
+      actorType: dto.actorTypeId ? { actorTypeId: dto.actorTypeId } : undefined,
       department: dto.departmentId
-        ? ({ departmentId: dto.departmentId } as any)
+        ? { departmentId: dto.departmentId }
         : undefined,
-      town: dto.townId ? ({ townId: dto.townId } as any) : undefined,
+      town: dto.townId ? { townId: dto.townId } : undefined,
       vereda: dto.vereda,
-      crop: dto.cropId ? ({ cropId: dto.cropId } as any) : undefined,
+      crop: dto.cropId ? { cropId: dto.cropId } : undefined,
     });
 
     if (dto.cropIds?.length) {
@@ -149,8 +189,18 @@ export class CampaignSessionsService {
 
     return matches.some((r) => {
       if (r.option?.optionId === expected) return true;
-      if (r.textValue !== null && r.textValue !== undefined && r.textValue === expected) return true;
-      if (r.numericValue !== null && r.numericValue !== undefined && String(r.numericValue) === expected) return true;
+      if (
+        r.textValue !== null &&
+        r.textValue !== undefined &&
+        r.textValue === expected
+      )
+        return true;
+      if (
+        r.numericValue !== null &&
+        r.numericValue !== undefined &&
+        String(r.numericValue) === expected
+      )
+        return true;
       if (r.booleanValue !== null && r.booleanValue !== undefined) {
         if (expected === 'true' && r.booleanValue === true) return true;
         if (expected === 'false' && r.booleanValue === false) return true;
@@ -164,7 +214,9 @@ export class CampaignSessionsService {
     allResponses: Response[],
     sessionCrops: TypeOfCrop[],
   ): boolean {
-    const conditions = (step.conditions ?? []).sort((a, b) => a.order - b.order);
+    const conditions = (step.conditions ?? []).sort(
+      (a, b) => a.order - b.order,
+    );
     if (conditions.length === 0) return true;
 
     let result = this.evalCondition(conditions[0], allResponses, sessionCrops);
@@ -201,10 +253,13 @@ export class CampaignSessionsService {
 
     for (const step of steps) {
       if (completedOrders.has(step.order)) continue;
-      if (!this.stepPassesConditions(step, allResponses, sessionCrops)) continue;
+      if (!this.stepPassesConditions(step, allResponses, sessionCrops))
+        continue;
 
       if (!step.instrument) {
-        throw new NotFoundException(`Instrument for step ${step.stepId} not found`);
+        throw new NotFoundException(
+          `Instrument for step ${step.stepId} not found`,
+        );
       }
 
       return {
@@ -221,5 +276,39 @@ export class CampaignSessionsService {
     }
 
     return null;
+  }
+
+  /**
+   * Borrado acotado a sesiones sin encuestas asociadas (spec 50). La guarda
+   * de encuestas NO es opcional: `surveys.campaign_session_id` es CASCADE, y
+   * `responses.survey_id` también, así que sin ella un DELETE de sesión
+   * borraría encuestas y respuestas de campo en silencio.
+   */
+  async remove(sessionId: string): Promise<void> {
+    await this.sessionsRepository.manager.transaction(async (manager) => {
+      // Lock pesimista sobre la sesión: una fila bajo FOR UPDATE bloquea a
+      // cualquier INSERT concurrente en `surveys` que la referencie (la FK
+      // toma un lock KEY SHARE sobre el padre, incompatible con FOR UPDATE).
+      // Sin este lock, una encuesta podría crearse entre el count() y el
+      // remove() de abajo, y el CASCADE de surveys/responses la borraría en
+      // silencio — justo lo que esta guarda existe para impedir.
+      const session = await manager
+        .createQueryBuilder(CampaignSession, 'session')
+        .setLock('pessimistic_write')
+        .where('session.sessionId = :sessionId', { sessionId })
+        .getOne();
+      if (!session) throw new NotFoundException('Campaign session not found');
+
+      const surveysCount = await manager.getRepository(Survey).count({
+        where: { campaignSession: { sessionId } },
+      });
+      if (surveysCount > 0) {
+        throw new ConflictException(
+          'Campaign session has surveys and cannot be deleted',
+        );
+      }
+
+      await manager.remove(session);
+    });
   }
 }

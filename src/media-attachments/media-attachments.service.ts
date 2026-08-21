@@ -12,7 +12,10 @@ import { User } from 'src/users/entities/user.entity';
 import { StorageService } from 'src/storage/storage.service';
 import { ConfirmUploadDto } from './dto/confirm-upload.dto';
 import { CreatePresignedUrlDto } from './dto/create-presigned-url.dto';
-import { MediaAttachment, MediaAttachmentStatus } from './entities/media-attachment.entity';
+import {
+  MediaAttachment,
+  MediaAttachmentStatus,
+} from './entities/media-attachment.entity';
 
 const MIME_TO_EXT: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -43,7 +46,12 @@ export class MediaAttachmentsService {
   async createPresignedUrl(
     dto: CreatePresignedUrlDto,
     userId: string,
-  ): Promise<{ attachmentId: string; presignedUrl: string; storageKey: string; expiresAt: string }> {
+  ): Promise<{
+    attachmentId: string;
+    presignedUrl: string;
+    storageKey: string;
+    expiresAt: string;
+  }> {
     const survey = await this.surveyRepository.findOne({
       where: { surveyId: dto.surveyId },
     });

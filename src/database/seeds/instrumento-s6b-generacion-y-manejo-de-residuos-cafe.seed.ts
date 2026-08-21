@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,28 @@ async function saveOptions(
 const NAME = `S6B: Generación y Manejo de Residuos — Café`;
 const VERSION = 1;
 
-export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["multiple_choice", "numeric", "open_text", "single_choice", "yes_no", "likert"];
+  const typeNames = [
+    'multiple_choice',
+    'numeric',
+    'open_text',
+    'single_choice',
+    'yes_no',
+    'likert',
+  ];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -82,14 +102,33 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S6B',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `Tabla de Residuos por Cultivo`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Caracterización Detallada de Residuos`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `Interés en Valorización de Residuos`, order: 3, instrument }))
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `Tabla de Residuos por Cultivo`,
+        order: 1,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `Caracterización Detallada de Residuos`,
+        order: 2,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `Interés en Valorización de Residuos`,
+        order: 3,
+        instrument,
+      }),
+    ),
   ]);
 
   // ── Tabla de Residuos por Cultivo ──
@@ -473,7 +512,6 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       conditionQuestion: q_b5de82ed_3012_4b28_abb9_9c496365799c,
       conditionValue: 'true',
     });
-
   }
 
   // ── Caracterización Detallada de Residuos ──
@@ -524,12 +562,13 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       order: o++,
       section: sec2,
     });
-    const opts_50a03f41_74a5_4698_b39c_a11a0894d2ef = await saveOptions(manager, q_50a03f41_74a5_4698_b39c_a11a0894d2ef, [
-      { text: `No` },
-      { text: `Sí` },
-      { text: `No sabe / No aplica` },
-    ]);
-    const opt_0dcb81ee_2103_49fd_8901_7b06e8d0db04 = opts_50a03f41_74a5_4698_b39c_a11a0894d2ef.get(`Sí`)!;
+    const opts_50a03f41_74a5_4698_b39c_a11a0894d2ef = await saveOptions(
+      manager,
+      q_50a03f41_74a5_4698_b39c_a11a0894d2ef,
+      [{ text: `No` }, { text: `Sí` }, { text: `No sabe / No aplica` }],
+    );
+    const opt_0dcb81ee_2103_49fd_8901_7b06e8d0db04 =
+      opts_50a03f41_74a5_4698_b39c_a11a0894d2ef.get(`Sí`)!;
 
     const q_b3b74a8e_2f3b_47fd_bd1d_a5a10b8bdb6a = await saveQuestion(manager, {
       text: `¿Puede compartir los resultados de la caracterización con el proyecto?`,
@@ -702,12 +741,13 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       order: o++,
       section: sec2,
     });
-    const opts_1291925d_2725_4daa_9c73_c936ba954ea0 = await saveOptions(manager, q_1291925d_2725_4daa_9c73_c936ba954ea0, [
-      { text: `Sí` },
-      { text: `No` },
-      { text: `No sabe / No aplica` },
-    ]);
-    const opt_73cdf984_60ed_48ec_9034_c22256fc40d4 = opts_1291925d_2725_4daa_9c73_c936ba954ea0.get(`Sí`)!;
+    const opts_1291925d_2725_4daa_9c73_c936ba954ea0 = await saveOptions(
+      manager,
+      q_1291925d_2725_4daa_9c73_c936ba954ea0,
+      [{ text: `Sí` }, { text: `No` }, { text: `No sabe / No aplica` }],
+    );
+    const opt_73cdf984_60ed_48ec_9034_c22256fc40d4 =
+      opts_1291925d_2725_4daa_9c73_c936ba954ea0.get(`Sí`)!;
 
     const q_e997afa5_a104_44fe_91b8_f88b4c983dca = await saveQuestion(manager, {
       text: `¿Puede compartir los resultados de metales pesados con el proyecto?`,
@@ -743,7 +783,6 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       { text: `No sabe` },
       { text: `Hexosas (C6): glucosa, fructosa` },
     ]);
-
   }
 
   // ── Interés en Valorización de Residuos ──
@@ -1002,7 +1041,6 @@ export async function seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager:
       { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
-
   }
 
   console.log(`[seed] "${NAME}" insertado (75 preguntas).`);

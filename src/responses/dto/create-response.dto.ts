@@ -25,7 +25,7 @@ export class CreateResponseDto {
   @IsUUID()
   questionId: string;
 
-  /** UUID de la opción seleccionada — usar para preguntas de tipo single_choice, likert, yes_no, multiple_choice y compliance */
+  /** UUID de la opción seleccionada — usar para preguntas de tipo single_choice, likert, yes_no, multiple_choice, compliance y numeric_with_unit (unidad seleccionada) */
   @ApiPropertyOptional({
     format: 'uuid',
     example: '550e8400-e29b-41d4-a716-446655440002',
@@ -41,7 +41,7 @@ export class CreateResponseDto {
   @IsNotEmpty()
   textValue?: string;
 
-  /** Valor numérico — usar cuando la pregunta es de tipo numeric */
+  /** Valor numérico — usar cuando la pregunta es de tipo numeric o numeric_with_unit (combinado con optionId para la unidad) */
   @ApiPropertyOptional({ example: 42.5 })
   @IsOptional()
   @IsNumber()

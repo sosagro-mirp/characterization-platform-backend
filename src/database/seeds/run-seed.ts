@@ -45,7 +45,6 @@ import { seedInstrumentoS10InteresEnParticiparEnElProyecto } from './instrumento
 import { seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras } from './instrumento-s11-adopcion-tecnologica-diagnostico-de-barreras.seed';
 import { seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas } from './instrumento-s11-adopcion-tecnologica-diagnostico-extensionistas.seed';
 import { seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario } from './instrumento-s11-adopcion-tecnologica-perfil-de-inversion-del-propietario.seed';
-import { seedInstrumentoS11AdopcionTecnologicaProductoresYPropietariosResidentes } from './instrumento-s11-adopcion-tecnologica-productores-y-propietarios-residentes.seed';
 import { seedInstrumentoS12AspectosFitosanitariosDiagnostico } from './instrumento-s12-aspectos-fitosanitarios-diagnostico.seed';
 import { seedInstrumentoS13ValidacionesTecnico } from './instrumento-s13-validaciones-tecnico.seed';
 import { seedInstrumentoSDcuDiagnosticoBarrerasAdopcionDigital } from './instrumento-s-dcu-diagnostico-barreras-adopcion-digital.seed';
@@ -144,7 +143,9 @@ async function run(): Promise<void> {
       await seedTypesOfCrops(manager);
       await seedTypesOfQuestions(manager);
       // S1 — Identificación
-      await seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioProductor(manager);
+      await seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioProductor(
+        manager,
+      );
       await seedInstrumentoS1bIdentificacionDeLaUnidadProductiva(manager);
       // S2 — Cultivos
       await seedInstrumentoS2CultivosIdentificacionDeCadenas(manager);
@@ -154,7 +155,9 @@ async function run(): Promise<void> {
       await seedInstrumentoS27BloqueCanamo(manager);
       // S3 — Manejo del cultivo
       await seedInstrumentoS341SusceptibilidadAEnfermedades(manager);
-      await seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbientales(manager);
+      await seedInstrumentoS3ManejoDelCultivoSueloYCondicionesAmbientales(
+        manager,
+      );
       await seedInstrumentoS3bCaracterizacionMorfologicaCacaoTecnicos(manager);
       // S4 — Poscosecha
       await seedInstrumentoS41PoscosechaCacao(manager);
@@ -163,7 +166,9 @@ async function run(): Promise<void> {
       await seedInstrumentoS44PoscosechaCanamo(manager);
       await seedInstrumentoS45EnergiaYEquipos(manager);
       // S5 — Calidad
-      await seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalidad(manager);
+      await seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalidad(
+        manager,
+      );
       // S6 — Residuos
       await seedInstrumentoS6aGeneracionYManejoDeResiduosCacao(manager);
       await seedInstrumentoS6bGeneracionYManejoDeResiduosCafe(manager);
@@ -184,10 +189,13 @@ async function run(): Promise<void> {
       // S10 — Participación
       await seedInstrumentoS10InteresEnParticiparEnElProyecto(manager);
       // S11 — Adopción tecnológica
-      await seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas(manager);
+      await seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas(
+        manager,
+      );
       await seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras(manager);
-      await seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(manager);
-      await seedInstrumentoS11AdopcionTecnologicaProductoresYPropietariosResidentes(manager);
+      await seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelPropietario(
+        manager,
+      );
       // S12 — Fitosanitario
       await seedInstrumentoS12AspectosFitosanitariosDiagnostico(manager);
       // S13 — Validaciones técnico

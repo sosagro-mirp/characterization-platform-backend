@@ -11,7 +11,13 @@ import { MediaAttachmentsService } from './media-attachments.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([MediaAttachment, Survey, Question, Response, User]),
+    TypeOrmModule.forFeature([
+      MediaAttachment,
+      Survey,
+      Question,
+      Response,
+      User,
+    ]),
     StorageModule,
   ],
   controllers: [MediaAttachmentsController],

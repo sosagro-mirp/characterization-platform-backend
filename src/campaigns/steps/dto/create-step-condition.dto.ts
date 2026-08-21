@@ -9,7 +9,10 @@ import {
   Min,
   ValidateIf,
 } from 'class-validator';
-import type { ConditionType, LogicalOperator } from '../../entities/step-condition.entity';
+import type {
+  ConditionType,
+  LogicalOperator,
+} from '../../entities/step-condition.entity';
 
 export class CreateStepConditionDto {
   @ApiProperty({ example: 1, minimum: 1 })
@@ -17,7 +20,10 @@ export class CreateStepConditionDto {
   @Min(1)
   order: number;
 
-  @ApiPropertyOptional({ enum: ['AND', 'OR'], description: 'Requerido para order > 1' })
+  @ApiPropertyOptional({
+    enum: ['AND', 'OR'],
+    description: 'Requerido para order > 1',
+  })
   @IsOptional()
   @IsEnum(['AND', 'OR'])
   logicalOperator?: LogicalOperator;
@@ -26,19 +32,29 @@ export class CreateStepConditionDto {
   @IsEnum(['question', 'crop'])
   conditionType: ConditionType;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Requerido si conditionType = question' })
-  @ValidateIf((o) => o.conditionType === 'question')
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Requerido si conditionType = question',
+  })
+  @ValidateIf((o: CreateStepConditionDto) => o.conditionType === 'question')
   @IsUUID()
   conditionQuestionId?: string;
 
-  @ApiPropertyOptional({ example: 'si', maxLength: 50, description: 'Solo para conditionType = question' })
+  @ApiPropertyOptional({
+    example: 'si',
+    maxLength: 50,
+    description: 'Solo para conditionType = question',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(50)
   conditionValue?: string;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Requerido si conditionType = crop' })
-  @ValidateIf((o) => o.conditionType === 'crop')
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Requerido si conditionType = crop',
+  })
+  @ValidateIf((o: CreateStepConditionDto) => o.conditionType === 'crop')
   @IsUUID()
   conditionCropId?: string;
 }

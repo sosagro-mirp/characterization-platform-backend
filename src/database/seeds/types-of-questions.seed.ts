@@ -4,6 +4,7 @@ import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question
 const TYPES_OF_QUESTIONS: string[] = [
   'open_text',
   'numeric',
+  'numeric_with_unit',
   'yes_no',
   'single_choice',
   'multiple_choice',

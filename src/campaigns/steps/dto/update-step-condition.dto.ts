@@ -8,7 +8,10 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import type { ConditionType, LogicalOperator } from '../../entities/step-condition.entity';
+import type {
+  ConditionType,
+  LogicalOperator,
+} from '../../entities/step-condition.entity';
 
 export class UpdateStepConditionDto {
   @ApiPropertyOptional({ example: 2, minimum: 1 })

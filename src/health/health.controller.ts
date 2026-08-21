@@ -1,5 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
-import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
+import {
+  HealthCheck,
+  HealthCheckService,
+  TypeOrmHealthIndicator,
+} from '@nestjs/terminus';
 import { Public } from '../auth/decorators/public.decorator';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
@@ -16,7 +20,8 @@ export class HealthController {
   @Public()
   @ApiOperation({
     summary: 'Health check endpoint',
-    description: 'Returns the health status of the application and database. Used by orchestrators (Railway, uptime monitors, etc.)',
+    description:
+      'Returns the health status of the application and database. Used by orchestrators (Railway, uptime monitors, etc.)',
   })
   @ApiResponse({
     status: 200,

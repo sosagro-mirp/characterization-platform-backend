@@ -21,35 +21,44 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 async function saveOptions(
   manager: EntityManager,
   question: Question,
-  options: { text: string; value?: number; isOther?: boolean; metadataId?: string }[],
+  options: {
+    text: string;
+    value?: number;
+    isOther?: boolean;
+    metadataId?: string;
+  }[],
 ): Promise<Map<string, string>> {
   const repo = manager.getRepository(OptionQuestion);
   const map = new Map<string, string>();
   for (const opt of options) {
-    const saved = await repo.save(repo.create({
-      question,
-      text: opt.text,
-      value: opt.value,
-      isOther: opt.isOther ?? false,
-      metadataId: opt.metadataId,
-    }));
+    const saved = await repo.save(
+      repo.create({
+        question,
+        text: opt.text,
+        value: opt.value,
+        isOther: opt.isOther ?? false,
+        metadataId: opt.metadataId,
+      }),
+    );
     map.set(opt.text, saved.optionId);
   }
   return map;
@@ -58,17 +67,28 @@ async function saveOptions(
 const NAME = `S5: Dificultades para Cumplir Estándares de Calidad`;
 const VERSION = 1;
 
-export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalidad(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalidad(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
-  const typeNames = ["multiple_choice", "numeric", "open_text", "single_choice", "yes_no", "likert"];
+  const typeNames = [
+    'multiple_choice',
+    'numeric',
+    'open_text',
+    'single_choice',
+    'yes_no',
+    'likert',
+  ];
   const types: Record<string, TypeOfQuestion> = {};
   for (const n of typeNames) {
     const t = await typeRepo.findOne({ where: { name: n } });
@@ -82,15 +102,40 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S5',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const [sec1, sec2, sec3, sec4] = await Promise.all([
-    sectionRepo.save(sectionRepo.create({ name: `5.1 Barreras principales`, order: 1, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `5.2 Tipo de apoyo necesario`, order: 2, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `5.3 Reconocimiento por alta calidad`, order: 3, instrument })),
-    sectionRepo.save(sectionRepo.create({ name: `5.4 Impacto económico del incumplimiento`, order: 4, instrument }))
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `5.1 Barreras principales`,
+        order: 1,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `5.2 Tipo de apoyo necesario`,
+        order: 2,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `5.3 Reconocimiento por alta calidad`,
+        order: 3,
+        instrument,
+      }),
+    ),
+    sectionRepo.save(
+      sectionRepo.create({
+        name: `5.4 Impacto económico del incumplimiento`,
+        order: 4,
+        instrument,
+      }),
+    ),
   ]);
 
   // ── 5.1 Barreras principales ──
@@ -110,18 +155,30 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       { text: `Falta de conocimiento / apoyo institucional` },
       { text: `Otro`, isOther: true },
       { text: `Agua de mala calidad para los procesos de beneficio` },
-      { text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)` },
+      {
+        text: `Falta de equipos para medir parámetros de calidad (humedad, Brix, pH, etc.)`,
+      },
       { text: `Falta de conocimiento técnico sobre procesos de poscosecha` },
-      { text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)` },
-      { text: `Infraestructura deficiente (marquesinas, cajones de fermentación, bodegas)` },
-      { text: `Acceso limitado a insumos de calidad (semillas certificadas, fertilizantes)` },
-      { text: `Dificultades en el proceso de fermentación (duración, temperatura, volteo)` },
+      {
+        text: `Condiciones climáticas adversas (exceso de lluvia, temperaturas extremas)`,
+      },
+      {
+        text: `Infraestructura deficiente (marquesinas, cajones de fermentación, bodegas)`,
+      },
+      {
+        text: `Acceso limitado a insumos de calidad (semillas certificadas, fertilizantes)`,
+      },
+      {
+        text: `Dificultades en el proceso de fermentación (duración, temperatura, volteo)`,
+      },
       { text: `Dificultades en el secado (tiempo, temperatura, uniformidad)` },
       { text: `Problemas de plagas y enfermedades que afectan la calidad` },
       { text: `Contaminación por residuos de pesticidas o metales pesados` },
       { text: `Poca información sobre las normas técnicas aplicables` },
       { text: `Exigencias de certificaciones que no puede costear` },
-      { text: `Falta de laboratorios de análisis de calidad accesibles o económicos` },
+      {
+        text: `Falta de laboratorios de análisis de calidad accesibles o económicos`,
+      },
       { text: `Falta de financiamiento para mejorar procesos` },
     ]);
 
@@ -132,7 +189,6 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       order: o++,
       section: sec1,
     });
-
   }
 
   // ── 5.2 Tipo de apoyo necesario ──
@@ -155,7 +211,6 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       { text: `Acceso a mercados` },
       { text: `Capacitación técnica` },
     ]);
-
   }
 
   // ── 5.3 Reconocimiento por alta calidad ──
@@ -198,7 +253,6 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       { text: `No` },
       { text: `Sí` },
     ]);
-
   }
 
   // ── 5.4 Impacto económico del incumplimiento ──
@@ -261,12 +315,13 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       order: o++,
       section: sec4,
     });
-    const opts_e8655701_d850_4636_97ac_730421590eb1 = await saveOptions(manager, q_e8655701_d850_4636_97ac_730421590eb1, [
-      { text: `No sabe / No aplica` },
-      { text: `Sí` },
-      { text: `No` },
-    ]);
-    const opt_218dc095_2f36_49e3_8cfa_4032a58ab752 = opts_e8655701_d850_4636_97ac_730421590eb1.get(`Sí`)!;
+    const opts_e8655701_d850_4636_97ac_730421590eb1 = await saveOptions(
+      manager,
+      q_e8655701_d850_4636_97ac_730421590eb1,
+      [{ text: `No sabe / No aplica` }, { text: `Sí` }, { text: `No` }],
+    );
+    const opt_218dc095_2f36_49e3_8cfa_4032a58ab752 =
+      opts_e8655701_d850_4636_97ac_730421590eb1.get(`Sí`)!;
 
     await saveQuestion(manager, {
       text: `Valor aproximado o rango del precio diferencial (COP / kg o carga)`,
@@ -362,7 +417,6 @@ export async function seedInstrumentoS5DificultadesParaCumplirEstandaresDeCalida
       { text: `En desacuerdo`, value: 2 },
       { text: `Totalmente en desacuerdo`, value: 1 },
     ]);
-
   }
 
   console.log(`[seed] "${NAME}" insertado (19 preguntas).`);

@@ -8,7 +8,13 @@ import {
   Delete,
   ParseUUIDPipe,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { FarmsService } from './farms.service';
@@ -54,7 +60,10 @@ export class FarmsController {
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Finca actualizada.' })
   @ApiResponse({ status: 404, description: 'Finca no encontrada.' })
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateFarmDto: UpdateFarmDto) {
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateFarmDto: UpdateFarmDto,
+  ) {
     return this.farmsService.update(id, updateFarmDto);
   }
 
@@ -65,6 +74,6 @@ export class FarmsController {
   @ApiResponse({ status: 200, description: 'Finca eliminada.' })
   @ApiResponse({ status: 404, description: 'Finca no encontrada.' })
   remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.farmsService.remove(+id);
+    return this.farmsService.remove(id);
   }
 }

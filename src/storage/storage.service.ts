@@ -19,14 +19,18 @@ export class StorageService {
       endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: this.configService.getOrThrow<string>('R2_ACCESS_KEY_ID'),
-        secretAccessKey: this.configService.getOrThrow<string>('R2_SECRET_ACCESS_KEY'),
+        secretAccessKey: this.configService.getOrThrow<string>(
+          'R2_SECRET_ACCESS_KEY',
+        ),
       },
     });
 
     this.bucket = this.configService.getOrThrow<string>('R2_BUCKET_NAME');
-    this.publicBaseUrl = this.configService.getOrThrow<string>('R2_PUBLIC_BASE_URL');
+    this.publicBaseUrl =
+      this.configService.getOrThrow<string>('R2_PUBLIC_BASE_URL');
     this.defaultExpiresIn = parseInt(
-      this.configService.get<string>('R2_PRESIGNED_URL_EXPIRES_SECONDS') ?? '300',
+      this.configService.get<string>('R2_PRESIGNED_URL_EXPIRES_SECONDS') ??
+        '300',
       10,
     );
   }

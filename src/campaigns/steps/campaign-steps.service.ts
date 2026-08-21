@@ -111,11 +111,14 @@ export class CampaignStepsService {
       step.instrument = instrument;
     }
 
-
     if (dto.order !== undefined && dto.order !== step.order) {
       const oldOrder = step.order;
       const sibling = await this.stepsRepository.findOne({
-        where: { campaign: { campaignId }, order: dto.order, stepId: Not(stepId) },
+        where: {
+          campaign: { campaignId },
+          order: dto.order,
+          stepId: Not(stepId),
+        },
       });
       if (sibling) {
         // Move step to a temporary order to free the unique slot before swapping

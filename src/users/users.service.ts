@@ -10,6 +10,9 @@ import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './entities/user.entity';
+import { Institution } from 'src/institutions/entities/institution.entity';
+import { Laboratory } from 'src/laboratories/entities/laboratory.entity';
+import { Role } from 'src/roles/entities/role.entity';
 
 const BCRYPT_ROUNDS = 10;
 
@@ -41,9 +44,9 @@ export class UsersService {
       ...rest,
       password: await bcrypt.hash(password, BCRYPT_ROUNDS),
       ...(mustChangePassword !== undefined && { mustChangePassword }),
-      institution: institutionId ? ({ institutionId } as any) : undefined,
-      laboratory: laboratoryId ? ({ laboratoryId } as any) : undefined,
-      role: roleId ? ({ roleId } as any) : undefined,
+      institution: institutionId ? { institutionId } : undefined,
+      laboratory: laboratoryId ? { laboratoryId } : undefined,
+      role: roleId ? { roleId } : undefined,
     });
 
     const saved = await this.usersRepository.save(user);
@@ -98,16 +101,20 @@ export class UsersService {
       user.password = await bcrypt.hash(password, BCRYPT_ROUNDS);
       user.mustChangePassword = true;
     }
+    // Referencia parcial por id: TypeORM solo necesita la PK para persistir
+    // la FK, sin cargar la entidad relacionada completa.
     if (institutionId !== undefined) {
       user.institution = institutionId
-        ? ({ institutionId } as any)
+        ? ({ institutionId } as unknown as Institution)
         : undefined;
     }
     if (laboratoryId !== undefined) {
-      user.laboratory = laboratoryId ? ({ laboratoryId } as any) : undefined;
+      user.laboratory = laboratoryId
+        ? ({ laboratoryId } as unknown as Laboratory)
+        : undefined;
     }
     if (roleId !== undefined) {
-      user.role = roleId ? ({ roleId } as any) : undefined;
+      user.role = roleId ? ({ roleId } as unknown as Role) : undefined;
     }
 
     await this.usersRepository.save(user);

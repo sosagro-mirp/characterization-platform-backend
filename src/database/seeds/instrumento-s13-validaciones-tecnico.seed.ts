@@ -20,35 +20,42 @@ async function saveQuestion(
   },
 ): Promise<Question> {
   const repo = manager.getRepository(Question);
-  return repo.save(repo.create({
-    text: def.text,
-    type: def.type,
-    isRequired: def.isRequired,
-    isSelectionCriteria: def.isSelectionCriteria ?? false,
-    isKeyQuestion: def.isKeyQuestion ?? false,
-    order: def.order,
-    section: def.section,
-    conditionQuestion: def.conditionQuestion,
-    conditionValue: def.conditionValue,
-    systemField: def.systemField,
-  }));
+  return repo.save(
+    repo.create({
+      text: def.text,
+      type: def.type,
+      isRequired: def.isRequired,
+      isSelectionCriteria: def.isSelectionCriteria ?? false,
+      isKeyQuestion: def.isKeyQuestion ?? false,
+      order: def.order,
+      section: def.section,
+      conditionQuestion: def.conditionQuestion,
+      conditionValue: def.conditionValue,
+      systemField: def.systemField,
+    }),
+  );
 }
 
 const NAME = `S13: Validaciones técnico`;
 const VERSION = 1;
 
-export async function seedInstrumentoS13ValidacionesTecnico(manager: EntityManager): Promise<void> {
+export async function seedInstrumentoS13ValidacionesTecnico(
+  manager: EntityManager,
+): Promise<void> {
   const instrumentRepo = manager.getRepository(Instrument);
   const sectionRepo = manager.getRepository(Section);
   const typeRepo = manager.getRepository(TypeOfQuestion);
 
-  if (await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })) {
+  if (
+    await instrumentRepo.findOne({ where: { name: NAME, version: VERSION } })
+  ) {
     console.log(`[seed] "${NAME}" v${VERSION} ya existe. Se omite.`);
     return;
   }
 
   const numeric = await typeRepo.findOne({ where: { name: 'numeric' } });
-  if (!numeric) throw new Error(`[seed] TypeOfQuestion "numeric" no encontrado.`);
+  if (!numeric)
+    throw new Error(`[seed] TypeOfQuestion "numeric" no encontrado.`);
 
   const instrument = await instrumentRepo.save(
     instrumentRepo.create({
@@ -56,12 +63,17 @@ export async function seedInstrumentoS13ValidacionesTecnico(manager: EntityManag
       version: VERSION,
       publishDate: '2026-07-06',
       isActive: true,
+      code: 'S13',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
 
   const sec1 = await sectionRepo.save(
-    sectionRepo.create({ name: `Validación GPS de la unidad productiva`, order: 1, instrument }),
+    sectionRepo.create({
+      name: `Validación GPS de la unidad productiva`,
+      order: 1,
+      instrument,
+    }),
   );
 
   // ── Validación GPS de la unidad productiva ──

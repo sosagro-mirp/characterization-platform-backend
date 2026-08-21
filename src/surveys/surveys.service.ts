@@ -1,4 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
@@ -53,7 +60,10 @@ export class SurveysService {
     private readonly responsesRepository: Repository<Response>,
   ) {}
 
-  async create(createSurveyDto: CreateSurveyDto, userId?: string): Promise<Survey> {
+  async create(
+    createSurveyDto: CreateSurveyDto,
+    userId?: string,
+  ): Promise<Survey> {
     const instruments = await this.instrumentsRepository.find({
       where: {
         instrumentId: In(createSurveyDto.instrumentIds),
@@ -82,7 +92,9 @@ export class SurveysService {
       });
 
       if (!user) {
-        throw new UnauthorizedException('User account not found — please log in again');
+        throw new UnauthorizedException(
+          'User account not found — please log in again',
+        );
       }
     }
 
@@ -224,10 +236,17 @@ export class SurveysService {
     return this.surveysRepository.save(survey);
   }
 
-  async extractFarmer(surveyId: string): Promise<{ farmer: Farmer; existed: boolean }> {
+  async extractFarmer(
+    surveyId: string,
+  ): Promise<{ farmer: Farmer; existed: boolean }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: ['responses', 'responses.question', 'responses.option', 'campaignSession'],
+      relations: [
+        'responses',
+        'responses.question',
+        'responses.option',
+        'campaignSession',
+      ],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
@@ -238,7 +257,8 @@ export class SurveysService {
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
       if (!sf || sf === 'farm.town') continue;
-      const value = response.textValue ?? response.numericValue ?? response.booleanValue;
+      const value =
+        response.textValue ?? response.numericValue ?? response.booleanValue;
       if (value !== undefined && value !== null) {
         fieldMap[sf] = value;
       }
@@ -280,7 +300,9 @@ export class SurveysService {
       farmerName = fieldMap['farmer.producerName'] as string | undefined;
       farmerPhone = fieldMap['farmer.producerPhone'] as string | undefined;
       farmerEmail = fieldMap['farmer.producerEmail'] as string | undefined;
-      farmerDocumentId = fieldMap['farmer.producerDocumentId'] as string | undefined;
+      farmerDocumentId = fieldMap['farmer.producerDocumentId'] as
+        | string
+        | undefined;
 
       // Fallback: if producer name/documentId unknown, use respondent's as provisional
       if (!farmerName) {
@@ -291,15 +313,21 @@ export class SurveysService {
       }
 
       await this.surveysRepository.update(surveyId, {
-        respondentName: (fieldMap['farmer.name'] as string | undefined) || undefined,
-        respondentPhone: (fieldMap['farmer.phone'] as string | undefined) || undefined,
-        respondentDocumentId: (fieldMap['farmer.documentId'] as string | undefined) || undefined,
-        respondentEmail: (fieldMap['farmer.email'] as string | undefined) || undefined,
+        respondentName:
+          (fieldMap['farmer.name'] as string | undefined) || undefined,
+        respondentPhone:
+          (fieldMap['farmer.phone'] as string | undefined) || undefined,
+        respondentDocumentId:
+          (fieldMap['farmer.documentId'] as string | undefined) || undefined,
+        respondentEmail:
+          (fieldMap['farmer.email'] as string | undefined) || undefined,
       });
     }
 
     if (!farmerName) {
-      throw new UnprocessableEntityException('farmer.name is required to extract farmer');
+      throw new UnprocessableEntityException(
+        'farmer.name is required to extract farmer',
+      );
     }
 
     // Dedup by two levels when Q9=false and producerDocumentId absent
@@ -308,7 +336,9 @@ export class SurveysService {
 
     // Level 1: dedup by documentId (solid)
     if (farmerDocumentId) {
-      farmer = await this.farmersRepository.findOne({ where: { documentId: farmerDocumentId } });
+      farmer = await this.farmersRepository.findOne({
+        where: { documentId: farmerDocumentId },
+      });
       if (farmer) existed = true;
     }
 
@@ -329,19 +359,29 @@ export class SurveysService {
           this.farmsRepository.create({
             name: farmName,
             location: null,
-            vereda:                (fieldMap['farm.vereda']                as string  | undefined) ?? null,
-            latitude:              (fieldMap['farm.latitude']              as number  | undefined) ?? null,
-            longitude:             (fieldMap['farm.longitude']             as number  | undefined) ?? null,
-            altitude:              (fieldMap['farm.altitude']              as number  | undefined) ?? null,
-            area:                  (fieldMap['farm.area']                  as number  | undefined) ?? null,
-            waterAccess:           (fieldMap['farm.waterAccess']           as boolean | undefined) ?? null,
-            internetAccess:        (fieldMap['farm.internetAccess']        as boolean | undefined) ?? null,
-            hasElectricityAccess:  (fieldMap['farm.hasElectricityAccess']  as boolean | undefined) ?? null,
-            mainAccessType:        (fieldMap['farm.mainAccessType']        as string  | undefined) ?? null,
-            electricitySourceType: (fieldMap['farm.electricitySourceType'] as string  | undefined) ?? null,
-            waterSourceType:       (fieldMap['farm.waterSourceType']       as string  | undefined) ?? null,
-            plotCount:             (fieldMap['farm.plotCount']             as number  | undefined) ?? null,
-            town:                  resolvedTown ?? undefined,
+            vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
+            latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
+            longitude:
+              (fieldMap['farm.longitude'] as number | undefined) ?? null,
+            altitude: (fieldMap['farm.altitude'] as number | undefined) ?? null,
+            area: (fieldMap['farm.area'] as number | undefined) ?? null,
+            waterAccess:
+              (fieldMap['farm.waterAccess'] as boolean | undefined) ?? null,
+            internetAccess:
+              (fieldMap['farm.internetAccess'] as boolean | undefined) ?? null,
+            hasElectricityAccess:
+              (fieldMap['farm.hasElectricityAccess'] as boolean | undefined) ??
+              null,
+            mainAccessType:
+              (fieldMap['farm.mainAccessType'] as string | undefined) ?? null,
+            electricitySourceType:
+              (fieldMap['farm.electricitySourceType'] as string | undefined) ??
+              null,
+            waterSourceType:
+              (fieldMap['farm.waterSourceType'] as string | undefined) ?? null,
+            plotCount:
+              (fieldMap['farm.plotCount'] as number | undefined) ?? null,
+            town: resolvedTown ?? undefined,
           }),
         );
       }
@@ -349,14 +389,17 @@ export class SurveysService {
       farmer = await this.farmersRepository.save(
         this.farmersRepository.create({
           name: farmerName,
-          documentId:      farmerDocumentId ?? null,
-          phone:           farmerPhone ?? null,
-          email:           farmerEmail ?? null,
-          gender:          (fieldMap['farmer.gender']          as string  | undefined) ?? null,
-          age:             (fieldMap['farmer.age']             as number  | undefined) ?? null,
-          experienceYears: (fieldMap['farmer.experienceYears'] as number  | undefined) ?? null,
-          isMainIncome:    (fieldMap['farmer.isMainIncome']    as boolean | undefined) ?? null,
-          educationLevel:  (fieldMap['farmer.educationLevel']  as string  | undefined) ?? null,
+          documentId: farmerDocumentId ?? null,
+          phone: farmerPhone ?? null,
+          email: farmerEmail ?? null,
+          gender: (fieldMap['farmer.gender'] as string | undefined) ?? null,
+          age: (fieldMap['farmer.age'] as number | undefined) ?? null,
+          experienceYears:
+            (fieldMap['farmer.experienceYears'] as number | undefined) ?? null,
+          isMainIncome:
+            (fieldMap['farmer.isMainIncome'] as boolean | undefined) ?? null,
+          educationLevel:
+            (fieldMap['farmer.educationLevel'] as string | undefined) ?? null,
           farm: farm ?? undefined,
         }),
       );
@@ -402,7 +445,15 @@ export class SurveysService {
     return { hasDuplicate: true, surveyId: row.surveyId };
   }
 
-  async overwriteSurvey(dto: OverwriteSurveyDto): Promise<{ surveyId: string }> {
+  // Spec 70, Fase 4 — solo descarta el duplicado; ya no crea la encuesta de
+  // reemplazo. Crearla aquí, vacía, era uno de los vectores que dejaban
+  // encuestas huérfanas cuando el encuestador abandonaba tras sobrescribir.
+  // El cliente inicia el reemplazo con `beginSurvey()` (mobile), igual que
+  // cualquier otro inicio de instrumento — el registro real solo se crea al
+  // sincronizar, cuando exista al menos una respuesta.
+  async overwriteSurvey(
+    dto: OverwriteSurveyDto,
+  ): Promise<{ discardedSurveyId: string }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId: dto.surveyId },
       relations: ['instruments', 'campaignSession', 'campaignSession.campaign'],
@@ -413,29 +464,113 @@ export class SurveysService {
       where: { sessionId: dto.sessionId },
       relations: ['campaign'],
     });
-    if (!targetSession) throw new NotFoundException('CampaignSession not found');
+    if (!targetSession)
+      throw new NotFoundException('CampaignSession not found');
 
-    if (survey.campaignSession?.campaign?.campaignId !== targetSession.campaign?.campaignId) {
-      throw new BadRequestException('Survey does not belong to the same campaign as the session');
+    if (
+      survey.campaignSession?.campaign?.campaignId !==
+      targetSession.campaign?.campaignId
+    ) {
+      throw new BadRequestException(
+        'Survey does not belong to the same campaign as the session',
+      );
     }
-
-    const instrument = await this.instrumentsRepository.findOne({
-      where: { instrumentId: dto.instrumentId },
-    });
-    if (!instrument) throw new NotFoundException('Instrument not found');
 
     // Clear pivot table rows before removing to avoid FK constraint violations
     survey.instruments = [];
     await this.surveysRepository.save(survey);
     await this.surveysRepository.remove(survey);
 
-    const newSurvey = this.surveysRepository.create({
-      campaignSession: targetSession,
-      instruments: [instrument],
-      stepOrder: dto.stepOrder,
+    return { discardedSurveyId: dto.surveyId };
+  }
+
+  // Spec 70, Fase 6 — auditoría de solo lectura de las encuestas huérfanas
+  // vacías que dejaron los vectores 1-3 antes de la Fase 1-4 de este spec.
+  // El discriminador que hace segura esta lista (y el borrado que la usa) es
+  // la existencia de una encuesta HERMANA en la misma sesión y el mismo
+  // stepOrder que SÍ tiene respuestas: un marcador de paso saltado
+  // (`skipStep()`) es siempre la única encuesta de su paso, así que nunca
+  // tiene hermana y nunca puede aparecer aquí.
+  async findOrphanSurveys(): Promise<
+    Array<{
+      surveyId: string;
+      createdAt: Date;
+      stepOrder: number;
+      siblingSurveyId: string;
+    }>
+  > {
+    return this.surveysRepository
+      .createQueryBuilder('survey')
+      .leftJoin('survey.responses', 'response')
+      .innerJoin(
+        Survey,
+        'sibling',
+        'sibling.campaignSession = survey.campaignSession ' +
+          'AND sibling.stepOrder = survey.stepOrder ' +
+          'AND sibling.surveyId != survey.surveyId',
+      )
+      .innerJoin('sibling.responses', 'siblingResponse')
+      .where('survey.campaignSession IS NOT NULL')
+      .andWhere('survey.stepOrder IS NOT NULL')
+      .andWhere('response.responseId IS NULL')
+      .distinctOn(['survey.surveyId'])
+      .orderBy('survey.surveyId', 'ASC')
+      .addOrderBy('sibling.createdAt', 'ASC')
+      .select('survey.surveyId', 'surveyId')
+      .addSelect('survey.createdAt', 'createdAt')
+      .addSelect('survey.stepOrder', 'stepOrder')
+      .addSelect('sibling.surveyId', 'siblingSurveyId')
+      .getRawMany();
+  }
+
+  // Borrado acotado: solo acepta encuestas que aparecerían en
+  // `findOrphanSurveys()` — sin respuestas propias y con una hermana con
+  // respuestas en la misma sesión/paso. Nunca borra en cascada nada con
+  // datos de campo, y nunca acepta un marcador de paso saltado (siempre es
+  // la única encuesta de su paso, así que nunca tiene la hermana requerida).
+  async deleteOrphanSurvey(
+    surveyId: string,
+  ): Promise<{ deletedSurveyId: string }> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+      relations: ['instruments', 'campaignSession', 'responses'],
     });
-    const saved = await this.surveysRepository.save(newSurvey);
-    return { surveyId: saved.surveyId };
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    if (survey.responses && survey.responses.length > 0) {
+      throw new ConflictException('Cannot delete a survey that has responses');
+    }
+
+    if (!survey.campaignSession || survey.stepOrder == null) {
+      throw new ConflictException(
+        'Survey is not an auditable orphan candidate (missing session or stepOrder)',
+      );
+    }
+
+    const siblingWithResponses = await this.surveysRepository
+      .createQueryBuilder('sibling')
+      .innerJoin('sibling.responses', 'response')
+      .where('sibling.campaignSession = :sessionId', {
+        sessionId: survey.campaignSession.sessionId,
+      })
+      .andWhere('sibling.stepOrder = :stepOrder', {
+        stepOrder: survey.stepOrder,
+      })
+      .andWhere('sibling.surveyId != :surveyId', { surveyId })
+      .getOne();
+
+    if (!siblingWithResponses) {
+      throw new ConflictException(
+        'Survey has no sibling with responses in the same session/step — not a provable orphan',
+      );
+    }
+
+    // Clear pivot table rows before removing to avoid FK constraint violations
+    survey.instruments = [];
+    await this.surveysRepository.save(survey);
+    await this.surveysRepository.remove(survey);
+
+    return { deletedSurveyId: surveyId };
   }
 
   async skipStep(dto: SkipStepDto): Promise<{ surveyId: string }> {
@@ -516,10 +651,10 @@ export class SurveysService {
 
     // Maps ASCII camelCase systemField keys to TypeOfCrop display names in DB
     const CROP_FIELD_MAP: Record<string, string> = {
-      cacao:    'Cacao',
-      cafe:     'Café',
+      cacao: 'Cacao',
+      cafe: 'Café',
       cannabis: 'Cannabis',
-      canamo:   'Cáñamo',
+      canamo: 'Cáñamo',
     };
 
     // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
@@ -536,7 +671,8 @@ export class SurveysService {
           cropNames.push(resolved);
         }
       } else if (sf.startsWith('farm.')) {
-        const value = response.textValue ?? response.numericValue ?? response.booleanValue;
+        const value =
+          response.textValue ?? response.numericValue ?? response.booleanValue;
         if (value !== undefined && value !== null) {
           farmFieldMap[sf] = value;
         }
@@ -546,7 +682,9 @@ export class SurveysService {
     // Load matching TypeOfCrop entities by name
     const crops =
       cropNames.length > 0
-        ? await this.typesOfCropsRepository.find({ where: { name: In(cropNames) } })
+        ? await this.typesOfCropsRepository.find({
+            where: { name: In(cropNames) },
+          })
         : [];
 
     // Assign crops to CampaignSession via direct relation update to avoid cascading nulls
@@ -569,7 +707,9 @@ export class SurveysService {
             .innerJoin('r.survey', 's')
             .innerJoin('r.question', 'q')
             .leftJoinAndSelect('r.option', 'o')
-            .where('s.campaignSession = :sessionId', { sessionId: session.sessionId })
+            .where('s.campaignSession = :sessionId', {
+              sessionId: session.sessionId,
+            })
             .andWhere('q.systemField = :sf', { sf: 'farm.town' })
             .andWhere('o.metadataId IS NOT NULL')
             .getOne();
@@ -581,20 +721,44 @@ export class SurveysService {
 
           let farm: Farm | null = session.farmer.farm ?? null;
           const farmFields = {
-            name:                  farmName,
-            town:                  resolvedTown ?? undefined,
-            area:                  (farmFieldMap['farm.area']                  as number  | undefined) ?? undefined,
-            vereda:                (farmFieldMap['farm.vereda']                as string  | undefined) ?? undefined,
-            latitude:              (farmFieldMap['farm.latitude']              as number  | undefined) ?? undefined,
-            longitude:             (farmFieldMap['farm.longitude']             as number  | undefined) ?? undefined,
-            altitude:              (farmFieldMap['farm.altitude']              as number  | undefined) ?? undefined,
-            waterAccess:           (farmFieldMap['farm.waterAccess']           as boolean | undefined) ?? undefined,
-            internetAccess:        (farmFieldMap['farm.internetAccess']        as boolean | undefined) ?? undefined,
-            hasElectricityAccess:  (farmFieldMap['farm.hasElectricityAccess']  as boolean | undefined) ?? undefined,
-            mainAccessType:        (farmFieldMap['farm.mainAccessType']        as string  | undefined) ?? undefined,
-            electricitySourceType: (farmFieldMap['farm.electricitySourceType'] as string  | undefined) ?? undefined,
-            waterSourceType:       (farmFieldMap['farm.waterSourceType']       as string  | undefined) ?? undefined,
-            plotCount:             (farmFieldMap['farm.plotCount']             as number  | undefined) ?? undefined,
+            name: farmName,
+            town: resolvedTown ?? undefined,
+            area:
+              (farmFieldMap['farm.area'] as number | undefined) ?? undefined,
+            vereda:
+              (farmFieldMap['farm.vereda'] as string | undefined) ?? undefined,
+            latitude:
+              (farmFieldMap['farm.latitude'] as number | undefined) ??
+              undefined,
+            longitude:
+              (farmFieldMap['farm.longitude'] as number | undefined) ??
+              undefined,
+            altitude:
+              (farmFieldMap['farm.altitude'] as number | undefined) ??
+              undefined,
+            waterAccess:
+              (farmFieldMap['farm.waterAccess'] as boolean | undefined) ??
+              undefined,
+            internetAccess:
+              (farmFieldMap['farm.internetAccess'] as boolean | undefined) ??
+              undefined,
+            hasElectricityAccess:
+              (farmFieldMap['farm.hasElectricityAccess'] as
+                | boolean
+                | undefined) ?? undefined,
+            mainAccessType:
+              (farmFieldMap['farm.mainAccessType'] as string | undefined) ??
+              undefined,
+            electricitySourceType:
+              (farmFieldMap['farm.electricitySourceType'] as
+                | string
+                | undefined) ?? undefined,
+            waterSourceType:
+              (farmFieldMap['farm.waterSourceType'] as string | undefined) ??
+              undefined,
+            plotCount:
+              (farmFieldMap['farm.plotCount'] as number | undefined) ??
+              undefined,
           };
           if (farm?.farmId) {
             // Update existing farm (farmsRepository.update doesn't handle relations; use save)

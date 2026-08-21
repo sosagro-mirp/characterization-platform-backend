@@ -8,7 +8,14 @@ import { QuestionsController } from './questions.controller';
 import { QuestionsService } from './questions.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Question, Section, TypeOfQuestion, OptionQuestion])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Question,
+      Section,
+      TypeOfQuestion,
+      OptionQuestion,
+    ]),
+  ],
   controllers: [QuestionsController],
   providers: [QuestionsService],
 })
