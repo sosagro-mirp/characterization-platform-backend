@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { Farmer } from './entities/farmer.entity';
+import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
@@ -53,7 +54,37 @@ export class FarmersService {
     private readonly sessionsRepository: Repository<CampaignSession>,
     @InjectRepository(Survey)
     private readonly surveysRepository: Repository<Survey>,
+    @InjectRepository(FarmerDocumentCollision)
+    private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
   ) {}
+
+  // Spec 68 — colisiones de documentId detectadas por
+  // `SurveysService.extractFarmer()` (resueltas o pendientes), para revisión
+  // administrativa. Es la misma tabla que consulta la herramienta de
+  // solo lectura del MCP `sosagro-admin` (Fase 6).
+  async listDocumentCollisions() {
+    const rows = await this.documentCollisionsRepository.find({
+      relations: ['existingFarmer', 'survey'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return rows.map((row) => ({
+      collisionId: row.collisionId,
+      documentId: row.documentId,
+      submittedName: row.submittedName,
+      existingFarmer: {
+        farmerId: row.existingFarmer?.id ?? null,
+        name: row.existingFarmerName,
+      },
+      // La encuesta (S1a) de origen — null solo si esa encuesta ya no
+      // existe (SET NULL en la FK, ver el entity), nunca porque falte
+      // registrarla: extractFarmer() siempre la conoce al detectar.
+      surveyId: row.survey?.surveyId ?? null,
+      resolution: row.resolution,
+      createdAt: row.createdAt,
+      resolvedAt: row.resolvedAt,
+    }));
+  }
 
   async create(dto: CreateFarmerDto): Promise<Farmer> {
     let town: Town | undefined;
@@ -147,10 +178,18 @@ export class FarmersService {
   async remove(id: string): Promise<void> {
     const farmer = await this.findOne(id);
 
-    const [sessionsCount, surveysCount] = await Promise.all([
-      this.sessionsRepository.count({ where: { farmer: { id } } }),
-      this.surveysRepository.count({ where: { farmer: { id } } }),
-    ]);
+    const [sessionsCount, surveysCount, documentCollisionsCount] =
+      await Promise.all([
+        this.sessionsRepository.count({ where: { farmer: { id } } }),
+        this.surveysRepository.count({ where: { farmer: { id } } }),
+        // Spec 68 — farmer_document_collisions.existing_farmer_id también
+        // referencia a farmers con ON DELETE RESTRICT; sin este conteo caía en
+        // la red de seguridad genérica de abajo (409 con blockedBy vacío) en
+        // vez de decir explícitamente qué lo bloquea.
+        this.documentCollisionsRepository.count({
+          where: { existingFarmer: { id } },
+        }),
+      ]);
 
     const blockedBy: BlockedByEntry[] = [];
     if (sessionsCount > 0) {
@@ -158,6 +197,12 @@ export class FarmersService {
     }
     if (surveysCount > 0) {
       blockedBy.push({ resource: 'surveys', count: surveysCount });
+    }
+    if (documentCollisionsCount > 0) {
+      blockedBy.push({
+        resource: 'farmer_document_collisions',
+        count: documentCollisionsCount,
+      });
     }
 
     if (blockedBy.length > 0) {

@@ -6,6 +6,7 @@ import { Farm } from 'src/farms/entities/farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
+import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 
 interface FindCallArgs {
   relations: string[];
@@ -29,6 +30,7 @@ describe('FarmersService', () => {
         { provide: getRepositoryToken(Town), useValue: {} },
         { provide: getRepositoryToken(CampaignSession), useValue: {} },
         { provide: getRepositoryToken(Survey), useValue: {} },
+        { provide: getRepositoryToken(FarmerDocumentCollision), useValue: {} },
       ],
     }).compile();
 
