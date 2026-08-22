@@ -11,6 +11,7 @@ import { In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
+import { SYSTEM_INSTRUMENT_CODES } from './system-instrument-codes';
 
 @Injectable()
 export class InstrumentsService {
@@ -69,7 +70,12 @@ export class InstrumentsService {
       .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName']);
 
     if (excludeSystem) {
-      qb.where('instrument.code IS NULL');
+      qb.where(
+        'instrument.code IS NULL OR instrument.code NOT IN (:...codes)',
+        {
+          codes: SYSTEM_INSTRUMENT_CODES,
+        },
+      );
     }
 
     return qb.getMany();
@@ -97,11 +103,25 @@ export class InstrumentsService {
       .getMany();
   }
 
+  // Alias legacy → código actual (2026-08-22). `mobile/` y `frontend/`
+  // siguen pidiendo los códigos literales 'S1'/'S2' que el flujo de
+  // identificación S1/S2 tenía antes del backfill del spec 43, que renombró
+  // esos dos instrumentos a 'S1a'/'S1b' para no chocar con el código de
+  // dashboard 'S2' (un instrumento de contenido real, no relacionado).
+  // Nadie más llama a este endpoint con un código de dashboard, así que el
+  // alias es seguro: no se resuelve al instrumento equivocado para ningún
+  // otro llamador.
+  private static readonly LEGACY_CODE_ALIASES: Record<string, string> = {
+    S1: 'S1a',
+    S2: 'S1b',
+  };
+
   async findByCode(
     code: string,
   ): Promise<{ instrumentId: string; name: string }> {
+    const resolvedCode = InstrumentsService.LEGACY_CODE_ALIASES[code] ?? code;
     const instrument = await this.instrumentsRepository.findOne({
-      where: { code },
+      where: { code: resolvedCode },
       select: ['instrumentId', 'name'],
     });
     if (!instrument)

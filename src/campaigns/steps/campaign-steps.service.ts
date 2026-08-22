@@ -8,6 +8,7 @@ import { Not, Repository } from 'typeorm';
 import { Campaign } from '../entities/campaign.entity';
 import { CampaignStep } from '../entities/campaign-step.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
+import { isSystemInstrumentCode } from 'src/instruments/system-instrument-codes';
 import { CreateCampaignStepDto } from './dto/create-campaign-step.dto';
 import { UpdateCampaignStepDto } from './dto/update-campaign-step.dto';
 
@@ -48,9 +49,9 @@ export class CampaignStepsService {
       where: { instrumentId: dto.instrumentId },
     });
     if (!instrument) throw new NotFoundException('Instrument not found');
-    if (instrument.code != null) {
+    if (isSystemInstrumentCode(instrument.code)) {
       throw new BadRequestException(
-        'System instruments (S1, S2, etc.) cannot be added as campaign steps',
+        'System instruments (S1a, S1b, S_DCU) cannot be added as campaign steps',
       );
     }
 
@@ -103,9 +104,9 @@ export class CampaignStepsService {
         where: { instrumentId: dto.instrumentId },
       });
       if (!instrument) throw new NotFoundException('Instrument not found');
-      if (instrument.code != null) {
+      if (isSystemInstrumentCode(instrument.code)) {
         throw new BadRequestException(
-          'System instruments (S1, S2, etc.) cannot be added as campaign steps',
+          'System instruments (S1a, S1b, S_DCU) cannot be added as campaign steps',
         );
       }
       step.instrument = instrument;
