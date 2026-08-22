@@ -23,6 +23,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { CheckDuplicateQueryDto } from './dto/check-duplicate-query.dto';
+import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { SurveyFilters, SurveysService } from './surveys.service';
@@ -322,7 +323,9 @@ export class SurveysController {
     summary: 'Extraer agricultor desde respuestas S1',
     description:
       'Lee las respuestas de la encuesta que tienen systemField asignado (prefijo farmer.* / farm.*), ' +
-      'crea o reutiliza un Farmer y lo vincula a la CampaignSession.',
+      'crea o reutiliza un Farmer y lo vincula a la CampaignSession. Si el documentId coincide con un ' +
+      'Farmer existente cuyo nombre no corresponde (spec 68), responde 409 sin mutar nada — a menos ' +
+      "que el body incluya `resolution` ('same_person' | 'separate_person').",
   })
   @ApiParam({
     name: 'id',
@@ -332,10 +335,19 @@ export class SurveysController {
   @ApiResponse({ status: 201, description: '{ farmer, existed: boolean }' })
   @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
   @ApiResponse({
+    status: 409,
+    description:
+      'Colisión de documentId: el documento ya pertenece a otra persona (spec 68). ' +
+      '{ documentId, submittedName, existingFarmer: { farmerId, name } }',
+  })
+  @ApiResponse({
     status: 422,
     description: 'Falta farmer.name en las respuestas.',
   })
-  extractFarmer(@Param('id', ParseUUIDPipe) id: string) {
-    return this.surveysService.extractFarmer(id);
+  extractFarmer(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExtractFarmerDto,
+  ) {
+    return this.surveysService.extractFarmer(id, dto);
   }
 }

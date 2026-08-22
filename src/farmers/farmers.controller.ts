@@ -59,6 +59,27 @@ export class FarmersController {
     return this.farmersService.findAll();
   }
 
+  // Declarado antes de `@Get(':id')` — igual que `search` — para que
+  // `ParseUUIDPipe` no intente parsear "document-collisions" como un uuid.
+  @Get('document-collisions')
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Listar colisiones de documentId detectadas (spec 68)',
+    description:
+      'Colisiones de documentId entre agricultores distintos detectadas por ' +
+      'POST /api/surveys/:id/extract-farmer, resueltas o pendientes, para revisión administrativa.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Array de { collisionId, documentId, submittedName, existingFarmer: { farmerId, name }, ' +
+      'surveyId, resolution, createdAt, resolvedAt }. `surveyId` es la encuesta (S1a) que ' +
+      'disparó la detección; puede ser null solo si esa encuesta ya no existe.',
+  })
+  listDocumentCollisions() {
+    return this.farmersService.listDocumentCollisions();
+  }
+
   @Get(':id')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Get farmer by ID' })
