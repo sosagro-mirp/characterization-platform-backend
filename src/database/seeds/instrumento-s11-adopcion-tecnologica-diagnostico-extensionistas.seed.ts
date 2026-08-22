@@ -101,6 +101,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensioni
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S11-EXT',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

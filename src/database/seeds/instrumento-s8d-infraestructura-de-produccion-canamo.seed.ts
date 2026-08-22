@@ -101,6 +101,7 @@ export async function seedInstrumentoS8dInfraestructuraDeProduccionCanamo(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S8D',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

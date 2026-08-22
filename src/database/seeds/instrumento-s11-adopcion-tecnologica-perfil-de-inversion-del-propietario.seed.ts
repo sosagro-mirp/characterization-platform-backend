@@ -95,6 +95,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaPerfilDeInversionDelP
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S11-INV',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

@@ -95,6 +95,7 @@ export async function seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras
       version: VERSION,
       publishDate: '2026-06-25',
       isActive: false,
+      code: 'S11-DB',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

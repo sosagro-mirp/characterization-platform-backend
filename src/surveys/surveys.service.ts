@@ -64,6 +64,18 @@ export class SurveysService {
     createSurveyDto: CreateSurveyDto,
     userId?: string,
   ): Promise<Survey> {
+    // Spec 70, Fase 9 — idempotencia: si el cliente ya envió este
+    // clientSurveyId antes (reintento tras perder la respuesta de un POST
+    // que sí llegó), devolver la encuesta existente en vez de duplicarla.
+    if (createSurveyDto.clientSurveyId) {
+      const existing = await this.surveysRepository.findOne({
+        where: { clientSurveyId: createSurveyDto.clientSurveyId },
+      });
+      if (existing) {
+        return existing;
+      }
+    }
+
     const instruments = await this.instrumentsRepository.find({
       where: {
         instrumentId: In(createSurveyDto.instrumentIds),
@@ -164,9 +176,34 @@ export class SurveysService {
       crop: crop ?? undefined,
       campaignSession: campaignSession ?? undefined,
       stepOrder: createSurveyDto.stepOrder,
+      clientSurveyId: createSurveyDto.clientSurveyId,
     });
 
-    return await this.surveysRepository.save(survey);
+    try {
+      return await this.surveysRepository.save(survey);
+    } catch (err) {
+      // Spec 70, Fase 9 — carrera real: dos peticiones concurrentes con el
+      // mismo clientSurveyId pueden pasar juntas la comprobación previa.
+      // Postgres 23505 = unique_violation contra el índice único parcial de
+      // client_survey_id; en ese caso, releer y devolver la fila que ganó la
+      // carrera en vez de propagar el error.
+      const isUniqueViolation =
+        createSurveyDto.clientSurveyId &&
+        typeof err === 'object' &&
+        err !== null &&
+        (err as { code?: string }).code === '23505';
+
+      if (isUniqueViolation) {
+        const existing = await this.surveysRepository.findOne({
+          where: { clientSurveyId: createSurveyDto.clientSurveyId },
+        });
+        if (existing) {
+          return existing;
+        }
+      }
+
+      throw err;
+    }
   }
 
   async findAll(filters: SurveyFilters): Promise<Survey[]> {
@@ -584,6 +621,25 @@ export class SurveysService {
     });
     if (!instrument) throw new NotFoundException('Instrument not found');
 
+    // Spec 70, Fase 10 — idempotencia: sin esto, un doble salto (o un salto
+    // offline sobre un paso que otro dispositivo ya completó mientras tanto)
+    // crea una segunda fila para el mismo (sesión, stepOrder). Esa segunda
+    // fila, sin respuestas, tendría un hermano CON respuestas en su mismo
+    // paso — exactamente el discriminador que GET /api/surveys/orphans usa
+    // para detectar huérfanas — y aparecería ahí como falso positivo. Si ya
+    // existe cualquier encuesta para este paso (marcador previo o una
+    // completada de verdad), se devuelve esa en vez de crear otra: el paso ya
+    // está resuelto, saltado u online, y no hace falta un segundo registro.
+    const existing = await this.surveysRepository.findOne({
+      where: {
+        campaignSession: { sessionId: dto.sessionId },
+        stepOrder: dto.stepOrder,
+      },
+    });
+    if (existing) {
+      return { surveyId: existing.surveyId };
+    }
+
     // Create an empty survey as a skip marker — getNextStep treats any survey
     // with a stepOrder as "completed" regardless of whether it has responses.
     const survey = this.surveysRepository.create({
@@ -591,8 +647,28 @@ export class SurveysService {
       instruments: [instrument],
       stepOrder: dto.stepOrder,
     });
-    const saved = await this.surveysRepository.save(survey);
-    return { surveyId: saved.surveyId };
+
+    try {
+      const saved = await this.surveysRepository.save(survey);
+      return { surveyId: saved.surveyId };
+    } catch (err) {
+      // Misma carrera que en create() (Fase 9): dos llamadas concurrentes a
+      // skip-step para el mismo paso pueden pasar juntas la comprobación de
+      // arriba. Sin índice único que lo garantice a nivel de base de datos
+      // (deliberado — ver D8 en el spec: un paso admite legítimamente más de
+      // una encuesta durante el flujo de duplicados/sobrescritura), la
+      // defensa aquí es de mejor esfuerzo: releer y devolver lo que exista.
+      const raced = await this.surveysRepository.findOne({
+        where: {
+          campaignSession: { sessionId: dto.sessionId },
+          stepOrder: dto.stepOrder,
+        },
+      });
+      if (raced) {
+        return { surveyId: raced.surveyId };
+      }
+      throw err;
+    }
   }
 
   async findSurveyResponses(surveyId: string) {

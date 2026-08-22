@@ -96,6 +96,19 @@ export class Survey {
   @Column({ name: 'step_order', type: 'integer', nullable: true })
   stepOrder?: number;
 
+  // Spec 70, Fase 9 — clave de idempotencia: id local que el cliente móvil
+  // genera al crear el borrador (`local_survey_<uuid>`) y reenvía en cada
+  // reintento de POST /api/surveys. NULL en todo lo creado desde la web y en
+  // todo lo existente antes de esta fase. El índice único parcial vive en la
+  // migración (solo aplica cuando no es NULL).
+  @Column({
+    name: 'client_survey_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  clientSurveyId?: string;
+
   @Column({ name: 'respondent_name', type: 'text', nullable: true })
   respondentName?: string;
 

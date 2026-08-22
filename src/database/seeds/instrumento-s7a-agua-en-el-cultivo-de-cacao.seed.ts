@@ -101,6 +101,7 @@ export async function seedInstrumentoS7aAguaEnElCultivoDeCacao(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S7A',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

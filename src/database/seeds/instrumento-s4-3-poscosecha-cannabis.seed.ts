@@ -102,6 +102,7 @@ export async function seedInstrumentoS43PoscosechaCannabis(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S4.3',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

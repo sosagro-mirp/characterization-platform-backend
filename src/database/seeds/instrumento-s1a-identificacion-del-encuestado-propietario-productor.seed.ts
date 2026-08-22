@@ -101,7 +101,7 @@ export async function seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioPr
       version: VERSION,
       publishDate: '2026-06-25',
       isActive: false,
-      code: 'S1',
+      code: 'S1a',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

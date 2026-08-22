@@ -95,6 +95,7 @@ export async function seedInstrumentoS341SusceptibilidadAEnfermedades(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S3.4.1',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);

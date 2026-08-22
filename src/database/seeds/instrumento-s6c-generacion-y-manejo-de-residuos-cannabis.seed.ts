@@ -102,6 +102,7 @@ export async function seedInstrumentoS6cGeneracionYManejoDeResiduosCannabis(
       version: VERSION,
       publishDate: '2025-05-13',
       isActive: false,
+      code: 'S6C',
     }),
   );
   console.log(`[seed] "${NAME}" creado.`);
