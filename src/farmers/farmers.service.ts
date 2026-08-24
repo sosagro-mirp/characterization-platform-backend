@@ -1,10 +1,11 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { Farmer } from './entities/farmer.entity';
 import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
@@ -13,6 +14,7 @@ import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
+import { FarmerDeletionPreviewDto } from './dto/deletion-preview.dto';
 
 const FARMER_RELATIONS = ['farm', 'farm.town', 'farm.crops'];
 
@@ -43,6 +45,8 @@ function conflictBody(blockedBy: BlockedByEntry[] = []) {
 
 @Injectable()
 export class FarmersService {
+  private readonly logger = new Logger(FarmersService.name);
+
   constructor(
     @InjectRepository(Farmer)
     private readonly farmersRepository: Repository<Farmer>,
@@ -221,6 +225,195 @@ export class FarmersService {
       }
       throw error;
     }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Spec 73 — borrado en cascada de un agricultor y sus datos derivados.
+  // `getDeletionPreview` es de solo lectura; `removeCascade` ejecuta el
+  // borrado en una transacción, en el orden verificado en producción
+  // (`docs/testing/limpieza-produccion-2026-08-24.sql`):
+  //   colisiones → encuestas (arrastra respuestas por CASCADE de DB) →
+  //   sesiones → relaciones M:M/conexiones → agricultor → finca (si exclusiva)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Resuelve qué se borraría/borró para un agricultor: sesiones, encuestas
+   * (por los dos caminos posibles, sin duplicar — ver spec 73 "Contexto") y
+   * si su finca es exclusiva o compartida con otro agricultor.
+   */
+  private async computeDeletionPlan(id: string) {
+    const farmer = await this.farmersRepository.findOne({
+      where: { id },
+      relations: ['farm'],
+    });
+    if (!farmer) throw new NotFoundException('Farmer not found');
+
+    const sessions = await this.sessionsRepository.find({
+      where: { farmer: { id } },
+    });
+    const sessionIds = sessions.map((s) => s.sessionId);
+
+    // `surveys.farmer_id` puede estar en NULL con el vínculo real viajando
+    // por `campaign_session_id` (backlog: "surveys.farmer_id queda en NULL en
+    // parte de las encuestas"). Ambos caminos, sin duplicar por id.
+    const surveys = await this.surveysRepository.find({
+      where: sessionIds.length
+        ? [
+            { farmer: { id } },
+            { campaignSession: { sessionId: In(sessionIds) } },
+          ]
+        : { farmer: { id } },
+    });
+
+    const documentCollisionsCount =
+      await this.documentCollisionsRepository.count({
+        where: { existingFarmer: { id } },
+      });
+
+    let farmInfo: FarmerDeletionPreviewDto['farm'] = null;
+    if (farmer.farm) {
+      const farm = await this.farmsRepository.findOne({
+        where: { farmId: farmer.farm.farmId },
+        relations: ['farmers'],
+      });
+      const otherFarmers = (farm?.farmers ?? []).filter((f) => f.id !== id);
+      farmInfo = {
+        farmId: farmer.farm.farmId,
+        name: farm?.name ?? farmer.farm.name,
+        shared: otherFarmers.length > 0,
+        willBeDeleted: otherFarmers.length === 0,
+      };
+    }
+
+    return { farmer, sessionIds, surveys, documentCollisionsCount, farmInfo };
+  }
+
+  /** Ejecuta un `SELECT count(*) AS count ...` y devuelve el número, tipado. */
+  private async queryCount(sql: string, params: unknown[]): Promise<number> {
+    const rows = await this.farmersRepository.manager.query<
+      { count: number | string }[]
+    >(sql, params);
+    return Number(rows[0]?.count ?? 0);
+  }
+
+  async getDeletionPreview(id: string): Promise<FarmerDeletionPreviewDto> {
+    const { farmer, sessionIds, surveys, documentCollisionsCount, farmInfo } =
+      await this.computeDeletionPlan(id);
+
+    const surveyIds = surveys.map((s) => s.surveyId);
+    const responsesCount = surveyIds.length
+      ? await this.queryCount(
+          'SELECT count(*)::int AS count FROM responses WHERE survey_id = ANY($1::uuid[])',
+          [surveyIds],
+        )
+      : 0;
+
+    const relationsCount = await this.queryCount(
+      `SELECT
+         (SELECT count(*) FROM farmers_technologies WHERE farmer_id = $1) +
+         (SELECT count(*) FROM farmers_obstacles WHERE farmer_id = $1) +
+         (SELECT count(*) FROM farmers_digital_funcionalities WHERE farmer_id = $1) +
+         (SELECT count(*) FROM farmers_connections WHERE farmer_id = $1)
+         AS count`,
+      [id],
+    );
+
+    const changeRequestsCount = await this.queryCount(
+      'SELECT count(*)::int AS count FROM change_requests WHERE farmer_id = $1',
+      [id],
+    );
+
+    return {
+      farmerId: farmer.id,
+      name: farmer.name,
+      documentId: farmer.documentId,
+      counts: {
+        farms: farmInfo?.willBeDeleted ? 1 : 0,
+        campaignSessions: sessionIds.length,
+        surveys: surveyIds.length,
+        responses: responsesCount,
+        documentCollisions: documentCollisionsCount,
+        relations: relationsCount,
+      },
+      farm: farmInfo,
+      preserved: { changeRequests: changeRequestsCount },
+    };
+  }
+
+  async removeCascade(
+    id: string,
+    actor?: string,
+  ): Promise<FarmerDeletionPreviewDto> {
+    const { farmer, sessionIds, surveys, documentCollisionsCount, farmInfo } =
+      await this.computeDeletionPlan(id);
+    const surveyIds = surveys.map((s) => s.surveyId);
+
+    await this.farmersRepository.manager.transaction(async (manager) => {
+      // 1. Colisiones — RESTRICT, bloquean el borrado del agricultor.
+      await manager.delete(FarmerDocumentCollision, {
+        existingFarmer: { id },
+      });
+
+      // 2. Encuestas de ambos caminos. Arrastra `responses` por el CASCADE
+      // declarado en `response.entity.ts` (FK real en Postgres).
+      if (surveyIds.length) {
+        await manager.delete(Survey, { surveyId: In(surveyIds) });
+      }
+
+      // 3. Sesiones de campaña del agricultor.
+      if (sessionIds.length) {
+        await manager.delete(CampaignSession, { sessionId: In(sessionIds) });
+      }
+
+      // 4. Relaciones M:M y conexiones — join tables sin repositorio propio.
+      await manager.query(
+        'DELETE FROM farmers_technologies WHERE farmer_id = $1',
+        [id],
+      );
+      await manager.query(
+        'DELETE FROM farmers_obstacles WHERE farmer_id = $1',
+        [id],
+      );
+      await manager.query(
+        'DELETE FROM farmers_digital_funcionalities WHERE farmer_id = $1',
+        [id],
+      );
+      await manager.query(
+        'DELETE FROM farmers_connections WHERE farmer_id = $1',
+        [id],
+      );
+
+      // 5. El agricultor.
+      await manager.delete(Farmer, { id });
+
+      // 6. La finca, solo si quedó sin otro agricultor que la referencie.
+      if (farmInfo?.willBeDeleted) {
+        await manager.delete(Farm, { farmId: farmInfo.farmId });
+      }
+    });
+
+    this.logger.log(
+      `Borrado en cascada: farmerId=${id} actor=${actor ?? 'desconocido'} ` +
+        `sesiones=${sessionIds.length} encuestas=${surveyIds.length} ` +
+        `colisiones=${documentCollisionsCount} ` +
+        `finca=${farmInfo?.willBeDeleted ? farmInfo.farmId : 'conservada'}`,
+    );
+
+    return {
+      farmerId: farmer.id,
+      name: farmer.name,
+      documentId: farmer.documentId,
+      counts: {
+        farms: farmInfo?.willBeDeleted ? 1 : 0,
+        campaignSessions: sessionIds.length,
+        surveys: surveyIds.length,
+        responses: 0, // se calcula solo en el preview; el borrado no lo recuenta
+        documentCollisions: documentCollisionsCount,
+        relations: 0,
+      },
+      farm: farmInfo,
+      preserved: { changeRequests: 0 },
+    };
   }
 
   private isForeignKeyViolation(error: unknown): boolean {
