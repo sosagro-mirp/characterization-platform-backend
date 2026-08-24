@@ -19,6 +19,8 @@ import {
 } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { ROLES } from '../auth/constants';
 import { FarmersService } from './farmers.service';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
@@ -116,5 +118,45 @@ export class FarmersController {
   })
   remove(@Param('id', ParseUUIDPipe) id: string) {
     return this.farmersService.remove(id);
+  }
+
+  // Spec 73 — borrado en cascada. Restringido a ADMIN, igual que `remove()`.
+  @Get(':id/deletion-preview')
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Previsualizar el borrado en cascada de un agricultor (spec 73)',
+    description:
+      'Inventario de solo lectura de lo que se borraría con DELETE /:id/cascade: ' +
+      'fincas, sesiones de campaña, encuestas, respuestas, colisiones de documentId ' +
+      'y relaciones M:M. No modifica nada.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Inventario de borrado.' })
+  @ApiResponse({ status: 404, description: 'Farmer not found.' })
+  getDeletionPreview(@Param('id', ParseUUIDPipe) id: string) {
+    return this.farmersService.getDeletionPreview(id);
+  }
+
+  @Delete(':id/cascade')
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary:
+      'Borrar un agricultor en cascada, con sus datos derivados (spec 73)',
+    description:
+      'Borra en una transacción al agricultor, sus encuestas y respuestas, sus ' +
+      'sesiones de campaña, colisiones de documentId y relaciones M:M. Borra ' +
+      'también su finca, salvo que otro agricultor la comparta. Irreversible.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    description: 'Agricultor y sus datos derivados eliminados.',
+  })
+  @ApiResponse({ status: 404, description: 'Farmer not found.' })
+  removeCascade(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() actor: AuthenticatedUser,
+  ) {
+    return this.farmersService.removeCascade(id, actor.email);
   }
 }
