@@ -2,11 +2,14 @@ import {
   Body,
   Controller,
   Get,
+  HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -40,17 +43,23 @@ export class ConsentRecordsController {
   })
   @ApiResponse({ status: 201, description: 'Constancia registrada.' })
   @ApiResponse({
+    status: 200,
+    description: 'Ya existía — se devuelve la constancia existente.',
+  })
+  @ApiResponse({
     status: 422,
     description: 'Falta la autorización obligatoria de tratamiento de datos.',
   })
   async create(
     @Body() dto: CreateConsentRecordDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    const { record } = await this.consentRecordsService.create(
+    const { created, record } = await this.consentRecordsService.create(
       dto,
       user.userId,
     );
+    res.status(created ? HttpStatus.CREATED : HttpStatus.OK);
     return record;
   }
 

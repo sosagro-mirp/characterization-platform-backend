@@ -267,6 +267,37 @@ describe('Consentimiento informado (spec 78)', () => {
       expect(result.record.consentRecordId).toBe(RECORD_ID);
     });
 
+    // Hallazgo B3 (auditoría de la fase de pruebas) — el check-then-insert de
+    // arriba deja una ventana real entre lectura y escritura; el índice único
+    // parcial de la migración es el respaldo real. Si dos inserciones
+    // concurrentes lo violan, la perdedora recupera la fila que la ganadora
+    // acaba de crear en vez de propagar el error de base de datos.
+    it('recupera la constancia ganadora si el índice único de la migración rechaza una carrera', async () => {
+      documentsRepository.findOne.mockResolvedValue(publishedDoc());
+      const winnerRecord = {
+        consentRecordId: RECORD_ID,
+        sessionId: SESSION_ID,
+      };
+      recordsRepository.findOne
+        .mockResolvedValueOnce(null) // check-then-insert no ve la fila todavía
+        .mockResolvedValueOnce(winnerRecord); // re-consulta tras el 23505
+      recordsRepository.save.mockRejectedValueOnce({
+        driverError: { code: '23505' },
+      });
+
+      const result = await recordsService.create(
+        {
+          sessionId: SESSION_ID,
+          acceptedDataProcessing: true,
+          acceptedAt: new Date().toISOString(),
+        },
+        USER_ID,
+      );
+
+      expect(result.created).toBe(false);
+      expect(result.record).toBe(winnerRecord);
+    });
+
     // Criterio 8 (parte backend): la fecha de aceptación offline se respeta
     it('conserva la fecha de aceptación del dispositivo, no la de recepción', async () => {
       documentsRepository.findOne.mockResolvedValue(publishedDoc());
@@ -384,6 +415,22 @@ describe('Consentimiento informado (spec 78)', () => {
       await expect(
         recordsService.revoke(RECORD_ID, '', USER_ID),
       ).rejects.toBeInstanceOf(UnprocessableEntityException);
+      expect(recordsRepository.update).not.toHaveBeenCalled();
+    });
+
+    // Hallazgo B7 (auditoría de la fase de pruebas) — sin esta guarda, una
+    // segunda revocación pisaba en silencio la fecha/motivo/autor de la
+    // primera, perdiendo el dato legal relevante.
+    it('rechaza con 409 revocar una constancia ya revocada', async () => {
+      recordsRepository.findOne.mockResolvedValue({
+        consentRecordId: RECORD_ID,
+        revokedAt: new Date('2026-08-01T00:00:00Z'),
+        revokedReason: 'Motivo original',
+      });
+
+      await expect(
+        recordsService.revoke(RECORD_ID, 'Segundo intento', USER_ID),
+      ).rejects.toBeInstanceOf(ConflictException);
       expect(recordsRepository.update).not.toHaveBeenCalled();
     });
   });

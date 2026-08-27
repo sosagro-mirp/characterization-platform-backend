@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
   UnprocessableEntityException,
@@ -39,6 +40,8 @@ export interface SurveyFilters {
 
 @Injectable()
 export class SurveysService {
+  private readonly logger = new Logger(SurveysService.name);
+
   constructor(
     @InjectRepository(Survey)
     private readonly surveysRepository: Repository<Survey>,
@@ -524,10 +527,15 @@ export class SurveysService {
           farmer.id,
         );
       } catch (err) {
-        console.warn(
+        // B4 (auditoría spec 78) — `error`, no `warn`: un fallo aquí deja una
+        // constancia de consentimiento huérfana (criterio 6 incumplido) y
+        // debe quedar visible en los logs estructurados de producción, no
+        // perdido entre líneas de `console`.
+        this.logger.error(
           `[extractFarmer] failed to link orphan consent records for session=${survey.campaignSession.sessionId}: ${
             err instanceof Error ? err.message : String(err)
           }`,
+          err instanceof Error ? err.stack : undefined,
         );
       }
     }

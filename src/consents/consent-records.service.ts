@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   NotFoundException,
   UnprocessableEntityException,
@@ -12,9 +13,24 @@ import { CampaignSession } from '../campaign-sessions/entities/campaign-session.
 import { Farmer } from '../farmers/entities/farmer.entity';
 import { User } from '../users/entities/user.entity';
 
+/** Código Postgres de `unique_violation` — respalda la idempotencia de `create()`. */
+const POSTGRES_UNIQUE_VIOLATION = '23505';
+
 /** FK-only reference: evita una consulta extra solo para poner el id en la relación. */
 function userRef(userId: string): User {
   return { userId } as User;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'driverError' in error &&
+    typeof (error as { driverError?: unknown }).driverError === 'object' &&
+    (error as { driverError?: { code?: unknown } }).driverError !== null &&
+    (error as { driverError: { code?: unknown } }).driverError.code ===
+      POSTGRES_UNIQUE_VIOLATION
+  );
 }
 
 export type ConsentVigencyStatus =
@@ -91,8 +107,31 @@ export class ConsentRecordsService {
       syncedAt: new Date(),
     });
 
-    const saved = await this.consentRecordsRepository.save(record);
-    return { created: true, record: saved };
+    try {
+      const saved = await this.consentRecordsRepository.save(record);
+      return { created: true, record: saved };
+    } catch (error) {
+      // B3 (auditoría spec 78) — el check-then-insert de arriba deja una
+      // ventana real entre lectura y escritura (reintento de la cola de
+      // sincronización solapado con un reenvío, o doble envío del
+      // navegador). El índice único parcial de la migración
+      // `1787700000000-CreateConsents` es el respaldo real de la
+      // idempotencia; si dos inserciones concurrentes lo violan, la
+      // perdedora simplemente devuelve la fila que la ganadora acaba de
+      // crear, igual que si el check-then-insert la hubiera visto a tiempo.
+      if (isUniqueViolation(error) && dto.sessionId) {
+        const raceWinner = await this.consentRecordsRepository.findOne({
+          where: {
+            session: { sessionId: dto.sessionId },
+            consentDocument: { consentDocumentId: document.consentDocumentId },
+          },
+        });
+        if (raceWinner) {
+          return { created: false, record: raceWinner };
+        }
+      }
+      throw error;
+    }
   }
 
   findAll(filters?: {
@@ -194,6 +233,14 @@ export class ConsentRecordsService {
     });
     if (!record) {
       throw new NotFoundException('Consent record not found');
+    }
+
+    // B7 (auditoría spec 78) — sin esta guarda, una segunda revocación
+    // pisaría en silencio la fecha/motivo/autor de la primera. En un
+    // registro con valor legal, la primera revocación es el dato que importa
+    // conservar intacto.
+    if (record.revokedAt) {
+      throw new ConflictException('Esta constancia ya estaba revocada');
     }
 
     await this.consentRecordsRepository.update(
