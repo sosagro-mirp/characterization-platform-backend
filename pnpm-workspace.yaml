@@ -1,11 +1,26 @@
-# pnpm 11 requiere aprobar explícitamente los paquetes con scripts de build
-# (postinstall nativo, etc.) o falla la instalación con ERR_PNPM_IGNORED_BUILDS
-# bajo CI=true (Railway instala "pnpm" sin fijar versión, así que quedó
-# expuesto al bump de pnpm 10 -> 11 sin que ningún cambio de este repo lo
-# causara). Ver hallazgo del deploy 03 en /deploys.
+# Aprobación explícita de los paquetes que ejecutan scripts de build
+# (binarios nativos, telemetría opcional, etc.).
+#
+# Se declaran las DOS sintaxis a propósito:
+#   - `onlyBuiltDependencies` la lee pnpm 10 (la versión fijada hoy en
+#     `packageManager` y en el Dockerfile).
+#   - `allowBuilds` la lee pnpm 11, que removió la clave anterior y volvió
+#     `strictDepBuilds` el default: sin esta aprobación, la instalación falla
+#     con ERR_PNPM_IGNORED_BUILDS en vez de solo advertir.
+#
+# Mantener ambas hace que el build se comporte igual con cualquiera de las dos
+# versiones mayores, y evita que un futuro salto de pnpm rompa el despliegue
+# como pasó el 2026-08-27 (ver deploys/03_pre_deploy_produccion_v3.md).
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@scarf/scarf'
+  - '@sentry/node-cpu-profiler'
+  - bcrypt
+  - unrs-resolver
+
 allowBuilds:
   '@nestjs/core': true
   '@scarf/scarf': true
   '@sentry/node-cpu-profiler': true
-  'bcrypt': true
-  'unrs-resolver': true
+  bcrypt: true
+  unrs-resolver: true
