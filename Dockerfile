@@ -1,14 +1,14 @@
 # Stage 1: Dependencies
 FROM node:20-alpine AS deps
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.32.1
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 # Stage 2: Build
 FROM node:20-alpine AS build
 WORKDIR /app
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.32.1
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.json tsconfig.build.json nest-cli.json ./
