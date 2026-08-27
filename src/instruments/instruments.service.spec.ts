@@ -138,3 +138,207 @@ describe('InstrumentsService — hotfix códigos de sistema (2026-08-22)', () =>
     });
   });
 });
+
+/**
+ * Spec 77 — duplicación de instrumentos.
+ *
+ * La copia real se ejecuta dentro de `manager.transaction`; simulamos ese
+ * manager para poder inspeccionar qué se creó y con qué datos, sin tocar una
+ * base de datos real (eso lo cubre el e2e-077).
+ */
+describe('InstrumentsService.duplicate — Spec 77', () => {
+  let service: InstrumentsService;
+  let instrumentsRepository: {
+    createQueryBuilder: jest.Mock;
+    manager: { transaction: jest.Mock };
+  };
+  let usersRepository: { findOne: jest.Mock };
+  let qb: {
+    leftJoinAndSelect: jest.Mock;
+    leftJoin: jest.Mock;
+    addSelect: jest.Mock;
+    where: jest.Mock;
+    orderBy: jest.Mock;
+    addOrderBy: jest.Mock;
+    getOne: jest.Mock;
+  };
+  let fakeManager: {
+    create: jest.Mock;
+    save: jest.Mock;
+    update: jest.Mock;
+  };
+
+  let idCounter: number;
+  const nextId = () => `generated-${++idCounter}`;
+
+  beforeEach(async () => {
+    idCounter = 0;
+
+    qb = {
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      getOne: jest.fn(),
+    };
+
+    fakeManager = {
+      // `create` solo arma el objeto en memoria; `save` es el que le asigna
+      // el id, igual que TypeORM.
+      create: jest.fn((_entity: unknown, data: Record<string, unknown>) => ({
+        ...data,
+      })),
+      save: jest.fn((entity: unknown, data: Record<string, unknown>) => {
+        const idField =
+          entity === Instrument
+            ? 'instrumentId'
+            : (entity as { name: string }).name === 'Section'
+              ? 'sectionId'
+              : (entity as { name: string }).name === 'Question'
+                ? 'questionId'
+                : 'optionId';
+        return { ...data, [idField]: nextId() };
+      }),
+      update: jest.fn().mockResolvedValue(undefined),
+    };
+
+    instrumentsRepository = {
+      createQueryBuilder: jest.fn().mockReturnValue(qb),
+      manager: {
+        transaction: jest.fn(
+          async (cb: (manager: typeof fakeManager) => Promise<string>) =>
+            cb(fakeManager),
+        ),
+      },
+    };
+
+    usersRepository = { findOne: jest.fn().mockResolvedValue(undefined) };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        InstrumentsService,
+        {
+          provide: getRepositoryToken(Instrument),
+          useValue: instrumentsRepository,
+        },
+        { provide: getRepositoryToken(ActorType), useValue: {} },
+        { provide: getRepositoryToken(User), useValue: usersRepository },
+        { provide: getRepositoryToken(Town), useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get<InstrumentsService>(InstrumentsService);
+  });
+
+  it('lanza 404 si el instrumento origen no existe', async () => {
+    qb.getOne.mockResolvedValueOnce(null);
+
+    await expect(
+      service.duplicate('missing-id', { name: 'Copia', version: 1 }),
+    ).rejects.toThrow(new NotFoundException('Instrument not found'));
+
+    expect(instrumentsRepository.manager.transaction).not.toHaveBeenCalled();
+  });
+
+  it('crea la copia inactiva y sin código, sin importar el original', async () => {
+    qb.getOne
+      .mockResolvedValueOnce({
+        instrumentId: 'source-id',
+        isActive: true,
+        code: 'S9',
+        actorTypes: [{ actorTypeId: 'actor-1' }],
+        sections: [],
+      })
+      .mockResolvedValueOnce({ instrumentId: 'generated-1' }); // findOne() final
+
+    await service.duplicate('source-id', {
+      name: 'Copia de prueba',
+      version: 3,
+    });
+
+    const createCalls = fakeManager.create.mock.calls as [
+      unknown,
+      Record<string, unknown>,
+    ][];
+    const instrumentCreateCall = createCalls.find(
+      (call) => call[0] === Instrument,
+    );
+    expect(instrumentCreateCall?.[1]).toMatchObject({
+      name: 'Copia de prueba',
+      version: 3,
+      isActive: false,
+      code: undefined,
+      actorTypes: [{ actorTypeId: 'actor-1' }],
+    });
+  });
+
+  it('remapea conditionQuestionId a la pregunta copiada, no a la original', async () => {
+    qb.getOne
+      .mockResolvedValueOnce({
+        instrumentId: 'source-id',
+        isActive: false,
+        code: null,
+        actorTypes: [],
+        sections: [
+          {
+            sectionId: 'section-a',
+            name: 'Sección A',
+            order: 1,
+            questions: [
+              {
+                questionId: 'q-a1',
+                text: 'A1',
+                type: { typeId: 'type-1' },
+                isRequired: true,
+                isSelectionCriteria: false,
+                isKeyQuestion: false,
+                order: 1,
+                systemField: null,
+                conditionValue: null,
+                conditionQuestion: null,
+                options: [],
+              },
+            ],
+          },
+          {
+            sectionId: 'section-b',
+            name: 'Sección B',
+            order: 2,
+            questions: [
+              {
+                questionId: 'q-b1',
+                text: 'B1',
+                type: { typeId: 'type-1' },
+                isRequired: true,
+                isSelectionCriteria: false,
+                isKeyQuestion: false,
+                order: 1,
+                systemField: null,
+                conditionValue: 'si',
+                conditionQuestion: { questionId: 'q-a1' },
+                options: [],
+              },
+            ],
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ instrumentId: 'generated-1' });
+
+    await service.duplicate('source-id', { name: 'Copia', version: 1 });
+
+    // La única llamada a `update` debe apuntar la B1 copiada a la A1 copiada
+    // (un id `generated-N`), nunca al `q-a1` original.
+    expect(fakeManager.update).toHaveBeenCalledTimes(1);
+    const [, copiedB1Id, updatePayload] = fakeManager.update.mock.calls[0] as [
+      unknown,
+      string,
+      { conditionQuestion: { questionId: string }; conditionValue: string },
+    ];
+    expect(copiedB1Id).toMatch(/^generated-/);
+    expect(updatePayload.conditionQuestion.questionId).toMatch(/^generated-/);
+    expect(updatePayload.conditionQuestion.questionId).not.toBe('q-a1');
+    expect(updatePayload.conditionValue).toBe('si');
+  });
+});
