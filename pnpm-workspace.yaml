@@ -1,0 +1,11 @@
+# pnpm 11 requiere aprobar explícitamente los paquetes con scripts de build
+# (postinstall nativo, etc.) o falla la instalación con ERR_PNPM_IGNORED_BUILDS
+# bajo CI=true (Railway instala "pnpm" sin fijar versión, así que quedó
+# expuesto al bump de pnpm 10 -> 11 sin que ningún cambio de este repo lo
+# causara). Ver hallazgo del deploy 03 en /deploys.
+allowBuilds:
+  '@nestjs/core': true
+  '@scarf/scarf': true
+  '@sentry/node-cpu-profiler': true
+  'bcrypt': true
+  'unrs-resolver': true
