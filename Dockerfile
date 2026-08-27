@@ -10,7 +10,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 RUN npm install -g pnpm
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY tsconfig.json tsconfig.build.json nest-cli.json ./
 COPY src src
 COPY test test
