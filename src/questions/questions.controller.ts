@@ -21,8 +21,9 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { CopyQuestionDto } from './dto/copy-question.dto';
 import { Question } from './entities/question.entity';
-import { QuestionsService } from './questions.service';
+import { CopyQuestionResult, QuestionsService } from './questions.service';
 
 @ApiTags('Questions')
 @ApiBearerAuth()
@@ -49,6 +50,32 @@ export class QuestionsController {
     @Body() createQuestionDto: CreateQuestionDto,
   ) {
     return this.questionsService.create(sectionId, createQuestionDto);
+  }
+
+  @Post('copy')
+  @ApiOperation({
+    summary: 'Copiar pregunta desde otra sección',
+    description:
+      'Copia una pregunta —con sus opciones— al final de esta sección, ' +
+      'esté la de origen en el mismo instrumento o en otro distinto. La ' +
+      'condición de visibilidad de la pregunta de origen nunca viaja: se ' +
+      'reporta en `droppedCondition` cuando existía.',
+  })
+  @ApiParam({
+    name: 'sectionId',
+    format: 'uuid',
+    description: 'ID de la sección destino',
+  })
+  @ApiResponse({ status: 201, description: 'Pregunta copiada.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Sección destino o pregunta de origen no encontrada.',
+  })
+  copy(
+    @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
+    @Body() copyQuestionDto: CopyQuestionDto,
+  ): Promise<CopyQuestionResult> {
+    return this.questionsService.copyToSection(sectionId, copyQuestionDto);
   }
 
   @Get(':questionId')
