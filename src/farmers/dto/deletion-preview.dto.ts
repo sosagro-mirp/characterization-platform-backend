@@ -20,6 +20,8 @@ export interface DeletionCounts {
   responses: number;
   documentCollisions: number;
   relations: number;
+  /** Constancias de consentimiento informado (spec 78). */
+  consentRecords: number;
 }
 
 export class FarmerDeletionPreviewDto {

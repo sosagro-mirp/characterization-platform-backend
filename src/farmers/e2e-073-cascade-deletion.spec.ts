@@ -10,6 +10,7 @@ import { Farm } from 'src/farms/entities/farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 /**
  * Spec 73 — Borrado en cascada de un agricultor desde el panel.
@@ -131,6 +132,8 @@ describe('FarmersService — borrado en cascada (spec 73)', () => {
           provide: getRepositoryToken(FarmerDocumentCollision),
           useValue: documentCollisionsRepository,
         },
+        // Spec 78 — FarmersController.getConsentStatus depende de esto.
+        { provide: ConsentRecordsService, useValue: {} },
       ],
     }).compile();
 

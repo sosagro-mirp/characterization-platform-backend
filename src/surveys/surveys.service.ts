@@ -25,6 +25,7 @@ import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 export interface SurveyFilters {
   actorTypeId?: string;
@@ -63,6 +64,7 @@ export class SurveysService {
     private readonly responsesRepository: Repository<Response>,
     @InjectRepository(FarmerDocumentCollision)
     private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
+    private readonly consentRecordsService: ConsentRecordsService,
   ) {}
 
   async create(
@@ -509,6 +511,25 @@ export class SurveysService {
         { sessionId: survey.campaignSession.sessionId },
         { farmer },
       );
+
+      // Spec 78, criterio 6 — el consentimiento se registra antes de S1,
+      // cuando el Farmer todavía no existe (ConsentRecord.farmer_id queda en
+      // null, anclado solo por session_id). Aquí es donde el Farmer recién
+      // resuelto (nuevo o ya existente) queda disponible por primera vez, así
+      // que es el punto correcto para el backfill. Best-effort: un fallo aquí
+      // no debe tumbar la extracción del agricultor, que ya se completó.
+      try {
+        await this.consentRecordsService.linkOrphansToFarmer(
+          survey.campaignSession.sessionId,
+          farmer.id,
+        );
+      } catch (err) {
+        console.warn(
+          `[extractFarmer] failed to link orphan consent records for session=${survey.campaignSession.sessionId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      }
     }
 
     // A resolution was declared for a previously-detected collision — record

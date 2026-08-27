@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { FarmersController } from './farmers.controller';
 import { FarmersService } from './farmers.service';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 describe('FarmersController', () => {
   let controller: FarmersController;
@@ -8,7 +9,11 @@ describe('FarmersController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FarmersController],
-      providers: [{ provide: FarmersService, useValue: {} }],
+      providers: [
+        { provide: FarmersService, useValue: {} },
+        // Spec 78 — GET :id/consent depende de ConsentRecordsService.
+        { provide: ConsentRecordsService, useValue: {} },
+      ],
     }).compile();
 
     controller = module.get<FarmersController>(FarmersController);

@@ -8,6 +8,7 @@ import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { FarmersService } from './farmers.service';
 import { FarmersController } from './farmers.controller';
+import { ConsentsModule } from '../consents/consents.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { FarmersController } from './farmers.controller';
       CampaignSession,
       Survey,
     ]),
+    ConsentsModule,
   ],
   controllers: [FarmersController],
   providers: [FarmersService],
