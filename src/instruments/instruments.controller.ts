@@ -29,6 +29,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
+import { DuplicateInstrumentDto } from './dto/duplicate-instrument.dto';
 import { InstrumentsService } from './instruments.service';
 
 class FindAllInstrumentsQuery {
@@ -170,6 +171,35 @@ export class InstrumentsController {
     return this.instrumentsService.update(
       id,
       updateInstrumentDto,
+      user?.userId,
+    );
+  }
+
+  @Post(':id/duplicate')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Duplicar instrumento',
+    description:
+      'Crea una copia profunda del instrumento (secciones, preguntas y ' +
+      'opciones), remapeando las condiciones de visibilidad internas a las ' +
+      'preguntas de la copia. La copia nace inactiva y sin código de sistema.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    description: 'ID del instrumento a duplicar',
+  })
+  @ApiResponse({ status: 201, description: 'Instrumento duplicado.' })
+  @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
+  duplicate(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() duplicateInstrumentDto: DuplicateInstrumentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.instrumentsService.duplicate(
+      id,
+      duplicateInstrumentDto,
       user?.userId,
     );
   }

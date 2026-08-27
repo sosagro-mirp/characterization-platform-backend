@@ -1,12 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { EntityManager, Not, Repository } from 'typeorm';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
+
+export interface CopyQuestionResult {
+  // El entity `Question` no expone `conditionQuestionId`/`conditionValue` como
+  // campos planos (solo la relación `conditionQuestion`); la copia siempre
+  // los deja explícitamente en null, así que se agregan aquí para que la
+  // respuesta sea inequívoca sin depender de qué relaciones se hayan cargado.
+  question: Omit<Question, 'conditionValue'> & {
+    conditionQuestionId: string | null;
+    conditionValue: string | null;
+  };
+  droppedCondition: boolean;
+}
 
 const TYPES_WITHOUT_OPTIONS = ['open_text', 'numeric', 'yes_no', 'compliance'];
 
@@ -236,5 +248,82 @@ export class QuestionsService {
       }
     }
     await this.questionsRepository.save(remaining);
+  }
+
+  /**
+   * Fase 2 (Spec 77): copia una pregunta —con sus opciones— al final de una
+   * sección destino, esté o no en el mismo instrumento que la de origen.
+   *
+   * La condición de visibilidad (`conditionQuestionId`) SIEMPRE se descarta:
+   * la pregunta de la que depende puede no existir en el instrumento destino,
+   * y copiarla "a medias" dejaría una condición apuntando a una pregunta
+   * ajena. `droppedCondition` en la respuesta le permite a la UI avisarlo.
+   */
+  async copyToSection(
+    targetSectionId: string,
+    copyQuestionDto: { sourceQuestionId: string },
+  ): Promise<CopyQuestionResult> {
+    const targetSection = await this.sectionsRepository.findOne({
+      where: { sectionId: targetSectionId },
+    });
+    if (!targetSection) {
+      throw new NotFoundException('Target section not found');
+    }
+
+    const source = await this.questionsRepository.findOne({
+      where: { questionId: copyQuestionDto.sourceQuestionId },
+      relations: ['type', 'options', 'conditionQuestion'],
+    });
+    if (!source) {
+      throw new NotFoundException('Source question not found');
+    }
+
+    const droppedCondition = !!source.conditionQuestion;
+
+    const newQuestionId = await this.questionsRepository.manager.transaction(
+      async (manager: EntityManager) => {
+        const siblingCount = await manager.count(Question, {
+          where: { section: { sectionId: targetSectionId } },
+        });
+
+        const questionCopy = manager.create(Question, {
+          section: targetSection,
+          text: source.text,
+          type: source.type,
+          isRequired: source.isRequired,
+          isSelectionCriteria: source.isSelectionCriteria,
+          isKeyQuestion: source.isKeyQuestion,
+          order: siblingCount + 1,
+          systemField: source.systemField ?? undefined,
+        });
+        const savedQuestion = await manager.save(Question, questionCopy);
+
+        for (const option of source.options ?? []) {
+          const optionCopy = manager.create(OptionQuestion, {
+            question: savedQuestion,
+            text: option.text,
+            value: option.value ?? undefined,
+            isOther: option.isOther,
+            metadataId: option.metadataId ?? null,
+          });
+          await manager.save(OptionQuestion, optionCopy);
+        }
+
+        return savedQuestion.questionId;
+      },
+    );
+
+    const savedQuestion = (await this.questionsRepository.findOne({
+      where: { questionId: newQuestionId },
+      relations: ['type', 'options'],
+    })) as Question;
+
+    const question: CopyQuestionResult['question'] = {
+      ...savedQuestion,
+      conditionQuestionId: null,
+      conditionValue: null,
+    };
+
+    return { question, droppedCondition };
   }
 }

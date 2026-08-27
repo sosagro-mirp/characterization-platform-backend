@@ -7,9 +7,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
-import { In, Repository } from 'typeorm';
+import { Section } from 'src/sections/entities/section.entity';
+import { Question } from 'src/questions/entities/question.entity';
+import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
+import { EntityManager, In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
+import { DuplicateInstrumentDto } from './dto/duplicate-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
 import { SYSTEM_INSTRUMENT_CODES } from './system-instrument-codes';
 
@@ -204,6 +208,136 @@ export class InstrumentsService {
     }
 
     await this.instrumentsRepository.remove(instrument);
+  }
+
+  /**
+   * Fase 1 (Spec 77): copia profunda y transaccional de un instrumento
+   * completo — secciones, preguntas y opciones — junto con sus actorTypes.
+   *
+   * La copia SIEMPRE nace inactiva y sin `code`: heredar `code` violaría el
+   * índice único de la columna y convertiría la copia en un instrumento del
+   * sistema (S1a, S1b) sin que nadie lo pida. `isActive=false` evita que se
+   * aplique en campo antes de revisarla.
+   *
+   * Las condiciones de visibilidad internas (`conditionQuestionId`) se
+   * remapean a las preguntas de la copia en una segunda pasada: la pregunta
+   * condición puede vivir en una sección posterior a la dependiente, así que
+   * todavía no existe en el momento de insertar esta última.
+   */
+  async duplicate(
+    id: string,
+    duplicateInstrumentDto: DuplicateInstrumentDto,
+    userId?: string,
+  ): Promise<Instrument> {
+    const source = await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.sections', 'section')
+      .leftJoinAndSelect('section.questions', 'question')
+      .leftJoinAndSelect('question.type', 'type')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.conditionQuestion', 'conditionQuestion')
+      .where('instrument.instrumentId = :id', { id })
+      .orderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC')
+      .getOne();
+
+    if (!source) {
+      throw new NotFoundException('Instrument not found');
+    }
+
+    const user = userId
+      ? ((await this.usersRepository.findOne({ where: { userId } })) ??
+        undefined)
+      : undefined;
+
+    const newInstrumentId =
+      await this.instrumentsRepository.manager.transaction(
+        async (manager: EntityManager) => {
+          const copy = manager.create(Instrument, {
+            name: duplicateInstrumentDto.name,
+            version: duplicateInstrumentDto.version,
+            publishDate:
+              duplicateInstrumentDto.publishDate ??
+              new Date().toISOString().slice(0, 10),
+            isActive: false,
+            code: undefined,
+            actorTypes: source.actorTypes ?? [],
+            createdBy: user,
+            updatedBy: user,
+          });
+          const savedInstrument = await manager.save(Instrument, copy);
+
+          // originalQuestionId → copyQuestionId, para el remapeo de condiciones.
+          const questionIdMap = new Map<string, string>();
+          // Pendientes de remapear: copyQuestionId → { originalConditionQuestionId, conditionValue }
+          const pendingConditions: {
+            copyQuestionId: string;
+            originalConditionQuestionId: string;
+            conditionValue: string | null;
+          }[] = [];
+
+          for (const section of source.sections ?? []) {
+            const sectionCopy = manager.create(Section, {
+              name: section.name,
+              order: section.order,
+              instrument: savedInstrument,
+            });
+            const savedSection = await manager.save(Section, sectionCopy);
+
+            for (const question of section.questions ?? []) {
+              const questionCopy = manager.create(Question, {
+                section: savedSection,
+                text: question.text,
+                type: question.type,
+                isRequired: question.isRequired,
+                isSelectionCriteria: question.isSelectionCriteria,
+                isKeyQuestion: question.isKeyQuestion,
+                order: question.order,
+                systemField: question.systemField ?? undefined,
+                conditionValue: question.conditionValue ?? undefined,
+              });
+              const savedQuestion = await manager.save(Question, questionCopy);
+              questionIdMap.set(question.questionId, savedQuestion.questionId);
+
+              if (question.conditionQuestion) {
+                pendingConditions.push({
+                  copyQuestionId: savedQuestion.questionId,
+                  originalConditionQuestionId:
+                    question.conditionQuestion.questionId,
+                  conditionValue: question.conditionValue ?? null,
+                });
+              }
+
+              for (const option of question.options ?? []) {
+                const optionCopy = manager.create(OptionQuestion, {
+                  question: savedQuestion,
+                  text: option.text,
+                  value: option.value ?? undefined,
+                  isOther: option.isOther,
+                  metadataId: option.metadataId ?? null,
+                });
+                await manager.save(OptionQuestion, optionCopy);
+              }
+            }
+          }
+
+          for (const pending of pendingConditions) {
+            const copiedConditionQuestionId = questionIdMap.get(
+              pending.originalConditionQuestionId,
+            );
+            if (!copiedConditionQuestionId) continue;
+            await manager.update(Question, pending.copyQuestionId, {
+              conditionQuestion: { questionId: copiedConditionQuestionId },
+              conditionValue: pending.conditionValue ?? undefined,
+            });
+          }
+
+          return savedInstrument.instrumentId;
+        },
+      );
+
+    return this.findOne(newInstrumentId);
   }
 
   async findOneForRender(id: string) {
