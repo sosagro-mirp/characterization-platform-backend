@@ -21,6 +21,15 @@ import { ConsentRecordsService } from './consent-records.service';
  * ARRANCA EN ROJO: el módulo `src/consents/` no existe todavía — ni las
  * entidades, ni `ConsentDocumentsService`, ni `ConsentRecordsService`. El
  * backfill del criterio 6 tampoco está en `SurveysService.extractFarmer`.
+ *
+ * **Cambio de alcance (2026-08-28):** el consentimiento deja de bloquear la
+ * aplicación del instrumento (criterios 1, 2, 4, 5 reescritos; 1-bis a
+ * 1-sexter agregados). El backend nunca impuso ese bloqueo (era solo
+ * verificación de cliente, hallazgo F1 de la auditoría de Fase 9), así que
+ * ningún test de este archivo requiere reescritura. El campo nuevo
+ * `hasPendingConsent` (Fase 10) se agrega a la respuesta de `GET /api/farmers`
+ * — se prueba junto a `FarmersService`, no aquí (este archivo cubre solo
+ * `src/consents/`, no `src/farmers/`).
  */
 
 const DOC_V1 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';

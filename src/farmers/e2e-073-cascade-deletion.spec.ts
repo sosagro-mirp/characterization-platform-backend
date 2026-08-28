@@ -132,8 +132,14 @@ describe('FarmersService — borrado en cascada (spec 73)', () => {
           provide: getRepositoryToken(FarmerDocumentCollision),
           useValue: documentCollisionsRepository,
         },
-        // Spec 78 — FarmersController.getConsentStatus depende de esto.
-        { provide: ConsentRecordsService, useValue: {} },
+        // Spec 78 — FarmersController.getConsentStatus y
+        // FarmersService.findAll (Fase 10) dependen de esto.
+        {
+          provide: ConsentRecordsService,
+          useValue: {
+            getPendingConsentMap: jest.fn().mockResolvedValue(new Map()),
+          },
+        },
       ],
     }).compile();
 

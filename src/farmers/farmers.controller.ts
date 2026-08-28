@@ -60,7 +60,13 @@ export class FarmersController {
   @Get()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({ summary: 'List all farmers' })
-  @ApiResponse({ status: 200, description: 'List of farmers.' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'List of farmers. Each item includes `hasPendingConsent: boolean` ' +
+      '(spec 78, Fase 10) — true si no tiene un consentimiento vigente de la ' +
+      'versión publicada. El detalle exacto vive en GET /:id/consent.',
+  })
   findAll() {
     return this.farmersService.findAll();
   }

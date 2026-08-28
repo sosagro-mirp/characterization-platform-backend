@@ -5,7 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, IsNull, Repository } from 'typeorm';
+import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm';
 import { ConsentRecord } from './entities/consent-record.entity';
 import { ConsentDocumentsService } from './consent-documents.service';
 import { CreateConsentRecordDto } from './dto/create-consent-record.dto';
@@ -267,5 +267,38 @@ export class ConsentRecordsService {
       } as FindOptionsWhere<ConsentRecord>,
       { farmer: { id: farmerId } as Farmer },
     );
+  }
+
+  // Fase 10 (cambio de alcance 2026-08-28) — indicador agregado de
+  // "consentimiento pendiente" para el listado de agricultores del admin.
+  // Colapsa outdated_version | revoked | none en un solo booleano: el
+  // listado no necesita el matiz, solo el detalle (que sigue usando
+  // getFarmerStatus). Una sola consulta para todo el lote, en vez de N+1.
+  async getPendingConsentMap(
+    farmerIds: string[],
+  ): Promise<Map<string, boolean>> {
+    const pending = new Map<string, boolean>(farmerIds.map((id) => [id, true]));
+    if (farmerIds.length === 0) return pending;
+
+    const activeDocument = await this.consentDocumentsService.findActive();
+    if (!activeDocument) return pending;
+
+    const validRecords = await this.consentRecordsRepository.find({
+      where: {
+        farmer: { id: In(farmerIds) },
+        consentDocument: {
+          consentDocumentId: activeDocument.consentDocumentId,
+        },
+        acceptedDataProcessing: true,
+        revokedAt: IsNull(),
+      } as FindOptionsWhere<ConsentRecord>,
+      relations: ['farmer'],
+    });
+
+    for (const record of validRecords) {
+      if (record.farmer?.id) pending.set(record.farmer.id, false);
+    }
+
+    return pending;
   }
 }

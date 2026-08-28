@@ -15,6 +15,7 @@ import { Survey } from 'src/surveys/entities/survey.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { FarmerDeletionPreviewDto } from './dto/deletion-preview.dto';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 const FARMER_RELATIONS = ['farm', 'farm.town', 'farm.crops'];
 
@@ -60,6 +61,7 @@ export class FarmersService {
     private readonly surveysRepository: Repository<Survey>,
     @InjectRepository(FarmerDocumentCollision)
     private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
+    private readonly consentRecordsService: ConsentRecordsService,
   ) {}
 
   // Spec 68 — colisiones de documentId detectadas por
@@ -156,11 +158,26 @@ export class FarmersService {
     });
   }
 
-  async findAll(): Promise<Farmer[]> {
-    return this.farmersRepository.find({
+  // Fase 10 (cambio de alcance 2026-08-28) — cada agricultor del listado
+  // lleva `hasPendingConsent`, para que el admin vea de un vistazo a quién le
+  // falta el consentimiento informado, sin abrir cada detalle. El detalle
+  // exacto (`valid | outdated_version | revoked | none`) sigue viviendo en
+  // `GET /api/farmers/:id/consent`.
+  async findAll(): Promise<Array<Farmer & { hasPendingConsent: boolean }>> {
+    const farmers = await this.farmersRepository.find({
       relations: FARMER_RELATIONS,
       take: 500,
     });
+
+    const pendingMap = await this.consentRecordsService.getPendingConsentMap(
+      farmers.map((f) => f.id),
+    );
+
+    return farmers.map((farmer) =>
+      Object.assign(farmer, {
+        hasPendingConsent: pendingMap.get(farmer.id) ?? true,
+      }),
+    );
   }
 
   async findOne(id: string): Promise<Farmer> {
