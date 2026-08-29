@@ -269,6 +269,23 @@ export class ConsentRecordsService {
     );
   }
 
+  // Spec 79 — equivalente de linkOrphansToFarmer para el canal público: la
+  // constancia se registra anclada a `survey` (no existe session), y se
+  // reancla al agricultor al procesar el envío desde la bandeja de
+  // revisión (SurveysService.processPublicSubmission).
+  async linkOrphansToFarmerBySurvey(
+    surveyId: string,
+    farmerId: string,
+  ): Promise<void> {
+    await this.consentRecordsRepository.update(
+      {
+        survey: { surveyId },
+        farmer: IsNull(),
+      } as FindOptionsWhere<ConsentRecord>,
+      { farmer: { id: farmerId } as Farmer },
+    );
+  }
+
   // Fase 10 (cambio de alcance 2026-08-28) — indicador agregado de
   // "consentimiento pendiente" para el listado de agricultores del admin.
   // Colapsa outdated_version | revoked | none en un solo booleano: el

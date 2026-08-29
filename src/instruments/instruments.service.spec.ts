@@ -6,6 +6,7 @@ import { Instrument } from './entities/instrument.entity';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
+import { Question } from 'src/questions/entities/question.entity';
 
 /**
  * Hotfix del 2026-08-22 — dos regresiones reales de producción introducidas
@@ -64,6 +65,7 @@ describe('InstrumentsService — hotfix códigos de sistema (2026-08-22)', () =>
         { provide: getRepositoryToken(ActorType), useValue: {} },
         { provide: getRepositoryToken(User), useValue: {} },
         { provide: getRepositoryToken(Town), useValue: {} },
+        { provide: getRepositoryToken(Question), useValue: {} },
       ],
     }).compile();
 
@@ -226,6 +228,7 @@ describe('InstrumentsService.duplicate — Spec 77', () => {
         { provide: getRepositoryToken(ActorType), useValue: {} },
         { provide: getRepositoryToken(User), useValue: usersRepository },
         { provide: getRepositoryToken(Town), useValue: {} },
+        { provide: getRepositoryToken(Question), useValue: {} },
       ],
     }).compile();
 

@@ -34,6 +34,12 @@ export class UpdateInstrumentDto {
   @IsBoolean()
   isActive?: boolean;
 
+  /** Spec 79 — activa el enlace público /encuesta/{instrumentId}. Se rechaza con 422 si el instrumento tiene preguntas de imagen, audio o documento. */
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
+
   @ApiPropertyOptional({ example: 'S1', maxLength: 10 })
   @IsOptional()
   @IsString()

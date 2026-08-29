@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
@@ -28,7 +29,23 @@ export class InstrumentsService {
     private readonly usersRepository: Repository<User>,
     @InjectRepository(Town)
     private readonly townsRepository: Repository<Town>,
+    @InjectRepository(Question)
+    private readonly questionsRepository: Repository<Question>,
   ) {}
+
+  // Spec 79 — tipos de pregunta que exigen el flujo autenticado de
+  // media-attachments para subir el archivo. Un instrumento con alguna de
+  // estas no puede compartirse por el canal público sin autenticación.
+  // 'video' está incluido aunque el spec solo menciona imagen/audio/
+  // documento explícitamente: comparte la misma restricción (sube por
+  // media-attachments) y dejarlo fuera sería un hueco de seguridad, no una
+  // fidelidad al texto del spec.
+  private static readonly MEDIA_QUESTION_TYPES = [
+    'image',
+    'voice_recording',
+    'document',
+    'video',
+  ];
 
   async create(
     createInstrumentDto: CreateInstrumentDto,
@@ -166,6 +183,33 @@ export class InstrumentsService {
     }
 
     const { actorTypeIds, ...rest } = updateInstrumentDto;
+
+    // Spec 79, criterio 3 — activar el enlace público se rechaza si el
+    // instrumento tiene alguna pregunta multimedia. Solo se valida cuando
+    // isPublic pasa a true explícitamente: desactivarlo, o dejarlo sin
+    // tocar, nunca requiere esta consulta.
+    if (rest.isPublic === true && !instrument.isPublic) {
+      const mediaQuestions = await this.questionsRepository
+        .createQueryBuilder('question')
+        .innerJoin('question.section', 'section')
+        .innerJoin('section.instrument', 'instrument')
+        .innerJoin('question.type', 'type')
+        .where('instrument.instrumentId = :id', { id })
+        .andWhere('type.name IN (:...types)', {
+          types: InstrumentsService.MEDIA_QUESTION_TYPES,
+        })
+        .select(['question.questionId', 'type.name'])
+        .getMany();
+
+      if (mediaQuestions.length > 0) {
+        const types = [...new Set(mediaQuestions.map((q) => q.type.name))].join(
+          ', ',
+        );
+        throw new UnprocessableEntityException(
+          `Este instrumento no puede compartirse por enlace público: tiene preguntas de tipo ${types}, que requieren el flujo autenticado de subida de archivos.`,
+        );
+      }
+    }
 
     Object.assign(instrument, rest);
 

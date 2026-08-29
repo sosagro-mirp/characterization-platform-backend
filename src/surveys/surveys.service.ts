@@ -38,6 +38,16 @@ export interface SurveyFilters {
   farmerId?: string;
 }
 
+// Spec 79 — fila de la bandeja de revisión de envíos públicos.
+export interface PublicSubmissionRow {
+  surveyId: string;
+  instrumentId: string;
+  instrumentName: string;
+  createdAt: Date;
+  responseCount: number;
+  reviewStatus: string;
+}
+
 @Injectable()
 export class SurveysService {
   private readonly logger = new Logger(SurveysService.name);
@@ -1027,5 +1037,140 @@ export class SurveysService {
     }
 
     return { crops };
+  }
+
+  // ── Spec 79 — bandeja de revisión de envíos públicos ──────────────────────
+
+  async findPublicSubmissions(filters: {
+    instrumentId?: string;
+    reviewStatus?: 'pending' | 'processed' | 'discarded';
+  }): Promise<PublicSubmissionRow[]> {
+    const qb = this.surveysRepository
+      .createQueryBuilder('survey')
+      .innerJoinAndSelect('survey.instruments', 'instrument')
+      .where('survey.origin = :origin', { origin: 'public' });
+
+    if (filters.instrumentId) {
+      qb.andWhere('instrument.instrumentId = :instrumentId', {
+        instrumentId: filters.instrumentId,
+      });
+    }
+
+    if (filters.reviewStatus) {
+      qb.andWhere('survey.reviewStatus = :reviewStatus', {
+        reviewStatus: filters.reviewStatus,
+      });
+    }
+
+    qb.orderBy('survey.createdAt', 'DESC');
+
+    const surveys = await qb.getMany();
+    if (surveys.length === 0) return [];
+
+    // Una sola consulta agregada para el conteo de respuestas, en vez de
+    // N+1 por envío (ver spec 55, mismo criterio aplicado aquí).
+    const counts = await this.responsesRepository
+      .createQueryBuilder('response')
+      .select('response.survey', 'surveyId')
+      .addSelect('COUNT(*)', 'count')
+      .where('response.survey IN (:...surveyIds)', {
+        surveyIds: surveys.map((s) => s.surveyId),
+      })
+      .groupBy('response.survey')
+      .getRawMany<{ surveyId: string; count: string }>();
+    const countBySurveyId = new Map(
+      counts.map((row) => [row.surveyId, Number(row.count)]),
+    );
+
+    return surveys.map((survey) => ({
+      surveyId: survey.surveyId,
+      instrumentId: survey.instruments?.[0]?.instrumentId ?? '',
+      instrumentName: survey.instruments?.[0]?.name ?? '',
+      createdAt: survey.createdAt,
+      responseCount: countBySurveyId.get(survey.surveyId) ?? 0,
+      reviewStatus: survey.reviewStatus ?? 'pending',
+    }));
+  }
+
+  private async findPublicSurveyOrThrow(surveyId: string): Promise<Survey> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+    });
+
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    if (survey.origin !== 'public') {
+      throw new ConflictException(
+        'Esta encuesta no es un envío del canal público.',
+      );
+    }
+
+    return survey;
+  }
+
+  // Criterio 11/12 — reutiliza extractFarmer (misma detección de colisiones
+  // del spec 68) y extractCrops. Ante colisión pendiente, extractFarmer
+  // lanza 409 y este método deja el envío sin tocar — no se marca
+  // 'processed' hasta que el 409 se resuelve con `resolution`.
+  async processPublicSubmission(
+    surveyId: string,
+    dto: ExtractFarmerDto,
+    reviewedByUserId?: string,
+  ): Promise<{ farmer: Farmer; existed: boolean }> {
+    const survey = await this.findPublicSurveyOrThrow(surveyId);
+
+    if (survey.reviewStatus !== 'pending') {
+      throw new ConflictException(
+        `Este envío ya fue revisado (estado: ${survey.reviewStatus}).`,
+      );
+    }
+
+    const result = await this.extractFarmer(surveyId, dto);
+
+    await this.consentRecordsService.linkOrphansToFarmerBySurvey(
+      surveyId,
+      result.farmer.id,
+    );
+
+    await this.extractCrops(surveyId);
+
+    await this.surveysRepository.update(surveyId, {
+      farmer: { id: result.farmer.id } as Farmer,
+      reviewStatus: 'processed',
+      reviewedBy: reviewedByUserId
+        ? ({ userId: reviewedByUserId } as User)
+        : null,
+      reviewedAt: new Date(),
+    });
+
+    return result;
+  }
+
+  // Criterio 13 — descartar es un cambio de estado, no un borrado: la
+  // encuesta y sus respuestas se conservan para auditoría. Idempotente
+  // sobre un envío ya descartado (reintentar no es un error).
+  async discardPublicSubmission(
+    surveyId: string,
+    reviewedByUserId?: string,
+  ): Promise<{ surveyId: string; reviewStatus: string }> {
+    const survey = await this.findPublicSurveyOrThrow(surveyId);
+
+    if (survey.reviewStatus === 'processed') {
+      throw new ConflictException(
+        'Este envío ya fue procesado y no puede descartarse.',
+      );
+    }
+
+    if (survey.reviewStatus !== 'discarded') {
+      await this.surveysRepository.update(surveyId, {
+        reviewStatus: 'discarded',
+        reviewedBy: reviewedByUserId
+          ? ({ userId: reviewedByUserId } as User)
+          : null,
+        reviewedAt: new Date(),
+      });
+    }
+
+    return { surveyId, reviewStatus: 'discarded' };
   }
 }
