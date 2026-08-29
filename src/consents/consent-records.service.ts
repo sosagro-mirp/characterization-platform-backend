@@ -138,6 +138,9 @@ export class ConsentRecordsService {
     farmerId?: string;
     sessionId?: string;
     consentDocumentId?: string;
+    // Spec 79 — permite a la bandeja de revisión de envíos públicos mostrar
+    // la constancia anclada a la encuesta, antes de que exista un farmer.
+    surveyId?: string;
   }): Promise<ConsentRecord[]> {
     const where: Record<string, unknown> = {};
     if (filters?.farmerId) where.farmer = { id: filters.farmerId };
@@ -145,6 +148,7 @@ export class ConsentRecordsService {
     if (filters?.consentDocumentId) {
       where.consentDocument = { consentDocumentId: filters.consentDocumentId };
     }
+    if (filters?.surveyId) where.survey = { surveyId: filters.surveyId };
     return this.consentRecordsRepository.find({
       where,
       order: { createdAt: 'DESC' },
