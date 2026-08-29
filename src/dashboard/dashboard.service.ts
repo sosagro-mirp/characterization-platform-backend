@@ -678,6 +678,15 @@ export class DashboardService {
     categoryInstrumentIds?: string[],
     responseFilters: ResolvedResponseFilters = [],
   ): void {
+    // Spec 79, criterio 14 — un envío del canal público sin verificar no es
+    // dato del proyecto todavía: se excluye de todo agregado del dashboard
+    // hasta que un administrador lo procesa desde la bandeja de revisión.
+    // Toda encuesta de campo (origin='field', el DEFAULT) sigue igual que
+    // antes de este spec.
+    qb.andWhere(
+      "(survey.origin = 'field' OR survey.reviewStatus = 'processed')",
+    );
+
     if (filters.instrumentId) {
       qb.innerJoin(
         'survey.instruments',

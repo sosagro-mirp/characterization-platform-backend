@@ -49,6 +49,18 @@ export class Instrument {
   })
   isActive: boolean;
 
+  // Spec 79 — este instrumento se puede compartir por una URL pública
+  // (/encuesta/{instrumentId}) y recibir respuestas sin encuestador ni
+  // agricultor identificados. `isActive` manda: un instrumento inactivo no
+  // se sirve por el canal público aunque isPublic sea true.
+  @Column({
+    name: 'is_public',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  isPublic: boolean;
+
   @Column({
     type: 'varchar',
     length: 10,

@@ -1,5 +1,6 @@
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
+import { Survey } from 'src/surveys/entities/survey.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
   Column,
@@ -45,6 +46,15 @@ export class ConsentRecord {
   @ManyToOne(() => CampaignSession, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'session_id', referencedColumnName: 'sessionId' })
   session?: CampaignSession | null;
+
+  // Spec 79 — ancla la constancia a la encuesta cuando se acepta desde el
+  // canal público, momento en el que aún no existe ni Farmer ni
+  // CampaignSession. Al procesar la encuesta desde la bandeja de revisión,
+  // se reancla al agricultor creado con el mismo mecanismo de backfill que
+  // ConsentRecordsService.linkOrphansToFarmer usa para session.
+  @ManyToOne(() => Survey, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'survey_id', referencedColumnName: 'surveyId' })
+  survey?: Survey | null;
 
   @Column({
     name: 'accepted_data_processing',

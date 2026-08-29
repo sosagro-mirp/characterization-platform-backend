@@ -69,15 +69,24 @@ export class ConsentRecordsController {
   @ApiQuery({ name: 'farmerId', required: false, format: 'uuid' })
   @ApiQuery({ name: 'sessionId', required: false, format: 'uuid' })
   @ApiQuery({ name: 'consentDocumentId', required: false, format: 'uuid' })
+  @ApiQuery({
+    name: 'surveyId',
+    required: false,
+    format: 'uuid',
+    description:
+      'Spec 79 — constancia anclada a una encuesta pública, antes de que exista un farmer.',
+  })
   findAll(
     @Query('farmerId') farmerId?: string,
     @Query('sessionId') sessionId?: string,
     @Query('consentDocumentId') consentDocumentId?: string,
+    @Query('surveyId') surveyId?: string,
   ) {
     return this.consentRecordsService.findAll({
       farmerId,
       sessionId,
       consentDocumentId,
+      surveyId,
     });
   }
 
