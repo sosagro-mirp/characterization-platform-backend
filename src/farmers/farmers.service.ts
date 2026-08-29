@@ -15,6 +15,7 @@ import { Survey } from 'src/surveys/entities/survey.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { FarmerDeletionPreviewDto } from './dto/deletion-preview.dto';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 const FARMER_RELATIONS = ['farm', 'farm.town', 'farm.crops'];
 
@@ -60,6 +61,7 @@ export class FarmersService {
     private readonly surveysRepository: Repository<Survey>,
     @InjectRepository(FarmerDocumentCollision)
     private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
+    private readonly consentRecordsService: ConsentRecordsService,
   ) {}
 
   // Spec 68 — colisiones de documentId detectadas por
@@ -156,11 +158,26 @@ export class FarmersService {
     });
   }
 
-  async findAll(): Promise<Farmer[]> {
-    return this.farmersRepository.find({
+  // Fase 10 (cambio de alcance 2026-08-28) — cada agricultor del listado
+  // lleva `hasPendingConsent`, para que el admin vea de un vistazo a quién le
+  // falta el consentimiento informado, sin abrir cada detalle. El detalle
+  // exacto (`valid | outdated_version | revoked | none`) sigue viviendo en
+  // `GET /api/farmers/:id/consent`.
+  async findAll(): Promise<Array<Farmer & { hasPendingConsent: boolean }>> {
+    const farmers = await this.farmersRepository.find({
       relations: FARMER_RELATIONS,
       take: 500,
     });
+
+    const pendingMap = await this.consentRecordsService.getPendingConsentMap(
+      farmers.map((f) => f.id),
+    );
+
+    return farmers.map((farmer) =>
+      Object.assign(farmer, {
+        hasPendingConsent: pendingMap.get(farmer.id) ?? true,
+      }),
+    );
   }
 
   async findOne(id: string): Promise<Farmer> {
@@ -323,6 +340,13 @@ export class FarmersService {
       [id],
     );
 
+    // Spec 78 — el borrado en cascada elimina también las constancias de
+    // consentimiento del agricultor (derecho de supresión, Ley 1581/2012).
+    const consentRecordsCount = await this.queryCount(
+      'SELECT count(*)::int AS count FROM consent_records WHERE farmer_id = $1',
+      [id],
+    );
+
     return {
       farmerId: farmer.id,
       name: farmer.name,
@@ -334,6 +358,7 @@ export class FarmersService {
         responses: responsesCount,
         documentCollisions: documentCollisionsCount,
         relations: relationsCount,
+        consentRecords: consentRecordsCount,
       },
       farm: farmInfo,
       preserved: { changeRequests: changeRequestsCount },
@@ -383,10 +408,19 @@ export class FarmersService {
         [id],
       );
 
-      // 5. El agricultor.
+      // 5. Constancias de consentimiento (spec 78). El schema declara
+      // ON DELETE CASCADE en consent_records.farmer_id, pero se borra aquí
+      // de forma explícita — mismo criterio defensivo que el resto de esta
+      // transacción, que no depende de que `synchronize` haya materializado
+      // la FK con esa opción en todos los entornos.
+      await manager.query('DELETE FROM consent_records WHERE farmer_id = $1', [
+        id,
+      ]);
+
+      // 6. El agricultor.
       await manager.delete(Farmer, { id });
 
-      // 6. La finca, solo si quedó sin otro agricultor que la referencie.
+      // 7. La finca, solo si quedó sin otro agricultor que la referencie.
       if (farmInfo?.willBeDeleted) {
         await manager.delete(Farm, { farmId: farmInfo.farmId });
       }
@@ -410,6 +444,7 @@ export class FarmersService {
         responses: 0, // se calcula solo en el preview; el borrado no lo recuenta
         documentCollisions: documentCollisionsCount,
         relations: 0,
+        consentRecords: 0, // idem: solo el preview lo recuenta
       },
       farm: farmInfo,
       preserved: { changeRequests: 0 },

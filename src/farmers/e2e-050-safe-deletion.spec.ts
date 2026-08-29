@@ -12,6 +12,7 @@ import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { User } from 'src/users/entities/user.entity';
 import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 /**
  * Spec 50 — Borrado seguro de agricultores y sesiones de campaña.
@@ -87,6 +88,12 @@ describe('FarmersService.remove — borrado seguro (spec 50)', () => {
         {
           provide: getRepositoryToken(FarmerDocumentCollision),
           useValue: documentCollisionsRepository,
+        },
+        {
+          provide: ConsentRecordsService,
+          useValue: {
+            getPendingConsentMap: jest.fn().mockResolvedValue(new Map()),
+          },
         },
       ],
     }).compile();

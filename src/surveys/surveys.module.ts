@@ -14,6 +14,7 @@ import { User } from 'src/users/entities/user.entity';
 import { SurveysController } from './surveys.controller';
 import { Survey } from './entities/survey.entity';
 import { SurveysService } from './surveys.service';
+import { ConsentsModule } from '../consents/consents.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SurveysService } from './surveys.service';
       CampaignSession,
       Response,
     ]),
+    ConsentsModule,
   ],
   controllers: [SurveysController],
   providers: [SurveysService],

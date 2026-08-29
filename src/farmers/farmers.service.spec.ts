@@ -7,6 +7,7 @@ import { Town } from 'src/towns/entities/town.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 interface FindCallArgs {
   relations: string[];
@@ -18,9 +19,17 @@ describe('FarmersService', () => {
   let farmersRepository: {
     find: jest.Mock<Promise<unknown[]>, [FindCallArgs]>;
   };
+  let consentRecordsService: {
+    getPendingConsentMap: jest.Mock<Promise<Map<string, boolean>>, [string[]]>;
+  };
 
   beforeEach(async () => {
     farmersRepository = { find: jest.fn<Promise<unknown[]>, [FindCallArgs]>() };
+    consentRecordsService = {
+      getPendingConsentMap: jest
+        .fn<Promise<Map<string, boolean>>, [string[]]>()
+        .mockResolvedValue(new Map()),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -31,6 +40,7 @@ describe('FarmersService', () => {
         { provide: getRepositoryToken(CampaignSession), useValue: {} },
         { provide: getRepositoryToken(Survey), useValue: {} },
         { provide: getRepositoryToken(FarmerDocumentCollision), useValue: {} },
+        { provide: ConsentRecordsService, useValue: consentRecordsService },
       ],
     }).compile();
 
@@ -39,6 +49,44 @@ describe('FarmersService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  // Fase 10 (cambio de alcance 2026-08-28, spec 78) — cada agricultor del
+  // listado lleva `hasPendingConsent`, sin depender de N+1 llamadas.
+  describe('findAll — hasPendingConsent (spec 78, Fase 10)', () => {
+    it('marca pendiente a un agricultor sin consentimiento vigente', async () => {
+      farmersRepository.find.mockResolvedValue([{ id: 'farmer-1' }]);
+      consentRecordsService.getPendingConsentMap.mockResolvedValue(
+        new Map([['farmer-1', true]]),
+      );
+
+      const [farmer] = await service.findAll();
+
+      expect(consentRecordsService.getPendingConsentMap).toHaveBeenCalledWith([
+        'farmer-1',
+      ]);
+      expect(farmer.hasPendingConsent).toBe(true);
+    });
+
+    it('no marca pendiente a un agricultor con consentimiento vigente', async () => {
+      farmersRepository.find.mockResolvedValue([{ id: 'farmer-1' }]);
+      consentRecordsService.getPendingConsentMap.mockResolvedValue(
+        new Map([['farmer-1', false]]),
+      );
+
+      const [farmer] = await service.findAll();
+
+      expect(farmer.hasPendingConsent).toBe(false);
+    });
+
+    it('peca de marcar pendiente si el mapa no trae el agricultor', async () => {
+      farmersRepository.find.mockResolvedValue([{ id: 'farmer-1' }]);
+      consentRecordsService.getPendingConsentMap.mockResolvedValue(new Map());
+
+      const [farmer] = await service.findAll();
+
+      expect(farmer.hasPendingConsent).toBe(true);
+    });
   });
 
   describe('search', () => {

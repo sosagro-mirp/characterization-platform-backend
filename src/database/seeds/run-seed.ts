@@ -35,12 +35,15 @@ import { TypeOfInstitution } from 'src/types-of-institutions/entities/type-of-in
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
 import { User } from 'src/users/entities/user.entity';
 import { MediaAttachment } from 'src/media-attachments/entities/media-attachment.entity';
+import { ConsentDocument } from 'src/consents/entities/consent-document.entity';
+import { ConsentRecord } from 'src/consents/entities/consent-record.entity';
 import { seedActorTypes } from './actor-types.seed';
 import { seedGeography } from './geography.seed';
 import { seedTypesOfCrops } from './types-of-crops.seed';
 import { seedTypesOfQuestions } from './types-of-questions.seed';
 import { seedRoles } from './roles.seed';
 import { seedAdminUser } from './admin-user.seed';
+import { seedConsentDocument } from './consent-document.seed';
 import { seedInstrumentoS10InteresEnParticiparEnElProyecto } from './instrumento-s10-interes-en-participar-en-el-proyecto.seed';
 import { seedInstrumentoS11AdopcionTecnologicaDiagnosticoDeBarreras } from './instrumento-s11-adopcion-tecnologica-diagnostico-de-barreras.seed';
 import { seedInstrumentoS11AdopcionTecnologicaDiagnosticoExtensionistas } from './instrumento-s11-adopcion-tecnologica-diagnostico-extensionistas.seed';
@@ -82,6 +85,8 @@ import { seedMunicipioOptions } from './municipio-options.seed';
 const ALL_ENTITIES = [
   ActorType,
   MediaAttachment,
+  ConsentDocument,
+  ConsentRecord,
   Campaign,
   CampaignSession,
   CampaignStep,
@@ -139,6 +144,7 @@ async function run(): Promise<void> {
       await seedRoles(manager);
       await seedAdminUser(manager);
       await seedActorTypes(manager);
+      await seedConsentDocument(manager);
       await seedGeography(manager);
       await seedTypesOfCrops(manager);
       await seedTypesOfQuestions(manager);
