@@ -25,12 +25,16 @@ import { ROLES } from '../auth/constants';
 import { FarmersService } from './farmers.service';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 @ApiTags('Farmers')
 @ApiBearerAuth()
 @Controller('farmers')
 export class FarmersController {
-  constructor(private readonly farmersService: FarmersService) {}
+  constructor(
+    private readonly farmersService: FarmersService,
+    private readonly consentRecordsService: ConsentRecordsService,
+  ) {}
 
   @Post()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
@@ -56,7 +60,13 @@ export class FarmersController {
   @Get()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({ summary: 'List all farmers' })
-  @ApiResponse({ status: 200, description: 'List of farmers.' })
+  @ApiResponse({
+    status: 200,
+    description:
+      'List of farmers. Each item includes `hasPendingConsent: boolean` ' +
+      '(spec 78, Fase 10) — true si no tiene un consentimiento vigente de la ' +
+      'versión publicada. El detalle exacto vive en GET /:id/consent.',
+  })
   findAll() {
     return this.farmersService.findAll();
   }
@@ -90,6 +100,22 @@ export class FarmersController {
   @ApiResponse({ status: 404, description: 'Farmer not found.' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.farmersService.findOne(id);
+  }
+
+  // Spec 78 — vigencia del consentimiento informado del agricultor.
+  @Get(':id/consent')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Estado de consentimiento informado del agricultor',
+    description:
+      'status: "valid" | "outdated_version" | "revoked" | "none". La app web/móvil lo ' +
+      'usa antes de iniciar una campaña con un encuestado ya conocido para decidir si ' +
+      'debe volver a pedir el consentimiento.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Estado de consentimiento.' })
+  getConsentStatus(@Param('id', ParseUUIDPipe) id: string) {
+    return this.consentRecordsService.getFarmerStatus(id);
   }
 
   @Patch(':id')

@@ -24,5 +24,8 @@ import { Instrument } from './entities/instrument.entity';
   ],
   controllers: [InstrumentsController],
   providers: [InstrumentsService],
+  // Spec 79 — PublicSurveysModule reutiliza findOneForRender() en vez de
+  // duplicar la lógica de armado de secciones/preguntas/opciones.
+  exports: [InstrumentsService],
 })
 export class InstrumentsModule {}

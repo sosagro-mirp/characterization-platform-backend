@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
   UnprocessableEntityException,
@@ -25,6 +26,7 @@ import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 
 export interface SurveyFilters {
   actorTypeId?: string;
@@ -36,8 +38,20 @@ export interface SurveyFilters {
   farmerId?: string;
 }
 
+// Spec 79 — fila de la bandeja de revisión de envíos públicos.
+export interface PublicSubmissionRow {
+  surveyId: string;
+  instrumentId: string;
+  instrumentName: string;
+  createdAt: Date;
+  responseCount: number;
+  reviewStatus: string;
+}
+
 @Injectable()
 export class SurveysService {
+  private readonly logger = new Logger(SurveysService.name);
+
   constructor(
     @InjectRepository(Survey)
     private readonly surveysRepository: Repository<Survey>,
@@ -63,6 +77,7 @@ export class SurveysService {
     private readonly responsesRepository: Repository<Response>,
     @InjectRepository(FarmerDocumentCollision)
     private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
+    private readonly consentRecordsService: ConsentRecordsService,
   ) {}
 
   async create(
@@ -509,6 +524,30 @@ export class SurveysService {
         { sessionId: survey.campaignSession.sessionId },
         { farmer },
       );
+
+      // Spec 78, criterio 6 — el consentimiento se registra antes de S1,
+      // cuando el Farmer todavía no existe (ConsentRecord.farmer_id queda en
+      // null, anclado solo por session_id). Aquí es donde el Farmer recién
+      // resuelto (nuevo o ya existente) queda disponible por primera vez, así
+      // que es el punto correcto para el backfill. Best-effort: un fallo aquí
+      // no debe tumbar la extracción del agricultor, que ya se completó.
+      try {
+        await this.consentRecordsService.linkOrphansToFarmer(
+          survey.campaignSession.sessionId,
+          farmer.id,
+        );
+      } catch (err) {
+        // B4 (auditoría spec 78) — `error`, no `warn`: un fallo aquí deja una
+        // constancia de consentimiento huérfana (criterio 6 incumplido) y
+        // debe quedar visible en los logs estructurados de producción, no
+        // perdido entre líneas de `console`.
+        this.logger.error(
+          `[extractFarmer] failed to link orphan consent records for session=${survey.campaignSession.sessionId}: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+          err instanceof Error ? err.stack : undefined,
+        );
+      }
     }
 
     // A resolution was declared for a previously-detected collision — record
@@ -998,5 +1037,140 @@ export class SurveysService {
     }
 
     return { crops };
+  }
+
+  // ── Spec 79 — bandeja de revisión de envíos públicos ──────────────────────
+
+  async findPublicSubmissions(filters: {
+    instrumentId?: string;
+    reviewStatus?: 'pending' | 'processed' | 'discarded';
+  }): Promise<PublicSubmissionRow[]> {
+    const qb = this.surveysRepository
+      .createQueryBuilder('survey')
+      .innerJoinAndSelect('survey.instruments', 'instrument')
+      .where('survey.origin = :origin', { origin: 'public' });
+
+    if (filters.instrumentId) {
+      qb.andWhere('instrument.instrumentId = :instrumentId', {
+        instrumentId: filters.instrumentId,
+      });
+    }
+
+    if (filters.reviewStatus) {
+      qb.andWhere('survey.reviewStatus = :reviewStatus', {
+        reviewStatus: filters.reviewStatus,
+      });
+    }
+
+    qb.orderBy('survey.createdAt', 'DESC');
+
+    const surveys = await qb.getMany();
+    if (surveys.length === 0) return [];
+
+    // Una sola consulta agregada para el conteo de respuestas, en vez de
+    // N+1 por envío (ver spec 55, mismo criterio aplicado aquí).
+    const counts = await this.responsesRepository
+      .createQueryBuilder('response')
+      .select('response.survey', 'surveyId')
+      .addSelect('COUNT(*)', 'count')
+      .where('response.survey IN (:...surveyIds)', {
+        surveyIds: surveys.map((s) => s.surveyId),
+      })
+      .groupBy('response.survey')
+      .getRawMany<{ surveyId: string; count: string }>();
+    const countBySurveyId = new Map(
+      counts.map((row) => [row.surveyId, Number(row.count)]),
+    );
+
+    return surveys.map((survey) => ({
+      surveyId: survey.surveyId,
+      instrumentId: survey.instruments?.[0]?.instrumentId ?? '',
+      instrumentName: survey.instruments?.[0]?.name ?? '',
+      createdAt: survey.createdAt,
+      responseCount: countBySurveyId.get(survey.surveyId) ?? 0,
+      reviewStatus: survey.reviewStatus ?? 'pending',
+    }));
+  }
+
+  private async findPublicSurveyOrThrow(surveyId: string): Promise<Survey> {
+    const survey = await this.surveysRepository.findOne({
+      where: { surveyId },
+    });
+
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    if (survey.origin !== 'public') {
+      throw new ConflictException(
+        'Esta encuesta no es un envío del canal público.',
+      );
+    }
+
+    return survey;
+  }
+
+  // Criterio 11/12 — reutiliza extractFarmer (misma detección de colisiones
+  // del spec 68) y extractCrops. Ante colisión pendiente, extractFarmer
+  // lanza 409 y este método deja el envío sin tocar — no se marca
+  // 'processed' hasta que el 409 se resuelve con `resolution`.
+  async processPublicSubmission(
+    surveyId: string,
+    dto: ExtractFarmerDto,
+    reviewedByUserId?: string,
+  ): Promise<{ farmer: Farmer; existed: boolean }> {
+    const survey = await this.findPublicSurveyOrThrow(surveyId);
+
+    if (survey.reviewStatus !== 'pending') {
+      throw new ConflictException(
+        `Este envío ya fue revisado (estado: ${survey.reviewStatus}).`,
+      );
+    }
+
+    const result = await this.extractFarmer(surveyId, dto);
+
+    await this.consentRecordsService.linkOrphansToFarmerBySurvey(
+      surveyId,
+      result.farmer.id,
+    );
+
+    await this.extractCrops(surveyId);
+
+    await this.surveysRepository.update(surveyId, {
+      farmer: { id: result.farmer.id } as Farmer,
+      reviewStatus: 'processed',
+      reviewedBy: reviewedByUserId
+        ? ({ userId: reviewedByUserId } as User)
+        : null,
+      reviewedAt: new Date(),
+    });
+
+    return result;
+  }
+
+  // Criterio 13 — descartar es un cambio de estado, no un borrado: la
+  // encuesta y sus respuestas se conservan para auditoría. Idempotente
+  // sobre un envío ya descartado (reintentar no es un error).
+  async discardPublicSubmission(
+    surveyId: string,
+    reviewedByUserId?: string,
+  ): Promise<{ surveyId: string; reviewStatus: string }> {
+    const survey = await this.findPublicSurveyOrThrow(surveyId);
+
+    if (survey.reviewStatus === 'processed') {
+      throw new ConflictException(
+        'Este envío ya fue procesado y no puede descartarse.',
+      );
+    }
+
+    if (survey.reviewStatus !== 'discarded') {
+      await this.surveysRepository.update(surveyId, {
+        reviewStatus: 'discarded',
+        reviewedBy: reviewedByUserId
+          ? ({ userId: reviewedByUserId } as User)
+          : null,
+        reviewedAt: new Date(),
+      });
+    }
+
+    return { surveyId, reviewStatus: 'discarded' };
   }
 }

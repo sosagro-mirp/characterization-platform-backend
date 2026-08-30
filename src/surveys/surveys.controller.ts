@@ -172,6 +172,102 @@ export class SurveysController {
     );
   }
 
+  @Get('public-submissions')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Bandeja de revisión de envíos públicos',
+    description:
+      'Lista encuestas recibidas por el canal público (/api/public/surveys), sin agricultor ' +
+      'ni usuario, pendientes de convertirse en agricultor o descartarse. Solo origin="public" ' +
+      '— nunca incluye encuestas del flujo con encuestador. Spec 79.',
+  })
+  @ApiQuery({
+    name: 'instrumentId',
+    required: false,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiQuery({
+    name: 'reviewStatus',
+    required: false,
+    schema: { enum: ['pending', 'processed', 'discarded'] },
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Array de { surveyId, instrumentId, instrumentName, createdAt, responseCount, reviewStatus }.',
+  })
+  findPublicSubmissions(
+    @Query('instrumentId') instrumentId?: string,
+    @Query('reviewStatus') reviewStatus?: 'pending' | 'processed' | 'discarded',
+  ) {
+    return this.surveysService.findPublicSubmissions({
+      instrumentId,
+      reviewStatus,
+    });
+  }
+
+  @Post(':id/process-public')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Procesar un envío público: crear/vincular agricultor',
+    description:
+      'Reutiliza extractFarmer (misma detección de colisiones del spec 68) sobre un envío del ' +
+      'canal público, reancla su constancia de consentimiento al agricultor resultante, ejecuta ' +
+      'extractCrops y marca el envío como reviewStatus="processed". Ante colisión de documentId ' +
+      'sin resolución declarada, responde 409 y el envío queda pending. Spec 79.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    description: 'ID de la encuesta pública',
+  })
+  @ApiResponse({ status: 201, description: '{ farmer, existed: boolean }' })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'La encuesta no es de origen público, ya fue revisada, o hay colisión de documentId sin resolver.',
+  })
+  processPublicSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExtractFarmerDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.processPublicSubmission(id, dto, user.userId);
+  }
+
+  @Post(':id/discard-public')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Descartar un envío público',
+    description:
+      'Marca el envío como reviewStatus="discarded" — no borra la encuesta ni sus respuestas. ' +
+      'Idempotente: descartar un envío ya descartado no falla. Spec 79.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    description: 'ID de la encuesta pública',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '{ surveyId, reviewStatus: "discarded" }',
+  })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description: 'La encuesta no es de origen público o ya fue procesada.',
+  })
+  discardPublicSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.discardPublicSubmission(id, user.userId);
+  }
+
   @Get('orphans')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN)

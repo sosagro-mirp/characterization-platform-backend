@@ -36,6 +36,12 @@ export class CreateInstrumentDto {
   @IsBoolean()
   isActive: boolean;
 
+  /** Spec 79 — activa el enlace público /encuesta/{instrumentId}. Un instrumento recién creado nunca tiene preguntas todavía, así que esta validación solo importa en PATCH. */
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
+
   /** Código corto único del instrumento (ej. 'S1', 'S2'). Usado por el frontend para identificar instrumentos del sistema sin hardcodear UUIDs. */
   @ApiPropertyOptional({ example: 'S1', maxLength: 10 })
   @IsOptional()

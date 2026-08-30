@@ -5,6 +5,7 @@ import { Instrument } from './entities/instrument.entity';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { User } from 'src/users/entities/user.entity';
+import { Question } from 'src/questions/entities/question.entity';
 import { CampaignsService } from 'src/campaigns/campaigns.service';
 import { Campaign } from 'src/campaigns/entities/campaign.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
@@ -131,6 +132,7 @@ describe('InstrumentsService — exposición de auditoría (spec 53)', () => {
         { provide: getRepositoryToken(ActorType), useValue: {} },
         { provide: getRepositoryToken(User), useValue: {} },
         { provide: getRepositoryToken(Town), useValue: {} },
+        { provide: getRepositoryToken(Question), useValue: {} },
       ],
     }).compile();
 

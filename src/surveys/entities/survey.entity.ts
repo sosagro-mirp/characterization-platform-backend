@@ -129,6 +129,37 @@ export class Survey {
   })
   sincronized: boolean;
 
+  // Spec 79 — 'field' es toda encuesta del flujo con encuestador (web o
+  // móvil), existente o futura, por el DEFAULT. 'public' es exclusiva del
+  // canal público (/api/public/surveys) y siempre nace con
+  // reviewStatus='pending'.
+  @Column({
+    name: 'origin',
+    type: 'varchar',
+    length: 20,
+    nullable: false,
+    default: 'field',
+  })
+  origin: 'field' | 'public';
+
+  // Solo aplica a origin='public'. NULL en toda encuesta de campo — la
+  // bandeja filtra por origin, no por este campo, para que un bug de
+  // backfill no arrastre encuestas de campo a la bandeja.
+  @Column({
+    name: 'review_status',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  reviewStatus?: 'pending' | 'processed' | 'discarded' | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL', eager: false })
+  @JoinColumn({ name: 'reviewed_by', referencedColumnName: 'userId' })
+  reviewedBy?: User | null;
+
+  @Column({ name: 'reviewed_at', type: 'timestamp', nullable: true })
+  reviewedAt?: Date | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',

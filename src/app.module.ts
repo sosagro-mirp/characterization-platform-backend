@@ -47,6 +47,8 @@ import { MediaAttachmentsModule } from './media-attachments/media-attachments.mo
 import { StorageModule } from './storage/storage.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
+import { ConsentsModule } from './consents/consents.module';
+import { PublicSurveysModule } from './public-surveys/public-surveys.module';
 
 @Module({
   imports: [
@@ -147,6 +149,8 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
     StorageModule,
     DashboardModule,
     ApiKeysModule,
+    ConsentsModule,
+    PublicSurveysModule,
   ],
   controllers: [AppController],
   providers: [
