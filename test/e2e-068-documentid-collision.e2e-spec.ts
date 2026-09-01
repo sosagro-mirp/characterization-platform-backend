@@ -36,6 +36,11 @@ const DOC_SEPARATE = '9068000003';
 const DOC_BATTERY = '9068000004';
 const DOC_SEPARATE_THIRD_PARTY = '9068000005';
 const DOC_SEPARATE_REGRESSION = '9068000006';
+// Fase 8 — "Corregir el documento": el valor bien digitado al que corrige el
+// encuestador (libre) y otro que ya pertenece a un tercero (vuelve a chocar).
+const DOC_CORRECTED_FREE = '9068000007';
+const DOC_CORRECTED_TAKEN = '9068000008';
+const DOC_CORRECTED_SOURCE = '9068000009';
 
 const NAME_P1 = 'Santiago Suarez Cortes';
 const NAME_P2 = 'Karol Vanessa Quintero Marin';
@@ -118,6 +123,9 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
     DOC_BATTERY,
     DOC_SEPARATE_THIRD_PARTY,
     DOC_SEPARATE_REGRESSION,
+    DOC_CORRECTED_FREE,
+    DOC_CORRECTED_TAKEN,
+    DOC_CORRECTED_SOURCE,
   ];
 
   async function createSurvey(): Promise<string> {
@@ -534,6 +542,96 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
   });
 
   // ── criterio 13 ───────────────────────────────────────────────────────────
+
+  // ── criterio 9 — Fase 8: "Corregir el documento" ──────────────────────────
+
+  describe('Corrección del documento tras el aviso (Fase 8)', () => {
+    /** Lee de la base el documento realmente persistido en la encuesta. */
+    async function persistedDocumentOf(surveyId: string): Promise<string> {
+      const rows = await ds.query<{ text_value: string }[]>(
+        `SELECT text_value FROM responses WHERE survey_id = $1 AND question_id = $2`,
+        [surveyId, questionDocumentId],
+      );
+      return rows[0]?.text_value ?? '';
+    }
+
+    beforeAll(async () => {
+      // Dos documentos ya ocupados por otra persona: el mal digitado que
+      // dispara el aviso, y uno al que el encuestador podría corregir por
+      // error y que también está tomado.
+      const surveySource = await createIdentificationSurvey(
+        NAME_P1,
+        DOC_CORRECTED_SOURCE,
+      );
+      await extractFarmer(surveySource).expect(201);
+
+      const surveyTaken = await createIdentificationSurvey(
+        NAME_P1,
+        DOC_CORRECTED_TAKEN,
+      );
+      await extractFarmer(surveyTaken).expect(201);
+    });
+
+    it('aplica el documento corregido sobre la encuesta ya sincronizada y extrae sin aviso', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_SOURCE,
+      );
+      await extractFarmer(survey).expect(409);
+
+      const res = await extractFarmer(survey, {
+        correctedDocumentId: DOC_CORRECTED_FREE,
+      }).expect(201);
+
+      const body = res.body as ExtractFarmerBody;
+      expect(body.existed).toBe(false);
+      expect(body.farmer.documentId).toBe(DOC_CORRECTED_FREE);
+      expect(body.farmer.name).toBe(NAME_P2);
+
+      // El punto del criterio 9: la corrección tiene que quedar en la
+      // respuesta persistida, no solo en el agricultor derivado. Reenviar el
+      // batch no la propagaría (createMany ignora una encuesta que ya tiene
+      // respuestas), así que si esto falla el móvil no tiene otra vía.
+      expect(await persistedDocumentOf(survey)).toBe(DOC_CORRECTED_FREE);
+    });
+
+    it('vuelve a responder 409, con el documento nuevo, si el corregido también está tomado', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_SOURCE,
+      );
+      await extractFarmer(survey).expect(409);
+
+      const res = await extractFarmer(survey, {
+        correctedDocumentId: DOC_CORRECTED_TAKEN,
+      }).expect(409);
+
+      const body = res.body as CollisionConflictBody;
+      expect(body.documentId).toBe(DOC_CORRECTED_TAKEN);
+      expect(body.existingFarmer?.name).toBe(NAME_P1);
+    });
+
+    it('responde 422 si la encuesta no tiene ninguna respuesta de documento que corregir', async () => {
+      const surveyId = await createSurvey();
+      await request(app.getHttpServer())
+        .post('/api/responses/batch')
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .send([{ surveyId, questionId: questionNameId, textValue: NAME_P2 }])
+        .expect(201);
+
+      await extractFarmer(surveyId, {
+        correctedDocumentId: DOC_CORRECTED_FREE,
+      }).expect(422);
+    });
+
+    it('rechaza un documento corregido que no cumple la validación del DTO', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_SOURCE,
+      );
+      await extractFarmer(survey, { correctedDocumentId: '1' }).expect(400);
+    });
+  });
 
   describe('Registro auditable de colisiones', () => {
     it('un administrador puede listar las colisiones detectadas y su resolución', async () => {

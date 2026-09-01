@@ -350,6 +350,54 @@ export class SurveysService {
     return this.surveysRepository.save(survey);
   }
 
+  // Spec 68, Fase 8 — aplica el documento corregido sobre la respuesta ya
+  // persistida de la encuesta. Elige la misma respuesta que la extracción
+  // usaría como documento del agricultor: la del productor cuando el
+  // encuestado no lo es (Q9 = false) y esa respuesta existe, la del
+  // encuestado en cualquier otro caso.
+  private async applyCorrectedDocumentId(
+    manager: EntityManager,
+    surveyId: string,
+    correctedDocumentId: string,
+  ): Promise<void> {
+    const survey = await manager.findOne(Survey, {
+      where: { surveyId },
+      relations: ['responses', 'responses.question'],
+    });
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    const responses = survey.responses ?? [];
+    const isRespondent = responses.find(
+      (r) => r.question?.systemField === 'farmer.isRespondent',
+    )?.booleanValue;
+
+    const producerResponse = responses.find(
+      (r) => r.question?.systemField === 'farmer.producerDocumentId',
+    );
+    const respondentResponse = responses.find(
+      (r) => r.question?.systemField === 'farmer.documentId',
+    );
+
+    const target =
+      isRespondent === false && producerResponse
+        ? producerResponse
+        : respondentResponse;
+
+    if (!target) {
+      throw new UnprocessableEntityException(
+        'Survey has no document response to correct',
+      );
+    }
+
+    await manager.update(Response, target.responseId, {
+      textValue: correctedDocumentId.trim(),
+    });
+
+    this.logger.log(
+      `[extractFarmer] corrected documentId on response ${target.responseId} of survey ${surveyId}`,
+    );
+  }
+
   /**
    * Spec 84 (hallazgo de la ronda de pruebas, 2026-09-13) — serializa las
    * extracciones concurrentes de la MISMA encuesta y las hace idempotentes.
@@ -373,6 +421,24 @@ export class SurveysService {
     dto: ExtractFarmerDto = {},
   ): Promise<{ farmer: Farmer; existed: boolean }> {
     try {
+      // Spec 68, Fase 8 — "Corregir el documento". Para cuando el encuestador
+      // ve el aviso, la encuesta ya está sincronizada y `createMany()` ignora
+      // un batch cuya encuesta ya tiene respuestas, así que la corrección solo
+      // llega por aquí. Va en su propia transacción, antes de la extracción:
+      // si el documento nuevo también colisiona, la transacción principal se
+      // revierte, y la corrección debe sobrevivir a ese 409 — el móvil ya la
+      // descartó y el reintento leerá el documento persistido.
+      const { correctedDocumentId } = dto;
+      if (correctedDocumentId) {
+        await this.surveysRepository.manager.transaction(async (manager) => {
+          await this.lockSurvey(manager, surveyId);
+          await this.applyCorrectedDocumentId(
+            manager,
+            surveyId,
+            correctedDocumentId,
+          );
+        });
+      }
       return await this.surveysRepository.manager.transaction(
         async (manager) => {
           await this.lockSurvey(manager, surveyId);
