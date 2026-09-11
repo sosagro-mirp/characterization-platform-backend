@@ -141,7 +141,12 @@ export class OptionsQuestionController {
 
   @Delete(':id')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
-  @ApiOperation({ summary: 'Eliminar opción' })
+  @ApiOperation({
+    summary: 'Eliminar opción',
+    description:
+      'Spec 84: rechaza con 409 si la opción tiene respuestas. Para una ' +
+      'opción con respuestas que sobra, usar archivar en su lugar.',
+  })
   @ApiParam({
     name: 'questionId',
     format: 'uuid',
@@ -150,10 +155,54 @@ export class OptionsQuestionController {
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
   @ApiResponse({ status: 200, description: 'Opción eliminada.' })
   @ApiResponse({ status: 404, description: 'Opción no encontrada.' })
+  @ApiResponse({ status: 409, description: 'La opción tiene respuestas.' })
   remove(
     @Param('questionId', new ParseUUIDPipe()) questionId: string,
     @Param('id', new ParseUUIDPipe()) id: string,
   ) {
     return this.optionsQuestionService.remove(questionId, id);
+  }
+
+  @Patch(':id/archive')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Archivar opción',
+    description:
+      'Spec 84: la opción deja de mostrarse; sus respuestas se conservan.',
+  })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
+  @ApiResponse({ status: 200, description: 'Opción archivada.' })
+  @ApiResponse({ status: 404, description: 'Opción no encontrada.' })
+  archive(
+    @Param('questionId', new ParseUUIDPipe()) questionId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.optionsQuestionService.archive(questionId, id);
+  }
+
+  @Patch(':id/unarchive')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Desarchivar opción',
+    description: 'Spec 84: la opción vuelve a mostrarse.',
+  })
+  @ApiParam({
+    name: 'questionId',
+    format: 'uuid',
+    description: 'ID de la pregunta padre',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la opción' })
+  @ApiResponse({ status: 200, description: 'Opción desarchivada.' })
+  @ApiResponse({ status: 404, description: 'Opción no encontrada.' })
+  unarchive(
+    @Param('questionId', new ParseUUIDPipe()) questionId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.optionsQuestionService.unarchive(questionId, id);
   }
 }

@@ -473,6 +473,9 @@ export class SurveysService {
             name: farmName,
             location: null,
             vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
+            // Spec 84 — campo del instrumento de Registro (S_REG).
+            corregimiento:
+              (fieldMap['farm.corregimiento'] as string | undefined) ?? null,
             latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
             longitude:
               (fieldMap['farm.longitude'] as number | undefined) ?? null,
@@ -880,7 +883,12 @@ export class SurveysService {
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: ['responses', 'responses.question', 'campaignSession'],
+      relations: [
+        'responses',
+        'responses.question',
+        'responses.option',
+        'campaignSession',
+      ],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
@@ -896,6 +904,10 @@ export class SurveysService {
     // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
     // Also collect farm.* fields to create/update Farm if the instrument includes them
     const cropNames: string[] = [];
+    // Spec 84 — instrumento de Registro (S_REG): cultivo principal como
+    // pregunta de selección única, con `metadataId` = cropId. Convive con
+    // el mecanismo `crop.*` de arriba (usado por S2 y el taller).
+    const mainCropIds = new Set<string>();
     const farmFieldMap: Record<string, string | number | boolean> = {};
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
@@ -906,6 +918,10 @@ export class SurveysService {
           const resolved = CROP_FIELD_MAP[key] ?? key;
           cropNames.push(resolved);
         }
+      } else if (sf === 'farm.mainCrop') {
+        if (response.option?.metadataId) {
+          mainCropIds.add(response.option.metadataId);
+        }
       } else if (sf.startsWith('farm.')) {
         const value =
           response.textValue ?? response.numericValue ?? response.booleanValue;
@@ -915,13 +931,25 @@ export class SurveysService {
       }
     }
 
-    // Load matching TypeOfCrop entities by name
-    const crops =
+    // Load matching TypeOfCrop entities, por nombre (crop.*) y por cropId
+    // (farm.mainCrop), deduplicando.
+    const cropsByName =
       cropNames.length > 0
         ? await this.typesOfCropsRepository.find({
             where: { name: In(cropNames) },
           })
         : [];
+    const cropsByMainCrop =
+      mainCropIds.size > 0
+        ? await this.typesOfCropsRepository.find({
+            where: { cropId: In([...mainCropIds]) },
+          })
+        : [];
+    const cropsById = new Map<string, TypeOfCrop>();
+    for (const crop of [...cropsByName, ...cropsByMainCrop]) {
+      cropsById.set(crop.cropId, crop);
+    }
+    const crops = [...cropsById.values()];
 
     // Assign crops to CampaignSession via direct relation update to avoid cascading nulls
     if (survey.campaignSession) {
@@ -963,6 +991,10 @@ export class SurveysService {
               (farmFieldMap['farm.area'] as number | undefined) ?? undefined,
             vereda:
               (farmFieldMap['farm.vereda'] as string | undefined) ?? undefined,
+            // Spec 84 — campo del instrumento de Registro (S_REG).
+            corregimiento:
+              (farmFieldMap['farm.corregimiento'] as string | undefined) ??
+              undefined,
             latitude:
               (farmFieldMap['farm.latitude'] as number | undefined) ??
               undefined,

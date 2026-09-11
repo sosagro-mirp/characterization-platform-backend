@@ -67,7 +67,7 @@ export class InstrumentsController {
     summary: 'Listar instrumentos',
     description:
       'Retorna todos los instrumentos. Si se provee actorTypeId, filtra por tipo de actor. ' +
-      'Si excludeSystem=true, omite los instrumentos del sistema (code IS NOT NULL, ej. S1, S2).',
+      'Si excludeSystem=true, omite los instrumentos del sistema (ej. S1a, S1b, S_REG).',
   })
   @ApiQuery({
     name: 'actorTypeId',
@@ -79,7 +79,7 @@ export class InstrumentsController {
     name: 'excludeSystem',
     required: false,
     description:
-      'Si true, excluye instrumentos con código de sistema (S1, S2, etc.)',
+      'Si true, excluye instrumentos con código de sistema (S1a, S1b, S_REG, etc.)',
     schema: { type: 'boolean' },
   })
   @ApiResponse({ status: 200, description: 'Lista de instrumentos.' })
@@ -92,7 +92,9 @@ export class InstrumentsController {
 
   @Public()
   @Get('by-code/:code')
-  @ApiOperation({ summary: 'Obtener instrumento por código (S1, S2, etc.)' })
+  @ApiOperation({
+    summary: 'Obtener instrumento por código (S_REG, S1/S2 legado, etc.)',
+  })
   @ApiParam({
     name: 'code',
     description: 'Código del instrumento (máx 10 chars)',
@@ -120,6 +122,26 @@ export class InstrumentsController {
   @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
   findOneForRender(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.instrumentsService.findOneForRender(id);
+  }
+
+  @Get(':id/editor-structure')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Estructura completa para el editor (spec 84)',
+    description:
+      'A diferencia de /render, incluye preguntas y opciones archivadas, ' +
+      'con `archivedAt` y `responseCount` — el dato que decide si algo se ' +
+      'puede borrar o hay que archivarlo.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID del instrumento' })
+  @ApiResponse({
+    status: 200,
+    description: 'Estructura completa, incluida la archivada.',
+  })
+  @ApiResponse({ status: 404, description: 'Instrumento no encontrado.' })
+  getEditorStructure(@Param('id', new ParseUUIDPipe()) id: string) {
+    return this.instrumentsService.getEditorStructure(id);
   }
 
   @Public()

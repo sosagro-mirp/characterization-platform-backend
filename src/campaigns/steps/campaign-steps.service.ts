@@ -51,7 +51,7 @@ export class CampaignStepsService {
     if (!instrument) throw new NotFoundException('Instrument not found');
     if (isSystemInstrumentCode(instrument.code)) {
       throw new BadRequestException(
-        'System instruments (S1a, S1b, S_DCU) cannot be added as campaign steps',
+        'System instruments (S1a, S1b, S_DCU, S_REG) cannot be added as campaign steps',
       );
     }
 
@@ -106,7 +106,7 @@ export class CampaignStepsService {
       if (!instrument) throw new NotFoundException('Instrument not found');
       if (isSystemInstrumentCode(instrument.code)) {
         throw new BadRequestException(
-          'System instruments (S1a, S1b, S_DCU) cannot be added as campaign steps',
+          'System instruments (S1a, S1b, S_DCU, S_REG) cannot be added as campaign steps',
         );
       }
       step.instrument = instrument;

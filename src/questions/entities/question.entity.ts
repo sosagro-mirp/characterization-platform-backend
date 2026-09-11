@@ -101,6 +101,16 @@ export class Question {
   })
   conditionValue?: string;
 
+  // Spec 84 — "editar en sitio + archivar": NULL = visible; con fecha, la
+  // pregunta deja de aparecer en render/formulario público/caché móvil pero
+  // sus respuestas se conservan. Nunca se borra una pregunta con respuestas.
+  @Column({
+    name: 'archived_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  archivedAt?: Date | null;
+
   @OneToMany(
     () => Response,
     (response: Response): Question => response.question,

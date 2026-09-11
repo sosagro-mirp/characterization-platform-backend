@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Not, Repository } from 'typeorm';
+import { EntityManager, IsNull, Not, Repository } from 'typeorm';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
+import { Response } from 'src/responses/entities/response.entity';
+import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { Question } from './entities/question.entity';
@@ -49,6 +55,10 @@ export class QuestionsService {
     private readonly typesOfQuestionsRepository: Repository<TypeOfQuestion>,
     @InjectRepository(OptionQuestion)
     private readonly optionsRepository: Repository<OptionQuestion>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
+    @InjectRepository(StepCondition)
+    private readonly stepConditionsRepository: Repository<StepCondition>,
   ) {}
 
   private async seedLikertOptions(question: Question): Promise<void> {
@@ -63,6 +73,37 @@ export class QuestionsService {
       COMPLIANCE_DEFAULT_OPTIONS.map((opt) => ({ ...opt, question })),
     );
     await this.optionsRepository.save(options);
+  }
+
+  /** Spec 84 — cuántas respuestas ya existen para esta pregunta. */
+  private async countResponses(questionId: string): Promise<number> {
+    return this.responsesRepository.count({
+      where: { question: { questionId } },
+    });
+  }
+
+  /**
+   * Spec 84 — preguntas visibles (no archivadas) que dependen de esta por su
+   * condición de visibilidad, o pasos de campaña cuya condición depende de
+   * ella. Archivar o borrar una pregunta con dependientes activos la
+   * dejaría sin fundamento sin avisar a nadie.
+   */
+  private async findActiveDependents(
+    questionId: string,
+  ): Promise<{ dependentQuestions: string[]; stepConditions: number }> {
+    const dependentQuestions = await this.questionsRepository.find({
+      where: {
+        conditionQuestion: { questionId },
+        archivedAt: IsNull(),
+      },
+    });
+    const stepConditions = await this.stepConditionsRepository.count({
+      where: { conditionQuestion: { questionId } },
+    });
+    return {
+      dependentQuestions: dependentQuestions.map((q) => q.questionId),
+      stepConditions,
+    };
   }
 
   async create(
@@ -146,16 +187,32 @@ export class QuestionsService {
   ): Promise<Question> {
     const question = await this.questionsRepository.findOne({
       where: { questionId, section: { sectionId } },
-      relations: ['type', 'options', 'conditionQuestion'],
+      relations: ['type', 'options', 'conditionQuestion', 'section'],
     });
 
     if (!question) {
       throw new NotFoundException('Question not found');
     }
 
-    const { typeId, conditionQuestionId, order, ...rest } = updateQuestionDto;
+    const { typeId, conditionQuestionId, order, targetSectionId, ...rest } =
+      updateQuestionDto;
 
     if (typeId !== undefined && typeId !== question.type?.typeId) {
+      // Spec 84 — "editar en sitio + archivar": una pregunta con respuestas
+      // no puede cambiar de tipo (una respuesta de selección y una de sí/no
+      // guardan cosas distintas). Se crea una pregunta nueva y se archiva la
+      // vieja.
+      const responseCount = await this.countResponses(questionId);
+      if (responseCount > 0) {
+        throw new ConflictException({
+          message:
+            'No se puede cambiar el tipo de una pregunta con respuestas. ' +
+            'Cree una pregunta nueva con el tipo correcto y archive esta.',
+          questionId,
+          responseCount,
+        });
+      }
+
       const newType = await this.typesOfQuestionsRepository.findOne({
         where: { typeId },
       });
@@ -174,6 +231,40 @@ export class QuestionsService {
       question.type = newType;
     }
 
+    // Spec 84 — mover la pregunta a otra sección, siempre dentro del mismo
+    // instrumento (una condición o un mapeo de sistema pensado para un
+    // instrumento no tiene sentido reubicado en otro).
+    if (
+      targetSectionId !== undefined &&
+      targetSectionId !== question.section.sectionId
+    ) {
+      const targetSection = await this.sectionsRepository.findOne({
+        where: { sectionId: targetSectionId },
+        relations: ['instrument'],
+      });
+      const currentSection = await this.sectionsRepository.findOne({
+        where: { sectionId },
+        relations: ['instrument'],
+      });
+      if (!targetSection) {
+        throw new NotFoundException('Target section not found');
+      }
+      if (
+        !currentSection ||
+        targetSection.instrument.instrumentId !==
+          currentSection.instrument.instrumentId
+      ) {
+        throw new ConflictException(
+          'La sección destino debe pertenecer al mismo instrumento',
+        );
+      }
+      const siblingCount = await this.questionsRepository.count({
+        where: { section: { sectionId: targetSectionId } },
+      });
+      question.section = targetSection;
+      question.order = siblingCount + 1;
+    }
+
     if (conditionQuestionId !== undefined) {
       if (conditionQuestionId === null) {
         question.conditionQuestion = undefined;
@@ -189,7 +280,11 @@ export class QuestionsService {
       }
     }
 
-    if (order !== undefined && order !== question.order) {
+    if (
+      order !== undefined &&
+      order !== question.order &&
+      targetSectionId === undefined
+    ) {
       const sibling = await this.questionsRepository.findOne({
         where: { section: { sectionId }, order },
       });
@@ -234,6 +329,30 @@ export class QuestionsService {
       throw new NotFoundException('Question not found');
     }
 
+    // Spec 84 — "editar en sitio + archivar": nunca se borra una pregunta
+    // con respuestas. Se archiva en su lugar.
+    const responseCount = await this.countResponses(questionId);
+    if (responseCount > 0) {
+      throw new ConflictException({
+        message:
+          'Esta pregunta tiene respuestas y no se puede borrar. Archívela en su lugar.',
+        questionId,
+        responseCount,
+      });
+    }
+
+    const { dependentQuestions, stepConditions } =
+      await this.findActiveDependents(questionId);
+    if (dependentQuestions.length > 0 || stepConditions > 0) {
+      throw new ConflictException({
+        message:
+          'Otras preguntas o pasos de campaña dependen de esta pregunta.',
+        questionId,
+        dependentQuestions,
+        stepConditions,
+      });
+    }
+
     const removedOrder = question.order;
     await this.questionsRepository.remove(question);
 
@@ -248,6 +367,49 @@ export class QuestionsService {
       }
     }
     await this.questionsRepository.save(remaining);
+  }
+
+  /**
+   * Spec 84 — archiva una pregunta en vez de borrarla: deja de mostrarse en
+   * el render/formulario público/caché móvil, pero sus respuestas se
+   * conservan. Se rechaza si otra pregunta visible o un paso de campaña
+   * depende de su condición.
+   */
+  async archive(sectionId: string, questionId: string): Promise<Question> {
+    const question = await this.questionsRepository.findOne({
+      where: { questionId, section: { sectionId } },
+      relations: ['type', 'options'],
+    });
+    if (!question) {
+      throw new NotFoundException('Question not found');
+    }
+
+    const { dependentQuestions, stepConditions } =
+      await this.findActiveDependents(questionId);
+    if (dependentQuestions.length > 0 || stepConditions > 0) {
+      throw new ConflictException({
+        message:
+          'Otras preguntas o pasos de campaña dependen de esta pregunta.',
+        questionId,
+        dependentQuestions,
+        stepConditions,
+      });
+    }
+
+    question.archivedAt = new Date();
+    return this.questionsRepository.save(question);
+  }
+
+  async unarchive(sectionId: string, questionId: string): Promise<Question> {
+    const question = await this.questionsRepository.findOne({
+      where: { questionId, section: { sectionId } },
+      relations: ['type', 'options'],
+    });
+    if (!question) {
+      throw new NotFoundException('Question not found');
+    }
+    question.archivedAt = null;
+    return this.questionsRepository.save(question);
   }
 
   /**

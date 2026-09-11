@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Not, Repository } from 'typeorm';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
+import { Response } from 'src/responses/entities/response.entity';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { Section } from './entities/section.entity';
@@ -13,6 +18,8 @@ export class SectionsService {
     private readonly sectionsRepository: Repository<Section>,
     @InjectRepository(Instrument)
     private readonly instrumentsRepository: Repository<Instrument>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
   ) {}
 
   async create(
@@ -99,6 +106,21 @@ export class SectionsService {
 
     if (!section) {
       throw new NotFoundException('Section not found');
+    }
+
+    // Spec 84 — "editar en sitio + archivar": una sección con alguna
+    // pregunta respondida no se borra. Archivar las preguntas que sobren y
+    // borrar la sección cuando quede vacía.
+    const responseCount = await this.responsesRepository.count({
+      where: { question: { section: { sectionId } } },
+    });
+    if (responseCount > 0) {
+      throw new ConflictException({
+        message:
+          'Esta sección tiene preguntas con respuestas y no se puede borrar.',
+        sectionId,
+        responseCount,
+      });
     }
 
     const removedOrder = section.order;

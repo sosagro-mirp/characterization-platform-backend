@@ -127,6 +127,15 @@ export class Farm {
   })
   plotCount: number | null;
 
+  // Spec 84 — campo del instrumento de Registro (S_REG); no existía columna
+  // de finca para esto antes.
+  @Column({
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  corregimiento: string | null;
+
   @OneToMany(() => Farmer, (farmer) => farmer.farm)
   farmers: Farmer[];
 
