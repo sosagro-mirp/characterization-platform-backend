@@ -2,8 +2,8 @@
 set -euo pipefail
 
 LOCAL_PORT=5433
-REMOTE_HOST=mirp-lab
-REMOTE_PORT=5432
+REMOTE_HOST=asus
+REMOTE_PORT=5433
 
 if lsof -iTCP:"$LOCAL_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   echo "[db-tunnel] ya activo en localhost:$LOCAL_PORT"
