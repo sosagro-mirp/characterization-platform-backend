@@ -50,6 +50,20 @@ interface OptionRow {
   archived_at: string | null;
 }
 
+/** ¿Existe la columna en el entorno conectado? Interpolar su nombre en SQL es seguro: ambos argumentos son literales de este módulo, nunca entrada del usuario. */
+async function hasColumn(
+  ds: Queryable,
+  table: string,
+  column: string,
+): Promise<boolean> {
+  const rows = await ds.query<{ exists: string }[]>(
+    `SELECT column_name AS exists FROM information_schema.columns
+      WHERE table_name = $1 AND column_name = $2 LIMIT 1`,
+    [table, column],
+  );
+  return rows.length > 0;
+}
+
 /**
  * Spec 84, Fase 3 — exporta instrumentos completos (secciones → preguntas →
  * opciones) a un manifiesto portable entre entornos. Solo lectura: no
@@ -104,12 +118,27 @@ export async function exportManifest(
   );
   const sectionIds = sectionRows.map((r) => r.section_id);
 
+  // `archived_at` lo agrega la migración de la Fase 1, que no está corrida en
+  // todos los entornos: producción se exporta en solo lectura ANTES de
+  // migrarla (Fase 7), así que donde la columna no exista se exporta `null`
+  // — que es su valor real: sin columna no hay nada archivado.
+  const questionArchivedAt = (await hasColumn(ds, 'questions', 'archived_at'))
+    ? 'q.archived_at'
+    : 'NULL::timestamp AS archived_at';
+  const optionArchivedAt = (await hasColumn(
+    ds,
+    'options_question',
+    'archived_at',
+  ))
+    ? 'archived_at'
+    : 'NULL::timestamp AS archived_at';
+
   const questionRows = sectionIds.length
     ? await ds.query<QuestionRow[]>(
         `SELECT q.question_id, q.section_id, q.text, t.name AS type_name,
                 q.is_required, q.is_selection_criteria, q.is_key_question,
                 q."order", q.system_field, q.condition_question_id,
-                q.condition_value, q.archived_at
+                q.condition_value, ${questionArchivedAt}
          FROM questions q
          JOIN types_of_questions t ON t.type_id = q.type_id
          WHERE q.section_id = ANY($1::uuid[]) ORDER BY q."order"`,
@@ -120,7 +149,7 @@ export async function exportManifest(
 
   const optionRows = questionIds.length
     ? await ds.query<OptionRow[]>(
-        `SELECT option_id, question_id, text, value, is_other, metadata_id, archived_at
+        `SELECT option_id, question_id, text, value, is_other, metadata_id, ${optionArchivedAt}
          FROM options_question WHERE question_id = ANY($1::uuid[]) ORDER BY created_at`,
         [questionIds],
       )
