@@ -11,7 +11,7 @@
  *
  * Uso:
  *   ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts export --out <archivo> [--instruments id1,id2]
- *   ts-node ... cli.ts snapshot --to-target [--production-target-confirm]
+ *   ts-node ... cli.ts snapshot [--no-campaigns]
  *   ts-node ... cli.ts plan --base <archivo> --desired <archivo> --current <archivo> --out <archivo>
  *   ts-node ... cli.ts apply --plan <archivo> [--production-target-confirm] --out-backup <archivo>
  *   ts-node ... cli.ts restore --backup <archivo> [--production-target-confirm]
@@ -23,6 +23,7 @@ import { DataSource } from 'typeorm';
 import {
   applyPlan,
   buildPlan,
+  exportCampaigns,
   exportManifest,
   generateInventory,
   InstrumentManifest,
@@ -119,14 +120,20 @@ async function main() {
       }
       await source.initialize();
       const manifest = await exportManifest(source);
+      // `--no-campaigns` deja el destino sin campañas (las borra igual);
+      // por defecto se copian las del origen (decisión del usuario, spec 84).
+      const campaigns = flags['no-campaigns']
+        ? []
+        : await exportCampaigns(source);
       await source.destroy();
 
       const target = connect(targetUrl);
       await target.initialize();
-      await snapshot(target, manifest, { isProduction: false });
+      await snapshot(target, manifest, { isProduction: false }, campaigns);
       await target.destroy();
       console.log(
-        `Snapshot aplicado: ${manifest.instruments.length} instrumentos.`,
+        `Snapshot aplicado: ${manifest.instruments.length} instrumentos, ` +
+          `${campaigns.length} campañas (${campaigns.reduce((n, c) => n + c.steps.length, 0)} pasos).`,
       );
       break;
     }

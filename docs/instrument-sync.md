@@ -63,6 +63,15 @@ producción.
 SYNC_SOURCE_DATABASE_URL=<prod> SYNC_TARGET_DATABASE_URL=<dev> pnpm instruments:snapshot
 ```
 
+Copia también **las campañas** del origen con sus pasos y condiciones (agregar
+`--no-campaigns` para dejar el destino sin ninguna). Las campañas no viajan en
+el manifiesto ni en `plan`/`apply`: la promoción a producción nunca las toca.
+Aquí sí, porque el borrado previo las elimina y desarrollo necesita campañas
+desde las que aplicar los instrumentos. Dos referencias se traducen al
+destino: el cultivo de una condición (por nombre, como los catálogos del
+manifiesto) y `created_by_id`/`updated_by_id`, que se insertan en `NULL`
+porque los usuarios de producción no existen en desarrollo.
+
 Uso previsto: traer producción a desarrollo antes de empezar a depurar
 (Fase 7 del spec 84).
 

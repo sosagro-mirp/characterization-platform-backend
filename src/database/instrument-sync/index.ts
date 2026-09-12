@@ -15,3 +15,8 @@ export { applyPlan } from './apply';
 export { restoreFromBackup } from './restore';
 export { generateInventory } from './inventory';
 export { snapshot } from './snapshot';
+export {
+  exportCampaigns,
+  insertCampaigns,
+  type CampaignSnapshotCampaign,
+} from './campaigns';

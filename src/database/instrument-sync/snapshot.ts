@@ -3,6 +3,7 @@ import { InstrumentManifest } from './types';
 import { buildPlan } from './plan';
 import { applyPlan } from './apply';
 import { exportManifest } from './export';
+import { CampaignSnapshotCampaign, insertCampaigns } from './campaigns';
 
 /**
  * Spec 84, Fase 3 — reemplaza TODO el contenido de instrumentos de un
@@ -50,6 +51,12 @@ export async function snapshot(
   ds: DataSource,
   manifest: InstrumentManifest,
   guard: SnapshotGuard,
+  /**
+   * Campañas del origen (`exportCampaigns`). `snapshot()` borra las del
+   * destino siempre; si no se pasan, el destino queda sin ninguna campaña —
+   * útil solo si se van a crear a mano. Ver `campaigns.ts`.
+   */
+  campaigns: CampaignSnapshotCampaign[] = [],
 ): Promise<void> {
   if (guard.isProduction) {
     throw new Error(
@@ -76,6 +83,14 @@ export async function snapshot(
   };
   const plan = buildPlan({ base: empty, desired: manifest, current: empty });
   await applyPlan(ds, plan);
+
+  // Las campañas van después de los instrumentos: `campaign_steps.instrument_id`
+  // es RESTRICT y `step_conditions.condition_question_id` apunta a `questions`.
+  if (campaigns.length > 0) {
+    await ds.transaction(async (manager) => {
+      await insertCampaigns(manager, campaigns);
+    });
+  }
 
   // Verificación final: el destino debe coincidir con el manifiesto pedido.
   const after = await exportManifest(ds, {
