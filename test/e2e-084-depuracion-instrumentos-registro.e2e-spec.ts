@@ -407,6 +407,10 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     await insertResponse(regSurveyId, qProfile, { optionId: optPropietario });
   });
 
+  // Instrumento auxiliar del bloque de búsqueda — declarado aquí para que el
+  // `afterAll` global también lo limpie.
+  let searchInstrumentId: string | undefined;
+
   afterAll(async () => {
     const safe = async (sql: string, params: unknown[] = []) => {
       try {
@@ -441,7 +445,12 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       sessionId,
     ]);
     await safe(`DELETE FROM campaigns WHERE campaign_id = $1`, [campaignId]);
-    for (const id of [editorInstrumentId, regInstrumentId, createdSRegId]) {
+    for (const id of [
+      editorInstrumentId,
+      regInstrumentId,
+      createdSRegId,
+      searchInstrumentId,
+    ]) {
       if (id)
         await safe(`DELETE FROM instruments WHERE instrument_id = $1`, [id]);
     }
@@ -731,10 +740,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
           ?.sections.flatMap((s) => s.questions)
           .flatMap((q) => q.options ?? []) ?? [];
       const town = regOptions.find((o) => o.metadata?.kind === 'town');
-      expect(town?.metadata).toMatchObject({
-        kind: 'town',
-        key: expect.any(String),
-      });
+      expect(town?.metadata?.kind).toBe('town');
+      expect(typeof town?.metadata?.key).toBe('string');
+      expect(town?.metadata?.key).toBeTruthy();
       const crop = regOptions.find((o) => o.metadata?.kind === 'crop');
       expect(crop?.metadata).toMatchObject({ kind: 'crop', key: 'Café' });
       const actorKeys = regOptions
@@ -852,6 +860,7 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       otherInstrumentId = await insertInstrument(
         'E2E 084 Instrumento Busqueda',
       );
+      searchInstrumentId = otherInstrumentId;
       const otherSectionId = await insertSection(
         otherInstrumentId,
         'E2E 084 Seccion Busqueda',
@@ -927,6 +936,13 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
         }
       ).items.find((i) => i.questionId === dupA);
       expect(archivada?.archivedAt).toBeTruthy();
+
+      // Se desarchiva para no dejar el estado alterado a los casos siguientes.
+      await auth(
+        http().patch(
+          `/api/sections/${editorSectionId}/questions/${dupA}/unarchive`,
+        ),
+      ).expect(200);
     });
 
     it('devuelve el número de respuestas de cada coincidencia', async () => {

@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, IsNull, Not, Repository } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
@@ -296,6 +296,13 @@ export class QuestionsService {
     const { typeId, conditionQuestionId, order, targetSectionId, ...rest } =
       updateQuestionDto;
 
+    // Spec 84 — al mover una pregunta a otra sección hay que recompactar el
+    // orden de la sección de origen, igual que hace `remove`. Si no, queda un
+    // hueco ([1,2,4]) y la siguiente pregunta que entre ahí recibe
+    // `count + 1` = 4, colisionando con la que ya tiene ese orden: no hay
+    // índice único que lo impida (verificado en la Fase 0).
+    let movedFrom: { sectionId: string; order: number } | null = null;
+
     if (typeId !== undefined && typeId !== question.type?.typeId) {
       // Spec 84 — "editar en sitio + archivar": una pregunta con respuestas
       // no puede cambiar de tipo (una respuesta de selección y una de sí/no
@@ -360,6 +367,7 @@ export class QuestionsService {
       const siblingCount = await this.questionsRepository.count({
         where: { section: { sectionId: targetSectionId } },
       });
+      movedFrom = { sectionId, order: question.order };
       question.section = targetSection;
       question.order = siblingCount + 1;
     }
@@ -396,6 +404,10 @@ export class QuestionsService {
 
     Object.assign(question, rest);
     const saved = await this.questionsRepository.save(question);
+
+    if (movedFrom) {
+      await this.compactOrder(movedFrom.sectionId);
+    }
 
     if (
       typeId !== undefined &&
@@ -452,20 +464,28 @@ export class QuestionsService {
       });
     }
 
-    const removedOrder = question.order;
     await this.questionsRepository.remove(question);
+    await this.compactOrder(sectionId);
+  }
 
+  /**
+   * Renumera las preguntas de una sección a 1..n conservando su orden
+   * relativo. Se usa tras borrar una pregunta y tras moverla a otra sección:
+   * en ambos casos queda un hueco, y `order` se asigna por conteo.
+   */
+  private async compactOrder(sectionId: string): Promise<void> {
     const remaining = await this.questionsRepository.find({
-      where: { section: { sectionId }, order: Not(removedOrder) },
+      where: { section: { sectionId } },
       order: { order: 'ASC' },
     });
 
-    for (let i = 0; i < remaining.length; i++) {
-      if (remaining[i].order !== i + 1) {
-        remaining[i].order = i + 1;
-      }
+    const renumbered = remaining.filter((q, i) => q.order !== i + 1);
+    for (const question of renumbered) {
+      question.order = remaining.indexOf(question) + 1;
     }
-    await this.questionsRepository.save(remaining);
+    if (renumbered.length > 0) {
+      await this.questionsRepository.save(renumbered);
+    }
   }
 
   /**
