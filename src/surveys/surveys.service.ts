@@ -318,6 +318,10 @@ export class SurveysService {
     return await this.surveysRepository.manager.transaction(async (manager) => {
       // Lock por encuesta: dos llamadas concurrentes sobre la misma encuesta
       // se serializan; sobre encuestas distintas no se estorban.
+      // Cota a la espera del lock: sin ella una petición colgada retiene
+      // una conexión del pool indefinidamente. Al expirar, Postgres lanza
+      // 55P03 y la petición falla rápido en vez de quedarse pendiente.
+      await manager.query("SET LOCAL lock_timeout = '10s'");
       await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
         `extract-farmer:${surveyId}`,
       ]);
@@ -345,8 +349,39 @@ export class SurveysService {
 
     // Ya se extrajo de esta encuesta: devolver el mismo productor en vez de
     // crear otro. Es lo que convierte un reintento en una operación inocua.
+    //
+    // Antes del lock, una segunda extracción volvía a ejecutar el enlace de
+    // la sesión y el backfill de constancias huérfanas — era, de hecho, la
+    // única vía para reparar una constancia que hubiera quedado sin
+    // productor. El retorno temprano la eliminaría, así que ambos se
+    // reejecutan aquí: son idempotentes (un UPDATE al mismo valor) y baratos.
     if (survey.farmer) {
-      return { farmer: survey.farmer, existed: true };
+      const farmer = survey.farmer;
+      if (survey.campaignSession) {
+        await manager.update(
+          CampaignSession,
+          { sessionId: survey.campaignSession.sessionId },
+          { farmer },
+        );
+        await manager.query('SAVEPOINT consent_backfill_retry');
+        try {
+          await this.consentRecordsService.linkOrphansToFarmer(
+            survey.campaignSession.sessionId,
+            farmer.id,
+            manager,
+          );
+          await manager.query('RELEASE SAVEPOINT consent_backfill_retry');
+        } catch (err) {
+          await manager.query('ROLLBACK TO SAVEPOINT consent_backfill_retry');
+          this.logger.error(
+            `[extractFarmer] retry backfill failed for session=${survey.campaignSession.sessionId}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+            err instanceof Error ? err.stack : undefined,
+          );
+        }
+      }
+      return { farmer, existed: true };
     }
 
     // Build systemField → value map from all responses that have systemField set.
@@ -580,6 +615,14 @@ export class SurveysService {
       // resuelto (nuevo o ya existente) queda disponible por primera vez, así
       // que es el punto correcto para el backfill. Best-effort: un fallo aquí
       // no debe tumbar la extracción del agricultor, que ya se completó.
+      // Spec 84 — `SAVEPOINT` para que "mejor esfuerzo" siga significando lo
+      // mismo dentro de una transacción. Sin él, un fallo aquí aborta la
+      // transacción entera (Postgres 25P02), el `catch` de abajo se lo traga
+      // y el COMMIT final se degrada a ROLLBACK **sin lanzar**: el método
+      // devolvería 201 con un productor que nunca se guardó. El savepoint
+      // acota el daño al backfill y deja la extracción intacta, que es la
+      // decisión B4 del spec 78 (visible, no fatal).
+      await manager.query('SAVEPOINT consent_backfill');
       try {
         await this.consentRecordsService.linkOrphansToFarmer(
           survey.campaignSession.sessionId,
@@ -589,7 +632,9 @@ export class SurveysService {
           // constancia huérfana.
           manager,
         );
+        await manager.query('RELEASE SAVEPOINT consent_backfill');
       } catch (err) {
+        await manager.query('ROLLBACK TO SAVEPOINT consent_backfill');
         // B4 (auditoría spec 78) — `error`, no `warn`: un fallo aquí deja una
         // constancia de consentimiento huérfana (criterio 6 incumplido) y
         // debe quedar visible en los logs estructurados de producción, no

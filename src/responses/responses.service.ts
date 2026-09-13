@@ -106,6 +106,8 @@ export class ResponsesService {
     // comprobación se repite dentro de la transacción, ya protegida.
     return await this.responsesRepository.manager.transaction(
       async (manager) => {
+        // Ver `SurveysService.extractFarmer`: cota a la espera del lock.
+        await manager.query("SET LOCAL lock_timeout = '10s'");
         await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
           `responses-batch:${surveyId}`,
         ]);
