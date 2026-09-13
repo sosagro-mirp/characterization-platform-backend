@@ -584,6 +584,10 @@ export class SurveysService {
         await this.consentRecordsService.linkOrphansToFarmer(
           survey.campaignSession.sessionId,
           farmer.id,
+          // Spec 84 — misma transacción: el agricultor todavía no está
+          // confirmado y otra conexión no lo vería (FK), dejando la
+          // constancia huérfana.
+          manager,
         );
       } catch (err) {
         // B4 (auditoría spec 78) — `error`, no `warn`: un fallo aquí deja una
