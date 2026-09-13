@@ -12,7 +12,11 @@ import { ApplyResult, InstrumentManifest, Plan, PlanOperation } from './types';
  *   2. Vuelve a exportar el destino y lo compara contra `plan.baseline`
  *      (el estado con el que se calculó el plan) — si algo cambió desde
  *      entonces, aborta sin escribir nada (criterio 14).
- *   3. Ese export fresco es el respaldo (`backup`) que se devuelve.
+ *   3. Ese export fresco es el respaldo (`backup`). Antes de abrir la
+ *      transacción se entrega a `onBackup`, para que el llamador pueda
+ *      persistirlo: si el respaldo no se puede guardar, no se aplica nada.
+ *      Devolverlo al final no basta — si el proceso muere a mitad, el único
+ *      estado previo conocido se pierde con él.
  *   4. Aplica las operaciones de padres a hijos (instrumento → sección →
  *      pregunta → opción) y, en una segunda pasada, las condiciones entre
  *      preguntas — puede que una pregunta condición se haya creado en esta
@@ -20,9 +24,19 @@ import { ApplyResult, InstrumentManifest, Plan, PlanOperation } from './types';
  *   5. Los borrados van de hijos a padres, siempre después de confirmar que
  *      nadie los respondió (eso ya lo garantizó `buildPlan`).
  */
+export interface ApplyOptions {
+  /**
+   * Recibe el respaldo del destino **antes** de que se escriba nada. Si lanza,
+   * `applyPlan` aborta sin aplicar: un respaldo que no se pudo guardar es
+   * indistinguible de no tener respaldo.
+   */
+  onBackup?: (backup: InstrumentManifest) => Promise<void> | void;
+}
+
 export async function applyPlan(
   ds: DataSource,
   plan: Plan,
+  options: ApplyOptions = {},
 ): Promise<ApplyResult> {
   if (plan.conflicts.length > 0) {
     throw new Error(
@@ -35,6 +49,9 @@ export async function applyPlan(
   assertNoDrift(plan.baseline, live);
 
   const backup = live;
+  if (options.onBackup) {
+    await options.onBackup(backup);
+  }
 
   await ds.transaction(async (manager) => {
     const desired = flatten(plan.desired);

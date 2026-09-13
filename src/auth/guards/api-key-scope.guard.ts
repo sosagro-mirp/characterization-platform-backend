@@ -17,15 +17,20 @@ interface RequestWithApiKey extends Request {
 
 const READ_METHODS = new Set(['GET', 'HEAD']);
 const WRITE_METHODS = new Set(['POST', 'PATCH', 'PUT']);
+const DELETE_METHODS = new Set(['DELETE']);
 
 /**
  * Restricts what an API-key-authenticated request can do. Requests
  * authenticated via JWT are untouched by this guard — it only ever looks at
  * request.apiKey, which ApiKeyAuthGuard sets exclusively for API key auth.
  *
- * Rules (spec 48): DELETE is always forbidden for API keys regardless of
- * scope; @JwtOnly() routes are always forbidden for API keys; everything
- * else requires the matching read/write scope.
+ * Rules (spec 48, amended by spec 84): @JwtOnly() routes are always forbidden
+ * for API keys; every other request requires the scope matching its verb —
+ * `read` for GET/HEAD, `write` for POST/PATCH/PUT and `delete` for DELETE.
+ * `write` does not imply `delete`: spec 48 forbade DELETE outright, and spec
+ * 84 reopened it only for keys created explicitly with the `delete` scope, so
+ * that the MCP can depurate instrument structure without responses. Any other
+ * verb stays out of scope.
  */
 @Injectable()
 export class ApiKeyScopeGuard implements CanActivate {
@@ -54,15 +59,26 @@ export class ApiKeyScopeGuard implements CanActivate {
 
     const method = request.method.toUpperCase();
 
-    if (!READ_METHODS.has(method) && !WRITE_METHODS.has(method)) {
-      // Covers DELETE and any other verb — API keys never get anything
-      // beyond read/write, and DELETE is explicitly out of scope.
-      throw new ForbiddenException('API keys cannot perform delete operations');
+    if (
+      !READ_METHODS.has(method) &&
+      !WRITE_METHODS.has(method) &&
+      !DELETE_METHODS.has(method)
+    ) {
+      // Cualquier otro verbo (PURGE, TRACE…) sigue fuera de alcance.
+      throw new ForbiddenException(
+        `API keys cannot perform ${method} operations`,
+      );
     }
 
+    // Spec 84 — `delete` es un scope propio que `write` NO implica: una key
+    // solo borra si se creó explícitamente con él. El backend sigue
+    // respondiendo 409 ante cualquier borrado con respuestas o dependientes,
+    // así que esto amplía quién puede pedirlo, no qué se puede destruir.
     const requiredScope = READ_METHODS.has(method)
       ? API_KEY_SCOPES.READ
-      : API_KEY_SCOPES.WRITE;
+      : DELETE_METHODS.has(method)
+        ? API_KEY_SCOPES.DELETE
+        : API_KEY_SCOPES.WRITE;
 
     if (!apiKey.scopes.includes(requiredScope)) {
       throw new ForbiddenException(

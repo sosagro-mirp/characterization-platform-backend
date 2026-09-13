@@ -11,7 +11,7 @@
 export * from './types';
 export { exportManifest } from './export';
 export { buildPlan } from './plan';
-export { applyPlan } from './apply';
+export { applyPlan, type ApplyOptions } from './apply';
 export { restoreFromBackup } from './restore';
 export { generateInventory } from './inventory';
 export { snapshot } from './snapshot';

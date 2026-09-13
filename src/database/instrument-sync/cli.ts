@@ -78,17 +78,38 @@ function requireEnv(name: string): string {
   return value;
 }
 
-/** Bloquea escrituras contra producción salvo confirmación explícita del flag. */
+/**
+ * Bloquea escrituras contra producción salvo confirmación explícita del flag.
+ * Cuando hay un plan, informa siempre el alcance —cuántos instrumentos y qué
+ * operaciones— para que la confirmación se dé sabiendo qué se va a tocar y no
+ * a ciegas (Alcance C del spec 84).
+ */
 function assertTargetAllowed(
   url: string,
   flags: Record<string, string | boolean>,
+  plan?: Plan,
 ): void {
+  if (plan) {
+    const instruments = new Set(plan.operations.map((op) => op.instrumentId));
+    const byKind = plan.operations.reduce<Record<string, number>>((acc, op) => {
+      acc[op.kind] = (acc[op.kind] ?? 0) + 1;
+      return acc;
+    }, {});
+    const detalle =
+      Object.entries(byKind)
+        .map(([kind, n]) => `${n} ${kind}`)
+        .join(', ') || 'ninguna operación';
+    console.log(
+      `Alcance: ${instruments.size} instrumento(s) afectado(s) — ${detalle}.`,
+    );
+  }
+
   const looksLikeProduction =
     url.includes('neon.tech') || url.includes('railway');
   if (looksLikeProduction && !flags['production-target-confirm']) {
     throw new Error(
-      'El destino parece producción. Repita el comando con --production-target-confirm ' +
-        'solo después de confirmarlo explícitamente con el usuario.',
+      'El destino parece producción. Revise el alcance de arriba y repita el comando con ' +
+        '--production-target-confirm solo después de confirmarlo explícitamente con el usuario.',
     );
   }
 }
@@ -163,14 +184,24 @@ async function main() {
         readFileSync(String(flags.plan), 'utf-8'),
       ) as Plan;
       const targetUrl = requireEnv('SYNC_TARGET_DATABASE_URL');
-      assertTargetAllowed(targetUrl, flags);
+      assertTargetAllowed(targetUrl, flags, plan);
       const ds = connect(targetUrl);
       await ds.initialize();
-      const result = await applyPlan(ds, plan);
+      // El respaldo se escribe SIEMPRE y antes de aplicar: si el disco falla
+      // o la ruta no existe, `applyPlan` aborta sin tocar el destino. Con
+      // `--out-backup` se elige la ruta; sin él se genera una con marca de
+      // tiempo, nunca se omite (criterio 14).
+      const backupPath = String(
+        flags['out-backup'] ??
+          `.instrument-sync/backup-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
+      );
+      const result = await applyPlan(ds, plan, {
+        onBackup: (backup) => writeJson(backupPath, backup),
+      });
       await ds.destroy();
-      if (flags['out-backup'])
-        writeJson(String(flags['out-backup']), result.backup);
-      console.log(`Aplicado: ${result.applied.length} operación(es).`);
+      console.log(
+        `Aplicado: ${result.applied.length} operación(es). Respaldo previo en ${backupPath}`,
+      );
       break;
     }
 
