@@ -20,7 +20,7 @@ import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
@@ -293,21 +293,61 @@ export class SurveysService {
     return this.surveysRepository.save(survey);
   }
 
+  /**
+   * Spec 84 (hallazgo de la ronda de pruebas, 2026-09-13) — serializa las
+   * extracciones concurrentes de la MISMA encuesta y las hace idempotentes.
+   *
+   * Sin esto, dos llamadas simultáneas leían ambas "no existe productor con
+   * este documento" antes de que cualquiera escribiera, y creaban dos
+   * productores con el mismo documento y dos fincas duplicadas (reproducido
+   * dos veces desde el flujo web, con ~0,5 s de diferencia). La detección de
+   * colisiones del spec 68 no lo atrapa: compara contra lo ya guardado, y
+   * aquí ninguna de las dos había guardado todavía.
+   *
+   * No se resuelve con un índice único sobre `farmers.document_id`: la
+   * resolución `separate_person` del spec 68 crea a propósito un segundo
+   * productor con el mismo documento. La clave de idempotencia correcta es
+   * la **encuesta**: extraer dos veces de la misma encuesta debe devolver el
+   * mismo productor. Eso cubre también el reintento de la cola de
+   * sincronización del móvil.
+   */
   async extractFarmer(
     surveyId: string,
     dto: ExtractFarmerDto = {},
   ): Promise<{ farmer: Farmer; existed: boolean }> {
-    const survey = await this.surveysRepository.findOne({
+    return await this.surveysRepository.manager.transaction(async (manager) => {
+      // Lock por encuesta: dos llamadas concurrentes sobre la misma encuesta
+      // se serializan; sobre encuestas distintas no se estorban.
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `extract-farmer:${surveyId}`,
+      ]);
+      return await this.extractFarmerLocked(surveyId, dto, manager);
+    });
+  }
+
+  private async extractFarmerLocked(
+    surveyId: string,
+    dto: ExtractFarmerDto,
+    manager: EntityManager,
+  ): Promise<{ farmer: Farmer; existed: boolean }> {
+    const survey = await manager.findOne(Survey, {
       where: { surveyId },
       relations: [
         'responses',
         'responses.question',
         'responses.option',
         'campaignSession',
+        'farmer',
       ],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
+
+    // Ya se extrajo de esta encuesta: devolver el mismo productor en vez de
+    // crear otro. Es lo que convierte un reintento en una operación inocua.
+    if (survey.farmer) {
+      return { farmer: survey.farmer, existed: true };
+    }
 
     // Build systemField → value map from all responses that have systemField set.
     // farm.town is excluded: it resolves via option.metadataId, not a scalar value.
@@ -328,7 +368,7 @@ export class SurveysService {
       (r) => r.question?.systemField === 'farm.town',
     );
     if (townResponse?.option?.metadataId) {
-      resolvedTown = await this.townsRepository.findOne({
+      resolvedTown = await manager.findOne(Town, {
         where: { townId: townResponse.option.metadataId },
       });
       if (!resolvedTown) {
@@ -370,7 +410,7 @@ export class SurveysService {
         farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
       }
 
-      await this.surveysRepository.update(surveyId, {
+      await manager.update(Survey, surveyId, {
         respondentName:
           (fieldMap['farmer.name'] as string | undefined) || undefined,
         respondentPhone:
@@ -401,7 +441,7 @@ export class SurveysService {
     // documentId collision (typo, reused test data, two different people),
     // not automatically the same person. See farmers/name-matching.ts.
     if (farmerDocumentId) {
-      const existingByDocument = await this.farmersRepository.findOne({
+      const existingByDocument = await manager.findOne(Farmer, {
         where: { documentId: farmerDocumentId },
       });
 
@@ -457,7 +497,7 @@ export class SurveysService {
     // the collision would still get recorded as "separate_person" even
     // though no new farmer was actually created.
     if (!farmer && farmerPhone && dto.resolution !== 'separate_person') {
-      farmer = await this.farmersRepository.findOne({
+      farmer = await manager.findOne(Farmer, {
         where: { name: farmerName, phone: farmerPhone },
       });
       if (farmer) existed = true;
@@ -468,8 +508,8 @@ export class SurveysService {
       let farm: Farm | null = null;
       const farmName = fieldMap['farm.name'] as string | undefined;
       if (farmName) {
-        farm = await this.farmsRepository.save(
-          this.farmsRepository.create({
+        farm = await manager.save<Farm>(
+          manager.create(Farm, {
             name: farmName,
             location: null,
             vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
@@ -502,8 +542,8 @@ export class SurveysService {
         );
       }
 
-      farmer = await this.farmersRepository.save(
-        this.farmersRepository.create({
+      farmer = await manager.save<Farmer>(
+        manager.create(Farmer, {
           name: farmerName,
           documentId: farmerDocumentId ?? null,
           phone: farmerPhone ?? null,
@@ -521,9 +561,15 @@ export class SurveysService {
       );
     }
 
+    // Spec 84 — deja constancia de qué productor salió de esta encuesta. Es
+    // la clave de idempotencia que lee la guarda del principio: sin esto, un
+    // segundo `extract-farmer` sobre la misma encuesta vuelve a crear.
+    await manager.update(Survey, surveyId, { farmer });
+
     // Link farmer to the CampaignSession if the survey belongs to one
     if (survey.campaignSession) {
-      await this.campaignSessionsRepository.update(
+      await manager.update(
+        CampaignSession,
         { sessionId: survey.campaignSession.sessionId },
         { farmer },
       );

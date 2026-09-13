@@ -552,6 +552,43 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       );
       expect(sessionCrops.map((c) => c.crop_id)).toContain(cafeCropId);
     });
+
+    /**
+     * Regresión de la ronda de pruebas del 2026-09-13: el flujo web disparaba
+     * `extract-farmer` dos veces y ambas llamadas leían "no existe" antes de
+     * que cualquiera escribiera, creando DOS productores con el mismo
+     * documento y dos fincas. Se reprodujo dos veces en desarrollo.
+     */
+    it('extraer dos veces de la misma encuesta no duplica el productor', async () => {
+      const [primera, segunda] = await Promise.all([
+        auth(http().post(`/api/surveys/${regSurveyId}/extract-farmer`)).send(
+          {},
+        ),
+        auth(http().post(`/api/surveys/${regSurveyId}/extract-farmer`)).send(
+          {},
+        ),
+      ]);
+      expect([200, 201]).toContain(primera.status);
+      expect([200, 201]).toContain(segunda.status);
+
+      const cuerpoA = primera.body as { farmer: { id: string } };
+      const cuerpoB = segunda.body as { farmer: { id: string } };
+      expect(cuerpoA.farmer.id).toBe(cuerpoB.farmer.id);
+
+      const farmers = await ds.query<{ id: string }[]>(
+        `SELECT id FROM farmers WHERE document_id = $1`,
+        [regDocument],
+      );
+      expect(farmers).toHaveLength(1);
+
+      // La encuesta queda marcada con el productor que salió de ella: es la
+      // clave de idempotencia que hace inocuo cualquier reintento posterior.
+      const surveys = await ds.query<{ farmer_id: string | null }[]>(
+        `SELECT farmer_id FROM surveys WHERE survey_id = $1`,
+        [regSurveyId],
+      );
+      expect(surveys[0].farmer_id).toBe(farmers[0].id);
+    });
   });
 
   // ── Criterio 7 ────────────────────────────────────────────────────────────
