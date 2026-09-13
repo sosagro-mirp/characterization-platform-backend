@@ -42,7 +42,11 @@ interface EditorQuestion {
   questionId: string;
   archivedAt: string | null;
   responseCount: number;
-  options?: { optionId: string; archivedAt: string | null; responseCount: number }[];
+  options?: {
+    optionId: string;
+    archivedAt: string | null;
+    responseCount: number;
+  }[];
 }
 
 interface EditorStructure {
@@ -125,7 +129,11 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     text: string,
     type: string,
     order: number,
-    extra: { systemField?: string; conditionQuestionId?: string; conditionValue?: string } = {},
+    extra: {
+      systemField?: string;
+      conditionQuestionId?: string;
+      conditionValue?: string;
+    } = {},
   ) {
     const rows = await ds.query<{ question_id: string }[]>(
       `INSERT INTO questions (question_id, section_id, text, type_id, is_required, "order",
@@ -144,7 +152,11 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     return rows[0].question_id;
   }
 
-  async function insertOption(questionId: string, text: string, metadataId: string | null = null) {
+  async function insertOption(
+    questionId: string,
+    text: string,
+    metadataId: string | null = null,
+  ) {
     const rows = await ds.query<{ option_id: string }[]>(
       `INSERT INTO options_question (option_id, question_id, text, value, metadata_id)
        VALUES (gen_random_uuid(), $1, $2, $2, $3) RETURNING option_id`,
@@ -153,7 +165,10 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     return rows[0].option_id;
   }
 
-  async function insertSurvey(instrumentId: string, campaignSessionId: string | null = null) {
+  async function insertSurvey(
+    instrumentId: string,
+    campaignSessionId: string | null = null,
+  ) {
     const rows = await ds.query<{ survey_id: string }[]>(
       `INSERT INTO surveys (survey_id, user_id, campaign_session_id, sincronized)
        VALUES (gen_random_uuid(), $1, $2, true) RETURNING survey_id`,
@@ -195,7 +210,11 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     );
     await app.init();
     ds = moduleFixture.get(DataSource);
@@ -234,20 +253,51 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
 
     // ── instrumento de edición ───────────────────────────────────────────────
     editorInstrumentId = await insertInstrument('E2E 084 Instrumento Edicion');
-    editorSectionId = await insertSection(editorInstrumentId, 'E2E 084 Seccion');
-    qAnswered = await insertQuestion(editorSectionId, 'Pregunta respondida', 'open_text', 1);
-    qFree = await insertQuestion(editorSectionId, 'Pregunta sin respuestas', 'open_text', 2);
-    qCondition = await insertQuestion(editorSectionId, 'Pregunta condicionante', 'yes_no', 3);
-    qDependent = await insertQuestion(editorSectionId, 'Pregunta dependiente', 'open_text', 4, {
-      conditionQuestionId: qCondition,
-      conditionValue: 'true',
-    });
-    qChoice = await insertQuestion(editorSectionId, 'Seleccion', 'single_choice', 5);
+    editorSectionId = await insertSection(
+      editorInstrumentId,
+      'E2E 084 Seccion',
+    );
+    qAnswered = await insertQuestion(
+      editorSectionId,
+      'Pregunta respondida',
+      'open_text',
+      1,
+    );
+    qFree = await insertQuestion(
+      editorSectionId,
+      'Pregunta sin respuestas',
+      'open_text',
+      2,
+    );
+    qCondition = await insertQuestion(
+      editorSectionId,
+      'Pregunta condicionante',
+      'yes_no',
+      3,
+    );
+    qDependent = await insertQuestion(
+      editorSectionId,
+      'Pregunta dependiente',
+      'open_text',
+      4,
+      {
+        conditionQuestionId: qCondition,
+        conditionValue: 'true',
+      },
+    );
+    qChoice = await insertQuestion(
+      editorSectionId,
+      'Seleccion',
+      'single_choice',
+      5,
+    );
     optUsed = await insertOption(qChoice, 'Opcion usada');
     optFree = await insertOption(qChoice, 'Opcion libre');
 
     editorSurveyId = await insertSurvey(editorInstrumentId);
-    await insertResponse(editorSurveyId, qAnswered, { text: 'respuesta e2e-084' });
+    await insertResponse(editorSurveyId, qAnswered, {
+      text: 'respuesta e2e-084',
+    });
     await insertResponse(editorSurveyId, qChoice, { optionId: optUsed });
 
     // ── Registro ─────────────────────────────────────────────────────────────
@@ -262,26 +312,74 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
 
     regInstrumentId = await insertInstrument('E2E 084 Registro');
     const regSection = await insertSection(regInstrumentId, 'Registro');
-    const qName = await insertQuestion(regSection, 'Nombre completo', 'open_text', 1, { systemField: 'farmer.name' });
-    const qDoc = await insertQuestion(regSection, 'Documento', 'open_text', 2, { systemField: 'farmer.documentId' });
-    const qPhone = await insertQuestion(regSection, 'Celular', 'open_text', 3, { systemField: 'farmer.phone' });
-    const qFarm = await insertQuestion(regSection, 'Finca', 'open_text', 4, { systemField: 'farm.name' });
-    const qTown = await insertQuestion(regSection, 'Municipio', 'single_choice', 5, { systemField: 'farm.town' });
+    const qName = await insertQuestion(
+      regSection,
+      'Nombre completo',
+      'open_text',
+      1,
+      { systemField: 'farmer.name' },
+    );
+    const qDoc = await insertQuestion(regSection, 'Documento', 'open_text', 2, {
+      systemField: 'farmer.documentId',
+    });
+    const qPhone = await insertQuestion(regSection, 'Celular', 'open_text', 3, {
+      systemField: 'farmer.phone',
+    });
+    const qFarm = await insertQuestion(regSection, 'Finca', 'open_text', 4, {
+      systemField: 'farm.name',
+    });
+    const qTown = await insertQuestion(
+      regSection,
+      'Municipio',
+      'single_choice',
+      5,
+      { systemField: 'farm.town' },
+    );
     const optTown = await insertOption(qTown, 'Municipio e2e', townId);
-    const qVereda = await insertQuestion(regSection, 'Vereda', 'open_text', 6, { systemField: 'farm.vereda' });
-    const qCorr = await insertQuestion(regSection, 'Corregimiento', 'open_text', 7, { systemField: 'farm.corregimiento' });
-    const qCrop = await insertQuestion(regSection, 'Cultivo principal', 'single_choice', 8, { systemField: 'farm.mainCrop' });
+    const qVereda = await insertQuestion(regSection, 'Vereda', 'open_text', 6, {
+      systemField: 'farm.vereda',
+    });
+    const qCorr = await insertQuestion(
+      regSection,
+      'Corregimiento',
+      'open_text',
+      7,
+      { systemField: 'farm.corregimiento' },
+    );
+    const qCrop = await insertQuestion(
+      regSection,
+      'Cultivo principal',
+      'single_choice',
+      8,
+      { systemField: 'farm.mainCrop' },
+    );
     const optCafe = await insertOption(qCrop, 'Café', cafeCropId);
 
     // Perfil (selección múltiple): queda como respuesta, con cada opción
     // ligada a su tipo de actor por metadataId (spec 84, Alcance B).
-    const actorTypes = await ds.query<{ actor_type_id: string; name: string }[]>(
+    const actorTypes = await ds.query<
+      { actor_type_id: string; name: string }[]
+    >(
       `SELECT actor_type_id, name FROM actor_type WHERE name IN ('productor', 'propietario', 'extensionista')`,
     );
-    const actorTypeId = (name: string) => actorTypes.find((a) => a.name === name)!.actor_type_id;
-    const qProfile = await insertQuestion(regSection, 'Perfil', 'multiple_choice', 9);
-    const optProductor = await insertOption(qProfile, 'Productor', actorTypeId('productor'));
-    const optPropietario = await insertOption(qProfile, 'Propietario', actorTypeId('propietario'));
+    const actorTypeId = (name: string) =>
+      actorTypes.find((a) => a.name === name)!.actor_type_id;
+    const qProfile = await insertQuestion(
+      regSection,
+      'Perfil',
+      'multiple_choice',
+      9,
+    );
+    const optProductor = await insertOption(
+      qProfile,
+      'Productor',
+      actorTypeId('productor'),
+    );
+    const optPropietario = await insertOption(
+      qProfile,
+      'Propietario',
+      actorTypeId('propietario'),
+    );
     await insertOption(qProfile, 'Extensionista', actorTypeId('extensionista'));
 
     const campaign = await ds.query<{ campaign_id: string }[]>(
@@ -323,8 +421,13 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     );
     for (const f of farmers) {
       await safe(`DELETE FROM consent_records WHERE farmer_id = $1`, [f.id]);
-      await safe(`UPDATE campaign_sessions SET farmer_id = NULL WHERE farmer_id = $1`, [f.id]);
-      await safe(`UPDATE surveys SET farmer_id = NULL WHERE farmer_id = $1`, [f.id]);
+      await safe(
+        `UPDATE campaign_sessions SET farmer_id = NULL WHERE farmer_id = $1`,
+        [f.id],
+      );
+      await safe(`UPDATE surveys SET farmer_id = NULL WHERE farmer_id = $1`, [
+        f.id,
+      ]);
       await safe(`DELETE FROM farmers WHERE id = $1`, [f.id]);
       if (f.farm_id) {
         await safe(`DELETE FROM farms_crops WHERE farm_id = $1`, [f.farm_id]);
@@ -334,10 +437,13 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     for (const surveyId of [editorSurveyId, regSurveyId]) {
       await safe(`DELETE FROM surveys WHERE survey_id = $1`, [surveyId]);
     }
-    await safe(`DELETE FROM campaign_sessions WHERE session_id = $1`, [sessionId]);
+    await safe(`DELETE FROM campaign_sessions WHERE session_id = $1`, [
+      sessionId,
+    ]);
     await safe(`DELETE FROM campaigns WHERE campaign_id = $1`, [campaignId]);
     for (const id of [editorInstrumentId, regInstrumentId, createdSRegId]) {
-      if (id) await safe(`DELETE FROM instruments WHERE instrument_id = $1`, [id]);
+      if (id)
+        await safe(`DELETE FROM instruments WHERE instrument_id = $1`, [id]);
     }
     await app.close();
   });
@@ -355,7 +461,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     });
 
     it('GET /instruments/by-code/S_REG devuelve el Registro', async () => {
-      const res = await http().get('/api/instruments/by-code/S_REG').expect(200);
+      const res = await http()
+        .get('/api/instruments/by-code/S_REG')
+        .expect(200);
       expect(res.body).toMatchObject({ code: 'S_REG' });
     });
 
@@ -363,7 +471,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       ['S1', 'S1a'],
       ['S2', 'S1b'],
     ])('el alias %s sigue resolviendo a %s', async (alias, real) => {
-      const res = await http().get(`/api/instruments/by-code/${alias}`).expect(200);
+      const res = await http()
+        .get(`/api/instruments/by-code/${alias}`)
+        .expect(200);
       expect(res.body).toMatchObject({ code: real });
     });
   });
@@ -372,7 +482,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
 
   describe('Criterio 2 — S_REG es instrumento de sistema', () => {
     it('no aparece con excludeSystem=true', async () => {
-      const res = await http().get('/api/instruments?excludeSystem=true').expect(200);
+      const res = await http()
+        .get('/api/instruments?excludeSystem=true')
+        .expect(200);
       const codes = (res.body as { code: string | null }[]).map((i) => i.code);
       expect(codes).not.toContain('S_REG');
     });
@@ -391,10 +503,14 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
 
   describe('Criterio 3 — extracción del Registro sobre una misma encuesta', () => {
     it('crea productor y finca con corregimiento, y asigna el cultivo principal a finca y sesión', async () => {
-      const farmerRes = await auth(http().post(`/api/surveys/${regSurveyId}/extract-farmer`)).send({});
+      const farmerRes = await auth(
+        http().post(`/api/surveys/${regSurveyId}/extract-farmer`),
+      ).send({});
       expect([200, 201]).toContain(farmerRes.status);
 
-      const cropsRes = await auth(http().post(`/api/surveys/${regSurveyId}/extract-crops`)).send({});
+      const cropsRes = await auth(
+        http().post(`/api/surveys/${regSurveyId}/extract-crops`),
+      ).send({});
       expect([200, 201]).toContain(cropsRes.status);
 
       const farmers = await ds.query<{ farm_id: string }[]>(
@@ -403,10 +519,11 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       );
       expect(farmers).toHaveLength(1);
 
-      const farms = await ds.query<{ town_id: string; vereda: string; corregimiento: string }[]>(
-        `SELECT town_id, vereda, corregimiento FROM farms WHERE farm_id = $1`,
-        [farmers[0].farm_id],
-      );
+      const farms = await ds.query<
+        { town_id: string; vereda: string; corregimiento: string }[]
+      >(`SELECT town_id, vereda, corregimiento FROM farms WHERE farm_id = $1`, [
+        farmers[0].farm_id,
+      ]);
       expect(farms[0]).toMatchObject({
         town_id: townId,
         vereda: 'Vereda E2E',
@@ -433,12 +550,18 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
   describe('Criterio 7 — guardas: nada con respuestas se destruye', () => {
     it('borrar una pregunta con respuestas → 409 y las respuestas siguen', async () => {
       const before = await countResponses(editorSurveyId);
-      await auth(http().delete(`/api/sections/${editorSectionId}/questions/${qAnswered}`)).expect(409);
+      await auth(
+        http().delete(
+          `/api/sections/${editorSectionId}/questions/${qAnswered}`,
+        ),
+      ).expect(409);
       expect(await countResponses(editorSurveyId)).toBe(before);
     });
 
     it('cambiar el tipo de una pregunta con respuestas → 409', async () => {
-      await auth(http().patch(`/api/sections/${editorSectionId}/questions/${qAnswered}`))
+      await auth(
+        http().patch(`/api/sections/${editorSectionId}/questions/${qAnswered}`),
+      )
         .send({ typeId: typeId.numeric })
         .expect(409);
     });
@@ -446,13 +569,17 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     it('borrar una sección con preguntas respondidas → 409', async () => {
       const before = await countResponses(editorSurveyId);
       await auth(
-        http().delete(`/api/instruments/${editorInstrumentId}/sections/${editorSectionId}`),
+        http().delete(
+          `/api/instruments/${editorInstrumentId}/sections/${editorSectionId}`,
+        ),
       ).expect(409);
       expect(await countResponses(editorSurveyId)).toBe(before);
     });
 
     it('borrar una opción usada en respuestas → 409 y la respuesta conserva su opción', async () => {
-      await auth(http().delete(`/api/questions/${qChoice}/options/${optUsed}`)).expect(409);
+      await auth(
+        http().delete(`/api/questions/${qChoice}/options/${optUsed}`),
+      ).expect(409);
       const rows = await ds.query<{ option_id: string | null }[]>(
         `SELECT option_id FROM responses WHERE survey_id = $1 AND question_id = $2`,
         [editorSurveyId, qChoice],
@@ -461,9 +588,13 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     });
 
     it('sin respuestas, borrar opción y pregunta sí funciona', async () => {
-      const optRes = await auth(http().delete(`/api/questions/${qChoice}/options/${optFree}`));
+      const optRes = await auth(
+        http().delete(`/api/questions/${qChoice}/options/${optFree}`),
+      );
       expect([200, 204]).toContain(optRes.status);
-      const qRes = await auth(http().delete(`/api/sections/${editorSectionId}/questions/${qFree}`));
+      const qRes = await auth(
+        http().delete(`/api/sections/${editorSectionId}/questions/${qFree}`),
+      );
       expect([200, 204]).toContain(qRes.status);
     });
   });
@@ -473,7 +604,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
   describe('Criterio 8 — dependencias al archivar', () => {
     it('archivar una pregunta de la que depende otra visible → 409', async () => {
       await auth(
-        http().patch(`/api/sections/${editorSectionId}/questions/${qCondition}/archive`),
+        http().patch(
+          `/api/sections/${editorSectionId}/questions/${qCondition}/archive`,
+        ),
       ).expect(409);
     });
   });
@@ -483,20 +616,32 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
   describe('Criterio 9 — visibilidad de lo archivado', () => {
     it('archivar oculta pregunta y opción del render y las muestra en editor-structure', async () => {
       await auth(
-        http().patch(`/api/sections/${editorSectionId}/questions/${qAnswered}/archive`),
+        http().patch(
+          `/api/sections/${editorSectionId}/questions/${qAnswered}/archive`,
+        ),
       ).expect(200);
-      await auth(http().patch(`/api/questions/${qChoice}/options/${optUsed}/archive`)).expect(200);
+      await auth(
+        http().patch(`/api/questions/${qChoice}/options/${optUsed}/archive`),
+      ).expect(200);
 
-      const render = await http().get(`/api/instruments/${editorInstrumentId}/render`).expect(200);
-      const renderQuestions = allRenderQuestions(render.body as RenderStructure);
+      const render = await http()
+        .get(`/api/instruments/${editorInstrumentId}/render`)
+        .expect(200);
+      const renderQuestions = allRenderQuestions(
+        render.body as RenderStructure,
+      );
       expect(renderQuestions.map((q) => q.questionId)).not.toContain(qAnswered);
       const choice = renderQuestions.find((q) => q.questionId === qChoice);
-      expect((choice?.options ?? []).map((o) => o.optionId)).not.toContain(optUsed);
+      expect((choice?.options ?? []).map((o) => o.optionId)).not.toContain(
+        optUsed,
+      );
 
       const editor = await auth(
         http().get(`/api/instruments/${editorInstrumentId}/editor-structure`),
       ).expect(200);
-      const editorQuestions = (editor.body as EditorStructure).sections.flatMap((s) => s.questions);
+      const editorQuestions = (editor.body as EditorStructure).sections.flatMap(
+        (s) => s.questions,
+      );
       const archived = editorQuestions.find((q) => q.questionId === qAnswered);
       expect(archived?.archivedAt).toBeTruthy();
       expect(archived?.responseCount).toBe(1);
@@ -508,16 +653,24 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     });
 
     it('editor-structure exige autenticación', async () => {
-      await http().get(`/api/instruments/${editorInstrumentId}/editor-structure`).expect(401);
+      await http()
+        .get(`/api/instruments/${editorInstrumentId}/editor-structure`)
+        .expect(401);
     });
 
     it('desarchivar devuelve la pregunta al render', async () => {
       await auth(
-        http().patch(`/api/sections/${editorSectionId}/questions/${qAnswered}/unarchive`),
+        http().patch(
+          `/api/sections/${editorSectionId}/questions/${qAnswered}/unarchive`,
+        ),
       ).expect(200);
-      const render = await http().get(`/api/instruments/${editorInstrumentId}/render`).expect(200);
+      const render = await http()
+        .get(`/api/instruments/${editorInstrumentId}/render`)
+        .expect(200);
       expect(
-        allRenderQuestions(render.body as RenderStructure).map((q) => q.questionId),
+        allRenderQuestions(render.body as RenderStructure).map(
+          (q) => q.questionId,
+        ),
       ).toContain(qAnswered);
     });
   });
@@ -527,15 +680,25 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
   describe('Criterio 10 — respuestas a lo archivado se aceptan y se conservan', () => {
     it('POST /responses/batch acepta una respuesta a una pregunta archivada', async () => {
       await auth(
-        http().patch(`/api/sections/${editorSectionId}/questions/${qDependent}/archive`),
+        http().patch(
+          `/api/sections/${editorSectionId}/questions/${qDependent}/archive`,
+        ),
       ).expect(200);
       await auth(http().post('/api/responses/batch'))
-        .send([{ surveyId: editorSurveyId, questionId: qDependent, textValue: 'borrador tardío' }])
+        .send([
+          {
+            surveyId: editorSurveyId,
+            questionId: qDependent,
+            textValue: 'borrador tardío',
+          },
+        ])
         .expect(201);
     });
 
     it('el historial de la encuesta sigue mostrando respuestas de preguntas archivadas', async () => {
-      const res = await auth(http().get(`/api/surveys/${editorSurveyId}/responses`)).expect(200);
+      const res = await auth(
+        http().get(`/api/surveys/${editorSurveyId}/responses`),
+      ).expect(200);
       expect(JSON.stringify(res.body)).toContain('borrador tardío');
     });
   });
@@ -546,11 +709,15 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     let base: InstrumentManifest;
 
     beforeAll(async () => {
-      base = await exportManifest(ds, { instrumentIds: [editorInstrumentId, regInstrumentId] });
+      base = await exportManifest(ds, {
+        instrumentIds: [editorInstrumentId, regInstrumentId],
+      });
     });
 
     it('Criterio 12 — catálogos por clave natural, hash y responseCount, sin datos personales', () => {
-      const instrument = base.instruments.find((i) => i.instrumentId === editorInstrumentId);
+      const instrument = base.instruments.find(
+        (i) => i.instrumentId === editorInstrumentId,
+      );
       expect(instrument?.hash).toEqual(expect.any(String));
       const question = instrument?.sections
         .flatMap((s) => s.questions)
@@ -564,7 +731,10 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
           ?.sections.flatMap((s) => s.questions)
           .flatMap((q) => q.options ?? []) ?? [];
       const town = regOptions.find((o) => o.metadata?.kind === 'town');
-      expect(town?.metadata).toMatchObject({ kind: 'town', key: expect.any(String) });
+      expect(town?.metadata).toMatchObject({
+        kind: 'town',
+        key: expect.any(String),
+      });
       const crop = regOptions.find((o) => o.metadata?.kind === 'crop');
       expect(crop?.metadata).toMatchObject({ kind: 'crop', key: 'Café' });
       const actorKeys = regOptions
@@ -589,7 +759,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       const section = desired.instruments
         .find((i) => i.instrumentId === editorInstrumentId)!
         .sections.find((s) => s.sectionId === editorSectionId)!;
-      section.questions = section.questions.filter((q) => q.questionId !== qAnswered);
+      section.questions = section.questions.filter(
+        (q) => q.questionId !== qAnswered,
+      );
       const choice = section.questions.find((q) => q.questionId === qChoice)!;
       choice.type = 'multiple_choice';
 
@@ -621,18 +793,25 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       desired.instruments
         .find((i) => i.instrumentId === editorInstrumentId)!
         .sections.flatMap((s) => s.questions)
-        .find((q) => q.questionId === qCondition)!.text = '¿Pregunta condicionante corregida?';
+        .find((q) => q.questionId === qCondition)!.text =
+        '¿Pregunta condicionante corregida?';
 
       const plan = buildPlan({ base, desired, current: base });
       expect(plan.conflicts).toHaveLength(0);
       expect(plan.operations).toEqual([
-        expect.objectContaining({ kind: 'update', entity: 'question', id: qCondition }),
+        expect.objectContaining({
+          kind: 'update',
+          entity: 'question',
+          id: qCondition,
+        }),
       ]);
 
       const result = await applyPlan(ds, plan);
       expect(result.backup).toBeDefined();
 
-      const after = await exportManifest(ds, { instrumentIds: [editorInstrumentId, regInstrumentId] });
+      const after = await exportManifest(ds, {
+        instrumentIds: [editorInstrumentId, regInstrumentId],
+      });
       const replan = buildPlan({ base: after, desired, current: after });
       expect(replan.operations).toHaveLength(0);
       expect(await countResponses(editorSurveyId)).toBe(before);
@@ -640,19 +819,137 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
 
     it('Criterio 14 — si el destino cambió desde el plan, no aplica nada', async () => {
       const desired = structuredClone(base);
-      desired.instruments.find((i) => i.instrumentId === editorInstrumentId)!.name =
-        'E2E 084 Instrumento Edicion (renombrado)';
+      desired.instruments.find(
+        (i) => i.instrumentId === editorInstrumentId,
+      )!.name = 'E2E 084 Instrumento Edicion (renombrado)';
       const plan = buildPlan({ base, desired, current: base });
 
-      await ds.query(`UPDATE instruments SET name = 'cambio concurrente' WHERE instrument_id = $1`, [
-        editorInstrumentId,
-      ]);
+      await ds.query(
+        `UPDATE instruments SET name = 'cambio concurrente' WHERE instrument_id = $1`,
+        [editorInstrumentId],
+      );
       await expect(applyPlan(ds, plan)).rejects.toThrow();
       const rows = await ds.query<{ name: string }[]>(
         `SELECT name FROM instruments WHERE instrument_id = $1`,
         [editorInstrumentId],
       );
       expect(rows[0].name).toBe('cambio concurrente');
+    });
+  });
+  // ── Búsqueda de preguntas (apoyo al criterio 17) ──────────────────────────
+
+  describe('GET /questions/search — detección de redundancias', () => {
+    let dupA: string;
+    let dupB: string;
+    let otherInstrumentId: string;
+    const needle = 'Sombrio del cultivo e2e084';
+
+    beforeAll(async () => {
+      // La misma pregunta repetida en dos instrumentos: el caso que la
+      // depuración necesita encontrar. Una lleva tilde y mayúsculas para
+      // comprobar que la búsqueda las ignora.
+      dupA = await insertQuestion(editorSectionId, needle, 'open_text', 20);
+      otherInstrumentId = await insertInstrument(
+        'E2E 084 Instrumento Busqueda',
+      );
+      const otherSectionId = await insertSection(
+        otherInstrumentId,
+        'E2E 084 Seccion Busqueda',
+      );
+      dupB = await insertQuestion(
+        otherSectionId,
+        'SOMBRÍO DEL CULTIVO E2E084',
+        'open_text',
+        1,
+      );
+    });
+
+    it('encuentra la misma pregunta en dos instrumentos, ignorando tildes y mayúsculas', async () => {
+      const res = await auth(
+        http()
+          .get('/api/questions/search')
+          .query({ q: 'sombrio del cultivo e2e084' }),
+      ).expect(200);
+      const body = res.body as {
+        total: number;
+        items: {
+          questionId: string;
+          instrumentId: string;
+          responseCount: number;
+        }[];
+      };
+      const ids = body.items.map((i) => i.questionId);
+      expect(ids).toContain(dupA);
+      expect(ids).toContain(dupB);
+      expect(body.total).toBe(body.items.length);
+      const found = body.items.find((i) => i.questionId === dupB);
+      expect(found?.instrumentId).toBe(otherInstrumentId);
+      expect(found?.responseCount).toBe(0);
+    });
+
+    it('instrumentIds acota la búsqueda a un instrumento', async () => {
+      const res = await auth(
+        http().get('/api/questions/search').query({
+          q: 'sombrio del cultivo e2e084',
+          instrumentIds: otherInstrumentId,
+        }),
+      ).expect(200);
+      const body = res.body as { items: { questionId: string }[] };
+      expect(body.items.map((i) => i.questionId)).toEqual([dupB]);
+    });
+
+    it('las archivadas solo aparecen con includeArchived=true', async () => {
+      await auth(
+        http().patch(
+          `/api/sections/${editorSectionId}/questions/${dupA}/archive`,
+        ),
+      ).expect(200);
+
+      const sinArchivadas = await auth(
+        http()
+          .get('/api/questions/search')
+          .query({ q: 'sombrio del cultivo e2e084' }),
+      ).expect(200);
+      expect(
+        (sinArchivadas.body as { items: { questionId: string }[] }).items.map(
+          (i) => i.questionId,
+        ),
+      ).not.toContain(dupA);
+
+      const conArchivadas = await auth(
+        http()
+          .get('/api/questions/search')
+          .query({ q: 'sombrio del cultivo e2e084', includeArchived: 'true' }),
+      ).expect(200);
+      const archivada = (
+        conArchivadas.body as {
+          items: { questionId: string; archivedAt: string | null }[];
+        }
+      ).items.find((i) => i.questionId === dupA);
+      expect(archivada?.archivedAt).toBeTruthy();
+    });
+
+    it('devuelve el número de respuestas de cada coincidencia', async () => {
+      const res = await auth(
+        http().get('/api/questions/search').query({ q: 'Pregunta respondida' }),
+      ).expect(200);
+      const item = (
+        res.body as { items: { questionId: string; responseCount: number }[] }
+      ).items.find((i) => i.questionId === qAnswered);
+      expect(item?.responseCount).toBe(1);
+    });
+
+    it('rechaza una búsqueda de menos de 2 caracteres', async () => {
+      await auth(http().get('/api/questions/search').query({ q: 'a' })).expect(
+        400,
+      );
+    });
+
+    it('exige autenticación', async () => {
+      await http()
+        .get('/api/questions/search')
+        .query({ q: 'sombrio' })
+        .expect(401);
     });
   });
 });

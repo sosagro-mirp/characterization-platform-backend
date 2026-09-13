@@ -7,6 +7,7 @@ import { Response } from 'src/responses/entities/response.entity';
 import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
 import { Question } from './entities/question.entity';
 import { QuestionsController } from './questions.controller';
+import { QuestionsSearchController } from './questions-search.controller';
 import { QuestionsService } from './questions.service';
 
 @Module({
@@ -22,7 +23,7 @@ import { QuestionsService } from './questions.service';
       StepCondition,
     ]),
   ],
-  controllers: [QuestionsController],
+  controllers: [QuestionsController, QuestionsSearchController],
   providers: [QuestionsService],
 })
 export class QuestionsModule {}

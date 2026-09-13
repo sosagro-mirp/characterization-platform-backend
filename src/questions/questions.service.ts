@@ -12,6 +12,7 @@ import { Response } from 'src/responses/entities/response.entity';
 import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
+import { SearchQuestionsDto } from './dto/search-questions.dto';
 import { Question } from './entities/question.entity';
 
 export interface CopyQuestionResult {
@@ -25,6 +26,34 @@ export interface CopyQuestionResult {
   };
   droppedCondition: boolean;
 }
+
+export interface SearchQuestionsItem {
+  questionId: string;
+  text: string;
+  systemField: string | null;
+  archivedAt: Date | null;
+  type: string;
+  sectionId: string;
+  sectionName: string;
+  instrumentId: string;
+  instrumentName: string;
+  instrumentCode: string | null;
+  /** Respuestas que ya tiene la pregunta — decide archivar vs. borrar. */
+  responseCount: number;
+}
+
+export interface SearchQuestionsResult {
+  items: SearchQuestionsItem[];
+  total: number;
+}
+
+/**
+ * Normaliza una expresión SQL a minúsculas y sin tildes para comparar
+ * enunciados. `unaccent` es una extensión y no está instalada en la base, así
+ * que se traducen a mano las vocales acentuadas y la ñ del español.
+ */
+const NORMALIZE = (expr: string): string =>
+  `translate(lower(${expr}), 'áéíóúüñ', 'aeiouun')`;
 
 const TYPES_WITHOUT_OPTIONS = ['open_text', 'numeric', 'yes_no', 'compliance'];
 
@@ -73,6 +102,76 @@ export class QuestionsService {
       COMPLIANCE_DEFAULT_OPTIONS.map((opt) => ({ ...opt, question })),
     );
     await this.optionsRepository.save(options);
+  }
+
+  /**
+   * Spec 84, Fase 9 — busca preguntas por texto entre instrumentos, para
+   * detectar redundancias durante la depuración. Solo lectura.
+   *
+   * La comparación ignora mayúsculas y tildes (`unaccent` no está instalado en
+   * la base, así que se normaliza con `translate` sobre las vocales acentuadas
+   * y la ñ, que es lo que aparece en los enunciados en español).
+   *
+   * Devuelve cada coincidencia con su sección e instrumento y el número de
+   * respuestas que ya tiene, porque de eso depende la decisión de la
+   * depuración: una pregunta con respuestas se archiva, una sin respuestas se
+   * puede borrar.
+   */
+  async searchByText(dto: SearchQuestionsDto): Promise<SearchQuestionsResult> {
+    const query = this.questionsRepository
+      .createQueryBuilder('question')
+      .innerJoin('question.section', 'section')
+      .innerJoin('section.instrument', 'instrument')
+      .innerJoin('question.type', 'type')
+      .leftJoin(Response, 'response', 'response.question = question.questionId')
+      .select([
+        'question.questionId AS "questionId"',
+        'question.text AS "text"',
+        'question.systemField AS "systemField"',
+        'question.archivedAt AS "archivedAt"',
+        'type.name AS "type"',
+        'section.sectionId AS "sectionId"',
+        'section.name AS "sectionName"',
+        'instrument.instrumentId AS "instrumentId"',
+        'instrument.name AS "instrumentName"',
+        'instrument.code AS "instrumentCode"',
+      ])
+      .addSelect('COUNT(response.responseId)', 'responseCount')
+      .where(`${NORMALIZE('question.text')} LIKE ${NORMALIZE(':needle')}`, {
+        needle: `%${dto.q}%`,
+      })
+      .groupBy('question.questionId')
+      .addGroupBy('question.text')
+      .addGroupBy('question.systemField')
+      .addGroupBy('question.archivedAt')
+      .addGroupBy('type.name')
+      .addGroupBy('section.sectionId')
+      .addGroupBy('section.name')
+      .addGroupBy('instrument.instrumentId')
+      .addGroupBy('instrument.name')
+      .addGroupBy('instrument.code')
+      .orderBy('instrument.name', 'ASC')
+      .addOrderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC');
+
+    if (!dto.includeArchived) {
+      query.andWhere('question.archivedAt IS NULL');
+    }
+    if (dto.instrumentIds?.length) {
+      query.andWhere('instrument.instrumentId IN (:...instrumentIds)', {
+        instrumentIds: dto.instrumentIds,
+      });
+    }
+
+    const rows = await query.getRawMany<
+      Omit<SearchQuestionsItem, 'responseCount'> & { responseCount: string }
+    >();
+
+    const items = rows.map((row) => ({
+      ...row,
+      responseCount: Number(row.responseCount),
+    }));
+    return { items, total: items.length };
   }
 
   /** Spec 84 — cuántas respuestas ya existen para esta pregunta. */
