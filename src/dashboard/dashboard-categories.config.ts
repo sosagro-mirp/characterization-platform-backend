@@ -9,6 +9,15 @@ export interface DashboardCategoryInstrumentMapping {
    * caso S1a → C1 + C2).
    */
   sectionNames?: string[];
+  /**
+   * Spec 84 — fuente histórica: se incluye aunque el instrumento esté
+   * inactivo (`isActive: false`). Pensado para S1a/S1b una vez que se
+   * desactiven al promover el instrumento de Registro (`S_REG`) en H1/H8 del
+   * spec 83: sus respuestas ya existentes no deben desaparecer de C1-C3 solo
+   * porque el instrumento dejó de aplicarse en campo. Una fuente sin esta
+   * marca (el caso normal, incluido `S_REG`) solo cuenta mientras esté activa.
+   */
+  historic?: boolean;
 }
 
 export interface DashboardCategoryConfig {
@@ -44,7 +53,11 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
       {
         instrumentCode: 'S1a',
         sectionNames: ['Identificación del encuestado/propietario/productor'],
+        historic: true,
       },
+      // Spec 84 — instrumento de Registro (S_REG), Fase 8: nace con una
+      // sección llamada exactamente "Identificación" para esta categoría.
+      { instrumentCode: 'S_REG', sectionNames: ['Identificación'] },
     ],
   },
   {
@@ -55,15 +68,24 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
       {
         instrumentCode: 'S1a',
         sectionNames: ['Ubicación', 'Acceso desde el Casco Urbano'],
+        historic: true,
       },
       { instrumentCode: 'S13' },
+      // Spec 84 — Fase 8: sección "Ubicación" del Registro (departamento,
+      // municipio, vereda, corregimiento).
+      { instrumentCode: 'S_REG', sectionNames: ['Ubicación'] },
     ],
   },
   {
     id: 'C3',
     code: 'C3',
     name: 'La finca',
-    instruments: [{ instrumentCode: 'S1b' }],
+    instruments: [
+      { instrumentCode: 'S1b', historic: true },
+      // Spec 84 — Fase 8: sección "Finca y cultivo" del Registro (nombre de
+      // la finca y cultivo principal).
+      { instrumentCode: 'S_REG', sectionNames: ['Finca y cultivo'] },
+    ],
   },
   {
     id: 'C4',

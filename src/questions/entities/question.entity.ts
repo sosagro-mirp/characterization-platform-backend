@@ -91,7 +91,7 @@ export class Question {
 
   @ManyToOne(() => Question, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'condition_question_id' })
-  conditionQuestion?: Question;
+  conditionQuestion?: Question | null;
 
   @Column({
     name: 'condition_value',
@@ -99,7 +99,17 @@ export class Question {
     length: 50,
     nullable: true,
   })
-  conditionValue?: string;
+  conditionValue?: string | null;
+
+  // Spec 84 — "editar en sitio + archivar": NULL = visible; con fecha, la
+  // pregunta deja de aparecer en render/formulario público/caché móvil pero
+  // sus respuestas se conservan. Nunca se borra una pregunta con respuestas.
+  @Column({
+    name: 'archived_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  archivedAt?: Date | null;
 
   @OneToMany(
     () => Response,

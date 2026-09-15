@@ -104,11 +104,19 @@ export class SectionsController {
 
   @Delete(':sectionId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Eliminar sección' })
+  @ApiOperation({
+    summary: 'Eliminar sección',
+    description:
+      'Spec 84: rechaza con 409 si alguna de sus preguntas tiene respuestas.',
+  })
   @ApiParam({ name: 'instrumentId', format: 'uuid' })
   @ApiParam({ name: 'sectionId', format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Sección eliminada.' })
   @ApiResponse({ status: 404, description: 'Sección no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description: 'La sección tiene preguntas con respuestas.',
+  })
   remove(
     @Param('instrumentId', new ParseUUIDPipe()) instrumentId: string,
     @Param('sectionId', new ParseUUIDPipe()) sectionId: string,

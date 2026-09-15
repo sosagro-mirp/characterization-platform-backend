@@ -11,6 +11,7 @@ import { Town } from 'src/towns/entities/town.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
+import { Response } from 'src/responses/entities/response.entity';
 import { EntityManager, In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
@@ -31,6 +32,8 @@ export class InstrumentsService {
     private readonly townsRepository: Repository<Town>,
     @InjectRepository(Question)
     private readonly questionsRepository: Repository<Question>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
   ) {}
 
   // Spec 79 — tipos de pregunta que exigen el flujo autenticado de
@@ -428,6 +431,24 @@ export class InstrumentsService {
       }
     }
 
+    // Spec 84 — "editar en sitio + archivar": el render de campo (móvil,
+    // formulario público, MCP) nunca muestra preguntas ni opciones
+    // archivadas. Una sección que tenía preguntas y se quedó sin ninguna
+    // visible por esto también se oculta; una sección que ya nacía vacía
+    // (0 preguntas en la base) se conserva tal cual estaba.
+    const sections = (instrument.sections ?? [])
+      .map((section) => {
+        const originalCount = section.questions?.length ?? 0;
+        const visibleQuestions = (section.questions ?? []).filter(
+          (q) => !q.archivedAt,
+        );
+        return { section, originalCount, visibleQuestions };
+      })
+      .filter(
+        ({ originalCount, visibleQuestions }) =>
+          originalCount === 0 || visibleQuestions.length > 0,
+      );
+
     return {
       instrumentId: instrument.instrumentId,
       name: instrument.name,
@@ -435,11 +456,11 @@ export class InstrumentsService {
       publishDate: instrument.publishDate,
       isActive: instrument.isActive,
       code: instrument.code ?? null,
-      sections: (instrument.sections ?? []).map((section) => ({
+      sections: sections.map(({ section, visibleQuestions }) => ({
         sectionId: section.sectionId,
         name: section.name,
         order: section.order,
-        questions: (section.questions ?? []).map((question) => ({
+        questions: visibleQuestions.map((question) => ({
           questionId: question.questionId,
           text: question.text,
           isRequired: question.isRequired,
@@ -462,25 +483,131 @@ export class InstrumentsService {
                 (a, b) => (a.value ?? 0) - (b.value ?? 0),
               )
             : (question.options ?? [])
-          ).map((option) => {
-            let departmentId: string | null = null;
-            if (question.systemField === 'farm.department') {
-              departmentId = option.metadataId ?? null;
-            } else if (question.systemField === 'farm.town') {
-              departmentId =
-                (option.metadataId &&
-                  townToDepartment.get(option.metadataId)) ||
-                null;
-            }
-            return {
-              optionId: option.optionId,
-              text: option.text,
-              value: option.value ?? null,
-              isOther: option.isOther,
-              metadataId: option.metadataId ?? null,
-              departmentId,
-            };
-          }),
+          )
+            .filter((option) => !option.archivedAt)
+            .map((option) => {
+              let departmentId: string | null = null;
+              if (question.systemField === 'farm.department') {
+                departmentId = option.metadataId ?? null;
+              } else if (question.systemField === 'farm.town') {
+                departmentId =
+                  (option.metadataId &&
+                    townToDepartment.get(option.metadataId)) ||
+                  null;
+              }
+              return {
+                optionId: option.optionId,
+                text: option.text,
+                value: option.value ?? null,
+                isOther: option.isOther,
+                metadataId: option.metadataId ?? null,
+                departmentId,
+              };
+            }),
+          conditionQuestionId: question.conditionQuestion?.questionId ?? null,
+          conditionValue: question.conditionValue ?? null,
+        })),
+      })),
+    };
+  }
+
+  /**
+   * Spec 84 — vista para el editor admin: a diferencia de `findOneForRender`
+   * (público, oculta lo archivado), esta muestra TODO, con `archivedAt` y
+   * `responseCount` por pregunta y por opción — el dato que decide si algo
+   * se puede borrar o hay que archivarlo.
+   */
+  async getEditorStructure(id: string) {
+    const instrument = await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.sections', 'section')
+      .leftJoinAndSelect('section.questions', 'question')
+      .leftJoinAndSelect('question.type', 'type')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.conditionQuestion', 'conditionQuestion')
+      .where('instrument.instrumentId = :id', { id })
+      .orderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC')
+      .addOrderBy('option.createdAt', 'ASC')
+      .getOne();
+
+    if (!instrument) {
+      throw new NotFoundException('Instrument not found');
+    }
+
+    const questionIds: string[] = [];
+    const optionIds: string[] = [];
+    for (const section of instrument.sections ?? []) {
+      for (const question of section.questions ?? []) {
+        questionIds.push(question.questionId);
+        for (const option of question.options ?? []) {
+          optionIds.push(option.optionId);
+        }
+      }
+    }
+
+    const questionResponseCounts = new Map<string, number>();
+    if (questionIds.length > 0) {
+      const rows = await this.responsesRepository
+        .createQueryBuilder('response')
+        .select('response.question', 'questionId')
+        .addSelect('COUNT(*)', 'count')
+        .where('response.question IN (:...questionIds)', { questionIds })
+        .groupBy('response.question')
+        .getRawMany<{ questionId: string; count: string }>();
+      for (const row of rows) {
+        questionResponseCounts.set(row.questionId, Number(row.count));
+      }
+    }
+
+    const optionResponseCounts = new Map<string, number>();
+    if (optionIds.length > 0) {
+      const rows = await this.responsesRepository
+        .createQueryBuilder('response')
+        .select('response.option', 'optionId')
+        .addSelect('COUNT(*)', 'count')
+        .where('response.option IN (:...optionIds)', { optionIds })
+        .groupBy('response.option')
+        .getRawMany<{ optionId: string; count: string }>();
+      for (const row of rows) {
+        optionResponseCounts.set(row.optionId, Number(row.count));
+      }
+    }
+
+    return {
+      instrumentId: instrument.instrumentId,
+      name: instrument.name,
+      version: instrument.version,
+      publishDate: instrument.publishDate,
+      isActive: instrument.isActive,
+      isPublic: instrument.isPublic,
+      code: instrument.code ?? null,
+      sections: (instrument.sections ?? []).map((section) => ({
+        sectionId: section.sectionId,
+        name: section.name,
+        order: section.order,
+        questions: (section.questions ?? []).map((question) => ({
+          questionId: question.questionId,
+          text: question.text,
+          isRequired: question.isRequired,
+          isSelectionCriteria: question.isSelectionCriteria,
+          isKeyQuestion: question.isKeyQuestion,
+          order: question.order,
+          systemField: question.systemField ?? null,
+          archivedAt: question.archivedAt ?? null,
+          responseCount: questionResponseCounts.get(question.questionId) ?? 0,
+          type: question.type
+            ? { typeId: question.type.typeId, name: question.type.name }
+            : null,
+          options: (question.options ?? []).map((option) => ({
+            optionId: option.optionId,
+            text: option.text,
+            value: option.value ?? null,
+            isOther: option.isOther,
+            metadataId: option.metadataId ?? null,
+            archivedAt: option.archivedAt ?? null,
+            responseCount: optionResponseCounts.get(option.optionId) ?? 0,
+          })),
           conditionQuestionId: question.conditionQuestion?.questionId ?? null,
           conditionValue: question.conditionValue ?? null,
         })),

@@ -7,6 +7,7 @@ import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { Question } from 'src/questions/entities/question.entity';
+import { Response } from 'src/responses/entities/response.entity';
 
 /**
  * Hotfix del 2026-08-22 — dos regresiones reales de producción introducidas
@@ -66,6 +67,7 @@ describe('InstrumentsService — hotfix códigos de sistema (2026-08-22)', () =>
         { provide: getRepositoryToken(User), useValue: {} },
         { provide: getRepositoryToken(Town), useValue: {} },
         { provide: getRepositoryToken(Question), useValue: {} },
+        { provide: getRepositoryToken(Response), useValue: {} },
       ],
     }).compile();
 
@@ -124,12 +126,12 @@ describe('InstrumentsService — hotfix códigos de sistema (2026-08-22)', () =>
   });
 
   describe('findAll(excludeSystem) — filtra por lista de códigos de sistema, no por code != null', () => {
-    it('con excludeSystem=true, filtra excluyendo S1a/S1b/S_DCU, no cualquier code', async () => {
+    it('con excludeSystem=true, filtra excluyendo S1a/S1b/S_DCU/S_REG, no cualquier code', async () => {
       await service.findAll(true);
 
       expect(qb.where).toHaveBeenCalledWith(
         'instrument.code IS NULL OR instrument.code NOT IN (:...codes)',
-        { codes: ['S1a', 'S1b', 'S_DCU'] },
+        { codes: ['S1a', 'S1b', 'S_DCU', 'S_REG'] },
       );
     });
 
@@ -229,6 +231,7 @@ describe('InstrumentsService.duplicate — Spec 77', () => {
         { provide: getRepositoryToken(User), useValue: usersRepository },
         { provide: getRepositoryToken(Town), useValue: {} },
         { provide: getRepositoryToken(Question), useValue: {} },
+        { provide: getRepositoryToken(Response), useValue: {} },
       ],
     }).compile();
 

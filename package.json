@@ -26,7 +26,14 @@
     "typeorm": "typeorm-ts-node-commonjs -d src/data-source.ts",
     "migration:generate": "pnpm build && pnpm typeorm migration:generate src/migrations/$npm_config_name",
     "migration:run": "pnpm build && pnpm typeorm migration:run",
-    "migration:revert": "pnpm build && pnpm typeorm migration:revert"
+    "migration:revert": "pnpm build && pnpm typeorm migration:revert",
+    "instruments:export": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts export",
+    "instruments:snapshot": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts snapshot",
+    "instruments:plan": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts plan",
+    "instruments:apply": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts apply",
+    "instruments:restore": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts restore",
+    "instruments:verify": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts verify",
+    "instruments:inventory": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts inventory"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1070.0",

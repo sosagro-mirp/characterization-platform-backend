@@ -61,4 +61,14 @@ export class UpdateQuestionDto {
   @IsString()
   @MaxLength(100)
   systemField?: string | null;
+
+  /**
+   * Spec 84 — mueve la pregunta a otra sección, siempre dentro del mismo
+   * instrumento. Al mover, la pregunta pasa al final de la sección destino
+   * (se ignora `order` de este mismo body si ambos vienen juntos).
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  targetSectionId?: string;
 }

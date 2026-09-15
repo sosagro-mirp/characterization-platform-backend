@@ -66,3 +66,7 @@ CLAUDE.md
 # Standalone seed runners (environment-specific, not for version control)
 src/database/seeds/run-*.ts
 
+# Spec 84 — manifiestos, planes y respaldos de instrument-sync (pueden
+# contener el contenido completo de instrumentos de producción; nunca en git)
+.instrument-sync/
+

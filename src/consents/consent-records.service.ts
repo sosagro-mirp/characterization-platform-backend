@@ -5,7 +5,13 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm';
+import {
+  EntityManager,
+  FindOptionsWhere,
+  In,
+  IsNull,
+  Repository,
+} from 'typeorm';
 import { ConsentRecord } from './entities/consent-record.entity';
 import { ConsentDocumentsService } from './consent-documents.service';
 import { CreateConsentRecordDto } from './dto/create-consent-record.dto';
@@ -260,11 +266,21 @@ export class ConsentRecordsService {
   // Criterio 6 — invocado desde SurveysService.extractFarmer justo después de
   // resolver el Farmer, para vincular la(s) constancia(s) huérfana(s)
   // (farmer IS NULL) que quedaron ancladas solo por session_id.
+  /**
+   * Spec 84 — `manager` permite participar en la transacción del llamador.
+   * `extractFarmer` crea el agricultor dentro de una transacción; sin esto,
+   * este UPDATE corre por otra conexión, no ve al agricultor todavía sin
+   * confirmar y falla por la clave foránea, dejando la constancia huérfana.
+   */
   async linkOrphansToFarmer(
     sessionId: string,
     farmerId: string,
+    manager?: EntityManager,
   ): Promise<void> {
-    await this.consentRecordsRepository.update(
+    const repository = manager
+      ? manager.getRepository(ConsentRecord)
+      : this.consentRecordsRepository;
+    await repository.update(
       {
         session: { sessionId },
         farmer: IsNull(),
