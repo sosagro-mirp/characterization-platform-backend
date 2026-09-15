@@ -69,6 +69,23 @@ function instrumentContent(i: ManifestInstrument) {
   return rest;
 }
 
+/**
+ * `archived_at` es `timestamp` sin zona. Los manifiestos anteriores al
+ * 2026-09-15 lo traen como ISO con `Z` y milisegundos
+ * (`2026-09-14T17:23:04.886Z`); los nuevos, como texto sin zona con
+ * microsegundos (`2026-09-14T17:23:04.886000`). Se comparan por los mismos
+ * dígitos, que es lo que la columna guarda.
+ */
+export function normalizeArchivedAt(value: string | null): string | null {
+  if (!value) return null;
+  const match = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?/.exec(
+    value,
+  );
+  if (!match) return value;
+  const fraction = (match[3] ?? '').padEnd(6, '0').slice(0, 6);
+  return `${match[1]}T${match[2]}.${fraction}`;
+}
+
 /** Contenido relevante de una pregunta, ignorando lo derivado (hash, responseCount, options). */
 function questionContent(q: ManifestQuestion) {
   const {
@@ -78,7 +95,7 @@ function questionContent(q: ManifestQuestion) {
     options: _options,
     ...rest
   } = q;
-  return rest;
+  return { ...rest, archivedAt: normalizeArchivedAt(rest.archivedAt) };
 }
 
 function optionContent(o: ManifestOption) {
@@ -88,7 +105,7 @@ function optionContent(o: ManifestOption) {
     responseCount: _responseCount,
     ...rest
   } = o;
-  return rest;
+  return { ...rest, archivedAt: normalizeArchivedAt(rest.archivedAt) };
 }
 
 function sectionContent(s: ManifestSection) {

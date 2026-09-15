@@ -2,7 +2,13 @@ import { DataSource, EntityManager } from 'typeorm';
 import { exportManifest } from './export';
 import { contentEqual, contentOf, flatten, FlatManifest } from './diff';
 import { resolveMetadataId } from './metadata';
-import { ApplyResult, InstrumentManifest, Plan, PlanOperation } from './types';
+import {
+  ApplyResult,
+  InstrumentManifest,
+  Plan,
+  PlanEntityKind,
+  PlanOperation,
+} from './types';
 
 /**
  * Spec 84, Fase 3 — aplica un plan generado por `buildPlan` contra el
@@ -31,6 +37,12 @@ export interface ApplyOptions {
    * indistinguible de no tener respaldo.
    */
   onBackup?: (backup: InstrumentManifest) => Promise<void> | void;
+  /**
+   * Se ejecuta dentro de la misma transacción, después de aplicar y verificar
+   * el plan y antes del commit. Si lanza, se revierte todo (lo usa `restore`
+   * para quitar los instrumentos creados de forma atómica).
+   */
+  beforeCommit?: (manager: EntityManager) => Promise<void>;
 }
 
 export async function applyPlan(
@@ -63,6 +75,18 @@ export async function applyPlan(
 
     const typeIdByName = await loadTypeIdByName(manager);
     const actorTypeIdByName = await loadActorTypeIdByName(manager);
+
+    // Spec 84 (auditoría 40, bloqueante) — `assertNoDrift` compara contenido
+    // e ignora `responseCount`: una respuesta que llegue entre el plan y el
+    // apply a algo que se borra desaparecería en cascada. Se bloquean las
+    // escrituras en `responses` hasta el commit y se vuelven a contar aquí.
+    await manager.query('LOCK TABLE responses IN SHARE MODE');
+    await assertNoResponsesOnDestructiveOps(
+      manager,
+      plan,
+      desired,
+      typeIdByName,
+    );
 
     for (const op of byKind('instrument')) {
       await applyInstrumentWrite(manager, desired, op, actorTypeIdByName);
@@ -113,9 +137,174 @@ export async function applyPlan(
         ]);
       }
     }
+
+    // Spec 84 (auditoría 40, Alcance C) — antes del commit, lo aplicado debe
+    // coincidir con lo deseado en cada entidad que tocó el plan; si no, se
+    // revierte todo.
+    const touched = [...new Set(plan.operations.map((op) => op.instrumentId))];
+    const after = flatten(
+      await exportManifest(manager, { instrumentIds: touched }),
+    );
+    const mismatches = appliedMismatches(plan, desired, after);
+    if (mismatches.length > 0) {
+      throw new Error(
+        `Lo aplicado no coincide con el plan (${mismatches.length}): ${mismatches
+          .slice(0, 5)
+          .join('; ')}. Se revirtió todo.`,
+      );
+    }
+
+    if (options.beforeCommit) {
+      await options.beforeCommit(manager);
+    }
   });
 
   return { backup, applied: plan.operations };
+}
+
+/** UUID que el plan borra, por entidad. */
+export function destructiveTargets(
+  plan: Plan,
+): Record<'section' | 'question' | 'option', string[]> {
+  const ids = (entity: PlanEntityKind) =>
+    plan.operations
+      .filter((op) => op.entity === entity && op.kind === 'delete')
+      .map((op) => op.id);
+  return {
+    section: ids('section'),
+    question: ids('question'),
+    option: ids('option'),
+  };
+}
+
+/**
+ * Compara, entidad por entidad, lo que quedó en el destino con lo que pedía el
+ * plan: lo borrado ya no existe y lo creado/actualizado/archivado tiene el
+ * contenido deseado. Devuelve una descripción por cada diferencia.
+ */
+export function appliedMismatches(
+  plan: Plan,
+  desired: FlatManifest,
+  after: FlatManifest,
+): string[] {
+  const out: string[] = [];
+  for (const op of plan.operations) {
+    const pair = (() => {
+      switch (op.entity) {
+        case 'instrument':
+          return [
+            desired.instruments.get(op.id),
+            after.instruments.get(op.id),
+            (v: unknown) =>
+              contentOf.instrument(
+                v as Parameters<typeof contentOf.instrument>[0],
+              ),
+          ] as const;
+        case 'section':
+          return [
+            desired.sections.get(op.id)?.section,
+            after.sections.get(op.id)?.section,
+            (v: unknown) =>
+              contentOf.section(v as Parameters<typeof contentOf.section>[0]),
+          ] as const;
+        case 'question':
+          return [
+            desired.questions.get(op.id)?.question,
+            after.questions.get(op.id)?.question,
+            (v: unknown) =>
+              contentOf.question(v as Parameters<typeof contentOf.question>[0]),
+          ] as const;
+        default:
+          return [
+            desired.options.get(op.id)?.option,
+            after.options.get(op.id)?.option,
+            (v: unknown) =>
+              contentOf.option(v as Parameters<typeof contentOf.option>[0]),
+          ] as const;
+      }
+    })();
+    const [want, got, content] = pair;
+    if (op.kind === 'delete') {
+      if (got) out.push(`${op.entity} ${op.id} debía borrarse y sigue`);
+      continue;
+    }
+    if (!got) {
+      out.push(`${op.entity} ${op.id} no quedó en el destino`);
+    } else if (!want || !contentEqual(content(want), content(got))) {
+      out.push(`${op.entity} ${op.id} quedó distinto de lo deseado`);
+    }
+  }
+  return out;
+}
+
+async function assertNoResponsesOnDestructiveOps(
+  manager: EntityManager,
+  plan: Plan,
+  desired: FlatManifest,
+  typeIdByName: Map<string, string>,
+): Promise<void> {
+  const targets = destructiveTargets(plan);
+  const problems: string[] = [];
+  const count = async (sql: string, ids: string[]) =>
+    ids.length === 0
+      ? 0
+      : Number((await manager.query<{ n: string }[]>(sql, [ids]))[0]?.n ?? 0);
+
+  const onQuestions = await count(
+    `SELECT COUNT(*)::text AS n FROM responses WHERE question_id = ANY($1::uuid[])`,
+    targets.question,
+  );
+  if (onQuestions > 0)
+    problems.push(`${onQuestions} respuesta(s) en preguntas a borrar`);
+
+  const onOptions = await count(
+    `SELECT COUNT(*)::text AS n FROM responses WHERE option_id = ANY($1::uuid[])`,
+    targets.option,
+  );
+  if (onOptions > 0)
+    problems.push(`${onOptions} respuesta(s) en opciones a borrar`);
+
+  const onSections = await count(
+    `SELECT COUNT(*)::text AS n FROM responses r
+       JOIN questions q ON q.question_id = r.question_id
+      WHERE q.section_id = ANY($1::uuid[])`,
+    targets.section,
+  );
+  if (onSections > 0)
+    problems.push(`${onSections} respuesta(s) en secciones a borrar`);
+
+  const typeChanges: string[] = [];
+  const updates = plan.operations.filter(
+    (op) => op.entity === 'question' && op.kind === 'update',
+  );
+  if (updates.length > 0) {
+    const rows = await manager.query<
+      { question_id: string; type_id: string }[]
+    >(
+      `SELECT question_id, type_id FROM questions WHERE question_id = ANY($1::uuid[])`,
+      [updates.map((op) => op.id)],
+    );
+    for (const row of rows) {
+      const wanted = desired.questions.get(row.question_id)?.question.type;
+      const wantedId = wanted ? typeIdByName.get(wanted) : undefined;
+      if (wantedId && wantedId !== row.type_id)
+        typeChanges.push(row.question_id);
+    }
+  }
+  const onTypeChanges = await count(
+    `SELECT COUNT(*)::text AS n FROM responses WHERE question_id = ANY($1::uuid[])`,
+    typeChanges,
+  );
+  if (onTypeChanges > 0)
+    problems.push(
+      `${onTypeChanges} respuesta(s) en preguntas que cambian de tipo`,
+    );
+
+  if (problems.length > 0) {
+    throw new Error(
+      `El destino recibió respuestas después del plan: ${problems.join('; ')}. No se aplicó nada; vuelva a generar el plan.`,
+    );
+  }
 }
 
 /** Instrumentos que el plan crea: `restore` los quita al volver al respaldo. */

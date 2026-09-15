@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { Queryable } from './metadata';
 import { exportManifest } from './export';
 import { buildPlan } from './plan';
 import { applyPlan } from './apply';
@@ -58,19 +59,29 @@ export async function restoreFromBackup(
     );
   }
 
-  const result = await applyPlan(ds, plan);
-
   const removedInstrumentIds = created.map((c) => c.instrumentId);
-  if (removedInstrumentIds.length > 0) {
-    await ds.transaction(async (manager) => {
+  const result = await applyPlan(ds, plan, {
+    // Auditoría 40 — el borrado de lo creado va en la misma transacción que la
+    // restauración, y el uso se vuelve a contar ahí (con `responses`
+    // bloqueada por `applyPlan`): si algo empezó a usarse, se revierte todo.
+    beforeCommit: async (manager) => {
+      if (removedInstrumentIds.length === 0) return;
+      const again = blockedCreatedInstruments(
+        await loadCreatedInstrumentUsage(manager, removedInstrumentIds),
+      );
+      if (again.length > 0) {
+        throw new Error(
+          `No se puede restaurar: ${again.join('; ')}. Se revirtió todo.`,
+        );
+      }
       // `sections`, `questions`, `options_question` e `instruments_actor_types`
       // caen en cascada; ya se comprobó que no hay respuestas ni encuestas.
       await manager.query(
         `DELETE FROM instruments WHERE instrument_id = ANY($1::uuid[])`,
         [removedInstrumentIds],
       );
-    });
-  }
+    },
+  });
 
   return { ...result, removedInstrumentIds };
 }
@@ -89,7 +100,7 @@ export function blockedCreatedInstruments(
 }
 
 async function loadCreatedInstrumentUsage(
-  ds: DataSource,
+  ds: Queryable,
   ids: string[],
 ): Promise<CreatedInstrumentUsage[]> {
   if (ids.length === 0) return [];

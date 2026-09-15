@@ -961,6 +961,44 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       );
       expect(rows[0].name).toBe('cambio concurrente');
     });
+
+    /**
+     * Auditoría 40 (bloqueante) — la comprobación de deriva ignora
+     * `responseCount`: una respuesta que llegue entre el plan y el apply a una
+     * pregunta que se borra no debe desaparecer en cascada.
+     */
+    it('Criterio 14 — una respuesta llegada después del plan bloquea el borrado', async () => {
+      const qTemporal = await insertQuestion(
+        editorSectionId,
+        'Pregunta temporal e2e-084',
+        'open_text',
+        30,
+      );
+      const antes = await exportManifest(ds, {
+        instrumentIds: [editorInstrumentId],
+      });
+      const desired = structuredClone(antes);
+      for (const section of desired.instruments[0].sections) {
+        section.questions = section.questions.filter(
+          (q) => q.questionId !== qTemporal,
+        );
+      }
+      const plan = buildPlan({ base: antes, desired, current: antes });
+      expect(plan.operations).toEqual([
+        expect.objectContaining({ kind: 'delete', id: qTemporal }),
+      ]);
+
+      await insertResponse(editorSurveyId, qTemporal, {
+        text: 'llegó tarde',
+      });
+      await expect(applyPlan(ds, plan)).rejects.toThrow(/respuestas/);
+
+      const rows = await ds.query<{ count: string }[]>(
+        `SELECT COUNT(*)::text AS count FROM responses WHERE question_id = $1`,
+        [qTemporal],
+      );
+      expect(Number(rows[0].count)).toBe(1);
+    });
   });
   // ── Búsqueda de preguntas (apoyo al criterio 17) ──────────────────────────
 
