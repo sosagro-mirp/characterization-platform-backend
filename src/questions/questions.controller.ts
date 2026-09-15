@@ -118,15 +118,62 @@ export class QuestionsController {
 
   @Delete(':questionId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Eliminar pregunta' })
+  @ApiOperation({
+    summary: 'Eliminar pregunta',
+    description:
+      'Spec 84: rechaza con 409 si la pregunta tiene respuestas, o si otra ' +
+      'pregunta visible o un paso de campaña depende de su condición. Para ' +
+      'una pregunta con respuestas que sobra, usar archivar en su lugar.',
+  })
   @ApiParam({ name: 'sectionId', format: 'uuid' })
   @ApiParam({ name: 'questionId', format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Pregunta eliminada.' })
   @ApiResponse({ status: 404, description: 'Pregunta no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description: 'La pregunta tiene respuestas o dependientes activos.',
+  })
   remove(
     @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
     @Param('questionId', new ParseUUIDPipe()) questionId: string,
   ) {
     return this.questionsService.remove(sectionId, questionId);
+  }
+
+  @Patch(':questionId/archive')
+  @ApiOperation({
+    summary: 'Archivar pregunta',
+    description:
+      'Spec 84: la pregunta deja de mostrarse en el render, el formulario ' +
+      'público y la caché móvil, pero sus respuestas se conservan. Se ' +
+      'rechaza con 409 si otra pregunta visible o un paso de campaña ' +
+      'depende de su condición.',
+  })
+  @ApiParam({ name: 'sectionId', format: 'uuid' })
+  @ApiParam({ name: 'questionId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Pregunta archivada.' })
+  @ApiResponse({ status: 404, description: 'Pregunta no encontrada.' })
+  @ApiResponse({ status: 409, description: 'Tiene dependientes activos.' })
+  archive(
+    @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
+    @Param('questionId', new ParseUUIDPipe()) questionId: string,
+  ) {
+    return this.questionsService.archive(sectionId, questionId);
+  }
+
+  @Patch(':questionId/unarchive')
+  @ApiOperation({
+    summary: 'Desarchivar pregunta',
+    description: 'Spec 84: la pregunta vuelve a mostrarse.',
+  })
+  @ApiParam({ name: 'sectionId', format: 'uuid' })
+  @ApiParam({ name: 'questionId', format: 'uuid' })
+  @ApiResponse({ status: 200, description: 'Pregunta desarchivada.' })
+  @ApiResponse({ status: 404, description: 'Pregunta no encontrada.' })
+  unarchive(
+    @Param('sectionId', new ParseUUIDPipe()) sectionId: string,
+    @Param('questionId', new ParseUUIDPipe()) questionId: string,
+  ) {
+    return this.questionsService.unarchive(sectionId, questionId);
   }
 }

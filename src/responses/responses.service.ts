@@ -94,19 +94,35 @@ export class ResponsesService {
 
     const surveyId = surveyIds[0];
 
-    const existingCount = await this.responsesRepository.count({
-      where: { survey: { surveyId } },
-    });
-
-    if (existingCount > 0) {
-      return this.responsesRepository.find({
-        where: { survey: { surveyId } },
-        relations: { survey: true, question: true, option: true },
-      });
-    }
-
+    // Spec 84 (hallazgo de la ronda de pruebas, 2026-09-13) — la guarda de
+    // idempotencia era un check-then-insert fuera de transacción: dos envíos
+    // casi simultáneos del mismo lote (la app móvil lo hizo con un solo toque
+    // en "Finalizar") contaban ambos cero respuestas y ambos insertaban, así
+    // que cada respuesta quedaba duplicada. No hay índice único que lo
+    // impida: una pregunta de selección múltiple admite legítimamente varias
+    // filas con el mismo `question_id`.
+    //
+    // El lock por encuesta serializa los envíos concurrentes y la
+    // comprobación se repite dentro de la transacción, ya protegida.
     return await this.responsesRepository.manager.transaction(
       async (manager) => {
+        // Ver `SurveysService.extractFarmer`: cota a la espera del lock.
+        await manager.query("SET LOCAL lock_timeout = '10s'");
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `responses-batch:${surveyId}`,
+        ]);
+
+        const existingCount = await manager.getRepository(Response).count({
+          where: { survey: { surveyId } },
+        });
+
+        if (existingCount > 0) {
+          return manager.getRepository(Response).find({
+            where: { survey: { surveyId } },
+            relations: { survey: true, question: true, option: true },
+          });
+        }
+
         const survey = await manager.getRepository(Survey).findOne({
           where: { surveyId },
         });

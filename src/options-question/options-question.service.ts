@@ -1,11 +1,13 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Question } from 'src/questions/entities/question.entity';
+import { Response } from 'src/responses/entities/response.entity';
 import { CreateOptionQuestionDto } from './dto/create-option-question.dto';
 import { UpdateOptionQuestionDto } from './dto/update-option-question.dto';
 import { OptionQuestion } from './entities/option-question.entity';
@@ -17,6 +19,8 @@ export class OptionsQuestionService {
     private readonly optionsQuestionRepository: Repository<OptionQuestion>,
     @InjectRepository(Question)
     private readonly questionsRepository: Repository<Question>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
   ) {}
 
   async create(
@@ -120,7 +124,38 @@ export class OptionsQuestionService {
 
   async remove(questionId: string, optionId: string): Promise<void> {
     const option = await this.findOne(questionId, optionId);
+
+    // Spec 84 — "editar en sitio + archivar": una opción usada en alguna
+    // respuesta no se borra. Se archiva en su lugar.
+    const responseCount = await this.responsesRepository.count({
+      where: { option: { optionId } },
+    });
+    if (responseCount > 0) {
+      throw new ConflictException({
+        message:
+          'Esta opción tiene respuestas y no se puede borrar. Archívela en su lugar.',
+        optionId,
+        responseCount,
+      });
+    }
+
     await this.optionsQuestionRepository.remove(option);
+  }
+
+  /** Spec 84 — la opción deja de mostrarse; sus respuestas se conservan. */
+  async archive(questionId: string, optionId: string): Promise<OptionQuestion> {
+    const option = await this.findOne(questionId, optionId);
+    option.archivedAt = new Date();
+    return this.optionsQuestionRepository.save(option);
+  }
+
+  async unarchive(
+    questionId: string,
+    optionId: string,
+  ): Promise<OptionQuestion> {
+    const option = await this.findOne(questionId, optionId);
+    option.archivedAt = null;
+    return this.optionsQuestionRepository.save(option);
   }
 
   private async ensureQuestionExists(questionId: string): Promise<void> {

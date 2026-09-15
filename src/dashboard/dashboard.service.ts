@@ -482,12 +482,7 @@ export class DashboardService {
       if (!category) {
         throw new NotFoundException('Categoría no encontrada.');
       }
-      const instrumentCodes = category.instruments.map(
-        (mapping) => mapping.instrumentCode,
-      );
-      categoryInstruments = await this.instrumentRepo.find({
-        where: { code: In(instrumentCodes), isActive: true },
-      });
+      categoryInstruments = await this.getCategoryInstruments(category);
     }
 
     let departmentName: string | undefined;
@@ -853,6 +848,38 @@ export class DashboardService {
   }
 
   /**
+   * Spec 84 — instrumentos que alimentan una categoría, respetando la marca
+   * `historic` de `dashboard-categories.config.ts`: las fuentes históricas
+   * (S1a/S1b una vez desactivadas) cuentan aunque `isActive: false`; el
+   * resto (incluido `S_REG`) solo mientras esté activo. Reemplaza el
+   * `find({ code: In(...), isActive: true })` que usaban por separado
+   * `validateFilters` y `getCategories`.
+   */
+  private async getCategoryInstruments(
+    category: DashboardCategoryConfig,
+  ): Promise<Instrument[]> {
+    const historicCodes = category.instruments
+      .filter((m) => m.historic)
+      .map((m) => m.instrumentCode);
+    const activeOnlyCodes = category.instruments
+      .filter((m) => !m.historic)
+      .map((m) => m.instrumentCode);
+
+    const [historic, activeOnly] = await Promise.all([
+      historicCodes.length
+        ? this.instrumentRepo.find({ where: { code: In(historicCodes) } })
+        : Promise.resolve([]),
+      activeOnlyCodes.length
+        ? this.instrumentRepo.find({
+            where: { code: In(activeOnlyCodes), isActive: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return [...historic, ...activeOnly];
+  }
+
+  /**
    * D6: exclusión por tipo no visualizable + denylist explícita de
    * systemField (no un blanket "farm.*"). `sectionNames` (spec 43, D1)
    * restringe la agregación a ciertas secciones del instrumento — necesario
@@ -901,9 +928,6 @@ export class DashboardService {
     const results: DashboardCategoryDto[] = [];
 
     for (const category of DASHBOARD_CATEGORIES) {
-      const instrumentCodes = category.instruments.map(
-        (mapping) => mapping.instrumentCode,
-      );
       const mappingByCode = new Map(
         category.instruments.map((mapping) => [
           mapping.instrumentCode,
@@ -911,9 +935,7 @@ export class DashboardService {
         ]),
       );
 
-      const activeInstruments = await this.instrumentRepo.find({
-        where: { code: In(instrumentCodes), isActive: true },
-      });
+      const activeInstruments = await this.getCategoryInstruments(category);
 
       let questionCount = 0;
       for (const instrument of activeInstruments) {

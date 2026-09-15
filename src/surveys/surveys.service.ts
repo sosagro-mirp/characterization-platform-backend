@@ -20,12 +20,13 @@ import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
+import { buildSystemFieldMap } from './system-field-map';
 import { ConsentRecordsService } from '../consents/consent-records.service';
 
 export interface SurveyFilters {
@@ -293,34 +294,98 @@ export class SurveysService {
     return this.surveysRepository.save(survey);
   }
 
+  /**
+   * Spec 84 (hallazgo de la ronda de pruebas, 2026-09-13) — serializa las
+   * extracciones concurrentes de la MISMA encuesta y las hace idempotentes.
+   *
+   * Sin esto, dos llamadas simultáneas leían ambas "no existe productor con
+   * este documento" antes de que cualquiera escribiera, y creaban dos
+   * productores con el mismo documento y dos fincas duplicadas (reproducido
+   * dos veces desde el flujo web, con ~0,5 s de diferencia). La detección de
+   * colisiones del spec 68 no lo atrapa: compara contra lo ya guardado, y
+   * aquí ninguna de las dos había guardado todavía.
+   *
+   * No se resuelve con un índice único sobre `farmers.document_id`: la
+   * resolución `separate_person` del spec 68 crea a propósito un segundo
+   * productor con el mismo documento. La clave de idempotencia correcta es
+   * la **encuesta**: extraer dos veces de la misma encuesta debe devolver el
+   * mismo productor. Eso cubre también el reintento de la cola de
+   * sincronización del móvil.
+   */
   async extractFarmer(
     surveyId: string,
     dto: ExtractFarmerDto = {},
   ): Promise<{ farmer: Farmer; existed: boolean }> {
-    const survey = await this.surveysRepository.findOne({
+    return await this.surveysRepository.manager.transaction(async (manager) => {
+      // Lock por encuesta: dos llamadas concurrentes sobre la misma encuesta
+      // se serializan; sobre encuestas distintas no se estorban.
+      // Cota a la espera del lock: sin ella una petición colgada retiene
+      // una conexión del pool indefinidamente. Al expirar, Postgres lanza
+      // 55P03 y la petición falla rápido en vez de quedarse pendiente.
+      await manager.query("SET LOCAL lock_timeout = '10s'");
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+        `extract-farmer:${surveyId}`,
+      ]);
+      return await this.extractFarmerLocked(surveyId, dto, manager);
+    });
+  }
+
+  private async extractFarmerLocked(
+    surveyId: string,
+    dto: ExtractFarmerDto,
+    manager: EntityManager,
+  ): Promise<{ farmer: Farmer; existed: boolean }> {
+    const survey = await manager.findOne(Survey, {
       where: { surveyId },
       relations: [
         'responses',
         'responses.question',
         'responses.option',
         'campaignSession',
+        'farmer',
       ],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
 
-    // Build systemField → value map from all responses that have systemField set.
-    // farm.town is excluded: it resolves via option.metadataId, not a scalar value.
-    const fieldMap: Record<string, string | number | boolean> = {};
-    for (const response of survey.responses ?? []) {
-      const sf = response.question?.systemField;
-      if (!sf || sf === 'farm.town') continue;
-      const value =
-        response.textValue ?? response.numericValue ?? response.booleanValue;
-      if (value !== undefined && value !== null) {
-        fieldMap[sf] = value;
+    // Ya se extrajo de esta encuesta: devolver el mismo productor en vez de
+    // crear otro. Es lo que convierte un reintento en una operación inocua.
+    //
+    // Antes del lock, una segunda extracción volvía a ejecutar el enlace de
+    // la sesión y el backfill de constancias huérfanas — era, de hecho, la
+    // única vía para reparar una constancia que hubiera quedado sin
+    // productor. El retorno temprano la eliminaría, así que ambos se
+    // reejecutan aquí: son idempotentes (un UPDATE al mismo valor) y baratos.
+    if (survey.farmer) {
+      const farmer = survey.farmer;
+      if (survey.campaignSession) {
+        await manager.update(
+          CampaignSession,
+          { sessionId: survey.campaignSession.sessionId },
+          { farmer },
+        );
+        await manager.query('SAVEPOINT consent_backfill_retry');
+        try {
+          await this.consentRecordsService.linkOrphansToFarmer(
+            survey.campaignSession.sessionId,
+            farmer.id,
+            manager,
+          );
+          await manager.query('RELEASE SAVEPOINT consent_backfill_retry');
+        } catch (err) {
+          await manager.query('ROLLBACK TO SAVEPOINT consent_backfill_retry');
+          this.logger.error(
+            `[extractFarmer] retry backfill failed for session=${survey.campaignSession.sessionId}: ${
+              err instanceof Error ? err.message : String(err)
+            }`,
+            err instanceof Error ? err.stack : undefined,
+          );
+        }
       }
+      return { farmer, existed: true };
     }
+
+    const fieldMap = buildSystemFieldMap(survey.responses ?? []);
 
     // Resolve farm.town from the selected option's metadataId (townId)
     let resolvedTown: Town | null = null;
@@ -328,7 +393,7 @@ export class SurveysService {
       (r) => r.question?.systemField === 'farm.town',
     );
     if (townResponse?.option?.metadataId) {
-      resolvedTown = await this.townsRepository.findOne({
+      resolvedTown = await manager.findOne(Town, {
         where: { townId: townResponse.option.metadataId },
       });
       if (!resolvedTown) {
@@ -370,7 +435,7 @@ export class SurveysService {
         farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
       }
 
-      await this.surveysRepository.update(surveyId, {
+      await manager.update(Survey, surveyId, {
         respondentName:
           (fieldMap['farmer.name'] as string | undefined) || undefined,
         respondentPhone:
@@ -401,7 +466,7 @@ export class SurveysService {
     // documentId collision (typo, reused test data, two different people),
     // not automatically the same person. See farmers/name-matching.ts.
     if (farmerDocumentId) {
-      const existingByDocument = await this.farmersRepository.findOne({
+      const existingByDocument = await manager.findOne(Farmer, {
         where: { documentId: farmerDocumentId },
       });
 
@@ -457,7 +522,7 @@ export class SurveysService {
     // the collision would still get recorded as "separate_person" even
     // though no new farmer was actually created.
     if (!farmer && farmerPhone && dto.resolution !== 'separate_person') {
-      farmer = await this.farmersRepository.findOne({
+      farmer = await manager.findOne(Farmer, {
         where: { name: farmerName, phone: farmerPhone },
       });
       if (farmer) existed = true;
@@ -468,11 +533,14 @@ export class SurveysService {
       let farm: Farm | null = null;
       const farmName = fieldMap['farm.name'] as string | undefined;
       if (farmName) {
-        farm = await this.farmsRepository.save(
-          this.farmsRepository.create({
+        farm = await manager.save<Farm>(
+          manager.create(Farm, {
             name: farmName,
             location: null,
             vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
+            // Spec 84 — campo del instrumento de Registro (S_REG).
+            corregimiento:
+              (fieldMap['farm.corregimiento'] as string | undefined) ?? null,
             latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
             longitude:
               (fieldMap['farm.longitude'] as number | undefined) ?? null,
@@ -499,8 +567,8 @@ export class SurveysService {
         );
       }
 
-      farmer = await this.farmersRepository.save(
-        this.farmersRepository.create({
+      farmer = await manager.save<Farmer>(
+        manager.create(Farmer, {
           name: farmerName,
           documentId: farmerDocumentId ?? null,
           phone: farmerPhone ?? null,
@@ -518,9 +586,15 @@ export class SurveysService {
       );
     }
 
+    // Spec 84 — deja constancia de qué productor salió de esta encuesta. Es
+    // la clave de idempotencia que lee la guarda del principio: sin esto, un
+    // segundo `extract-farmer` sobre la misma encuesta vuelve a crear.
+    await manager.update(Survey, surveyId, { farmer });
+
     // Link farmer to the CampaignSession if the survey belongs to one
     if (survey.campaignSession) {
-      await this.campaignSessionsRepository.update(
+      await manager.update(
+        CampaignSession,
         { sessionId: survey.campaignSession.sessionId },
         { farmer },
       );
@@ -531,12 +605,26 @@ export class SurveysService {
       // resuelto (nuevo o ya existente) queda disponible por primera vez, así
       // que es el punto correcto para el backfill. Best-effort: un fallo aquí
       // no debe tumbar la extracción del agricultor, que ya se completó.
+      // Spec 84 — `SAVEPOINT` para que "mejor esfuerzo" siga significando lo
+      // mismo dentro de una transacción. Sin él, un fallo aquí aborta la
+      // transacción entera (Postgres 25P02), el `catch` de abajo se lo traga
+      // y el COMMIT final se degrada a ROLLBACK **sin lanzar**: el método
+      // devolvería 201 con un productor que nunca se guardó. El savepoint
+      // acota el daño al backfill y deja la extracción intacta, que es la
+      // decisión B4 del spec 78 (visible, no fatal).
+      await manager.query('SAVEPOINT consent_backfill');
       try {
         await this.consentRecordsService.linkOrphansToFarmer(
           survey.campaignSession.sessionId,
           farmer.id,
+          // Spec 84 — misma transacción: el agricultor todavía no está
+          // confirmado y otra conexión no lo vería (FK), dejando la
+          // constancia huérfana.
+          manager,
         );
+        await manager.query('RELEASE SAVEPOINT consent_backfill');
       } catch (err) {
+        await manager.query('ROLLBACK TO SAVEPOINT consent_backfill');
         // B4 (auditoría spec 78) — `error`, no `warn`: un fallo aquí deja una
         // constancia de consentimiento huérfana (criterio 6 incumplido) y
         // debe quedar visible en los logs estructurados de producción, no
@@ -880,7 +968,12 @@ export class SurveysService {
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: ['responses', 'responses.question', 'campaignSession'],
+      relations: [
+        'responses',
+        'responses.question',
+        'responses.option',
+        'campaignSession',
+      ],
     });
 
     if (!survey) throw new NotFoundException('Survey not found');
@@ -896,6 +989,10 @@ export class SurveysService {
     // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
     // Also collect farm.* fields to create/update Farm if the instrument includes them
     const cropNames: string[] = [];
+    // Spec 84 — instrumento de Registro (S_REG): cultivo principal como
+    // pregunta de selección única, con `metadataId` = cropId. Convive con
+    // el mecanismo `crop.*` de arriba (usado por S2 y el taller).
+    const mainCropIds = new Set<string>();
     const farmFieldMap: Record<string, string | number | boolean> = {};
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
@@ -906,6 +1003,10 @@ export class SurveysService {
           const resolved = CROP_FIELD_MAP[key] ?? key;
           cropNames.push(resolved);
         }
+      } else if (sf === 'farm.mainCrop') {
+        if (response.option?.metadataId) {
+          mainCropIds.add(response.option.metadataId);
+        }
       } else if (sf.startsWith('farm.')) {
         const value =
           response.textValue ?? response.numericValue ?? response.booleanValue;
@@ -915,13 +1016,25 @@ export class SurveysService {
       }
     }
 
-    // Load matching TypeOfCrop entities by name
-    const crops =
+    // Load matching TypeOfCrop entities, por nombre (crop.*) y por cropId
+    // (farm.mainCrop), deduplicando.
+    const cropsByName =
       cropNames.length > 0
         ? await this.typesOfCropsRepository.find({
             where: { name: In(cropNames) },
           })
         : [];
+    const cropsByMainCrop =
+      mainCropIds.size > 0
+        ? await this.typesOfCropsRepository.find({
+            where: { cropId: In([...mainCropIds]) },
+          })
+        : [];
+    const cropsById = new Map<string, TypeOfCrop>();
+    for (const crop of [...cropsByName, ...cropsByMainCrop]) {
+      cropsById.set(crop.cropId, crop);
+    }
+    const crops = [...cropsById.values()];
 
     // Assign crops to CampaignSession via direct relation update to avoid cascading nulls
     if (survey.campaignSession) {
@@ -963,6 +1076,10 @@ export class SurveysService {
               (farmFieldMap['farm.area'] as number | undefined) ?? undefined,
             vereda:
               (farmFieldMap['farm.vereda'] as string | undefined) ?? undefined,
+            // Spec 84 — campo del instrumento de Registro (S_REG).
+            corregimiento:
+              (farmFieldMap['farm.corregimiento'] as string | undefined) ??
+              undefined,
             latitude:
               (farmFieldMap['farm.latitude'] as number | undefined) ??
               undefined,

@@ -59,6 +59,14 @@ export class OptionQuestion {
   })
   metadataId: string | null;
 
+  // Spec 84 — mismo mecanismo de archivado que Question.archivedAt.
+  @Column({
+    name: 'archived_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  archivedAt?: Date | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'timestamp',
