@@ -374,8 +374,11 @@ export class QuestionsService {
 
     if (conditionQuestionId !== undefined) {
       if (conditionQuestionId === null) {
-        question.conditionQuestion = undefined;
-        question.conditionValue = undefined;
+        // Spec 84 — `null`, no `undefined`: TypeORM omite las propiedades
+        // `undefined` al guardar, así que la condición quedaba intacta y la
+        // API respondía 200 sin haberla quitado.
+        question.conditionQuestion = null;
+        question.conditionValue = null;
       } else {
         const conditionQ = await this.questionsRepository.findOne({
           where: { questionId: conditionQuestionId },
