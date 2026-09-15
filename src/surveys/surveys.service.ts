@@ -26,6 +26,7 @@ import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
+import { buildSystemFieldMap } from './system-field-map';
 import { ConsentRecordsService } from '../consents/consent-records.service';
 
 export interface SurveyFilters {
@@ -384,18 +385,7 @@ export class SurveysService {
       return { farmer, existed: true };
     }
 
-    // Build systemField → value map from all responses that have systemField set.
-    // farm.town is excluded: it resolves via option.metadataId, not a scalar value.
-    const fieldMap: Record<string, string | number | boolean> = {};
-    for (const response of survey.responses ?? []) {
-      const sf = response.question?.systemField;
-      if (!sf || sf === 'farm.town') continue;
-      const value =
-        response.textValue ?? response.numericValue ?? response.booleanValue;
-      if (value !== undefined && value !== null) {
-        fieldMap[sf] = value;
-      }
-    }
+    const fieldMap = buildSystemFieldMap(survey.responses ?? []);
 
     // Resolve farm.town from the selected option's metadataId (townId)
     let resolvedTown: Town | null = null;
