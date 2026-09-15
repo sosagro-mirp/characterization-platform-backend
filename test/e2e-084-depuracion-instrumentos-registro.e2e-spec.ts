@@ -162,7 +162,7 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
   ) {
     const rows = await ds.query<{ option_id: string }[]>(
       `INSERT INTO options_question (option_id, question_id, text, value, metadata_id)
-       VALUES (gen_random_uuid(), $1, $2, $2, $3) RETURNING option_id`,
+       VALUES (gen_random_uuid(), $1, $2, NULL, $3) RETURNING option_id`,
       [questionId, text, metadataId],
     );
     return rows[0].option_id;
@@ -442,8 +442,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
   // `afterAll` global también lo limpie.
   let searchInstrumentId: string | undefined;
 
-  // Encuesta del caso de envíos concurrentes (criterio 10).
+  // Encuestas del criterio 10: envíos concurrentes y borrador tardío.
   let raceSurveyId: string | undefined;
+  let lateSurveyId: string | undefined;
 
   afterAll(async () => {
     const safe = async (sql: string, params: unknown[] = []) => {
@@ -472,7 +473,12 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
         await safe(`DELETE FROM farms WHERE farm_id = $1`, [f.farm_id]);
       }
     }
-    for (const surveyId of [editorSurveyId, regSurveyId, raceSurveyId]) {
+    for (const surveyId of [
+      editorSurveyId,
+      regSurveyId,
+      raceSurveyId,
+      lateSurveyId,
+    ]) {
       if (surveyId)
         await safe(`DELETE FROM surveys WHERE survey_id = $1`, [surveyId]);
     }
@@ -507,11 +513,21 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       }
     });
 
+    // `GET /instruments/by-code/:code` responde `{ instrumentId, name }` (sin
+    // `code`): se compara contra el UUID del instrumento con ese código real.
+    async function idOfCode(code: string): Promise<string> {
+      const rows = await ds.query<{ instrument_id: string }[]>(
+        `SELECT instrument_id FROM instruments WHERE code = $1`,
+        [code],
+      );
+      return rows[0].instrument_id;
+    }
+
     it('GET /instruments/by-code/S_REG devuelve el Registro', async () => {
       const res = await http()
         .get('/api/instruments/by-code/S_REG')
         .expect(200);
-      expect(res.body).toMatchObject({ code: 'S_REG' });
+      expect(res.body).toMatchObject({ instrumentId: await idOfCode('S_REG') });
     });
 
     it.each([
@@ -521,7 +537,7 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       const res = await http()
         .get(`/api/instruments/by-code/${alias}`)
         .expect(200);
-      expect(res.body).toMatchObject({ code: real });
+      expect(res.body).toMatchObject({ instrumentId: await idOfCode(real) });
     });
   });
 
@@ -787,10 +803,14 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
           `/api/sections/${editorSectionId}/questions/${qDependent}/archive`,
         ),
       ).expect(200);
+      // `responses/batch` es idempotente por encuesta (`d938548`): si la encuesta
+      // ya tiene respuestas devuelve las existentes sin insertar. El borrador
+      // tardío llega, por eso, en una encuesta propia.
+      lateSurveyId = await insertSurvey(editorInstrumentId);
       await auth(http().post('/api/responses/batch'))
         .send([
           {
-            surveyId: editorSurveyId,
+            surveyId: lateSurveyId,
             questionId: qDependent,
             textValue: 'borrador tardío',
           },
@@ -800,7 +820,7 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
 
     it('el historial de la encuesta sigue mostrando respuestas de preguntas archivadas', async () => {
       const res = await auth(
-        http().get(`/api/surveys/${editorSurveyId}/responses`),
+        http().get(`/api/surveys/${lateSurveyId}/responses`),
       ).expect(200);
       expect(JSON.stringify(res.body)).toContain('borrador tardío');
     });
@@ -812,10 +832,18 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
      */
     it('dos envíos concurrentes del mismo lote no duplican respuestas', async () => {
       raceSurveyId = await insertSurvey(editorInstrumentId);
+      // Pregunta propia: responder `qAnswered` alteraría el `responseCount` que
+      // comprueba después la búsqueda.
+      const qRace = await insertQuestion(
+        editorSectionId,
+        'Pregunta carrera e2e-084',
+        'open_text',
+        31,
+      );
       const lote = [
         {
           surveyId: raceSurveyId,
-          questionId: qAnswered,
+          questionId: qRace,
           textValue: 'carrera e2e-084',
         },
         { surveyId: raceSurveyId, questionId: qChoice, optionId: optUsed },
