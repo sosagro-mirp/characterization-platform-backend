@@ -1,4 +1,4 @@
-import { buildPlan } from './plan';
+import { buildPlan, verifyAgainstTarget } from './plan';
 import {
   InstrumentManifest,
   ManifestInstrument,
@@ -375,5 +375,52 @@ describe('buildPlan — archivado', () => {
     expect(plan(manifest([conOpcion]), desired).operations).toEqual([
       { kind: 'archive', entity: 'option', id: 'opt-1', instrumentId: 'i-1' },
     ]);
+  });
+});
+
+describe('verifyAgainstTarget', () => {
+  it('no reporta nada cuando el destino coincide con el manifiesto', () => {
+    const m = manifest([instrument()]);
+    const result = verifyAgainstTarget({ manifest: m, current: m });
+    expect(result.operations).toEqual([]);
+    expect(result.conflicts).toEqual([]);
+  });
+
+  it('detecta una pregunta distinta, una que falta y una que sobra en el destino', () => {
+    const manifestado = manifest([
+      instrument({
+        sections: [
+          section({
+            questions: [
+              question({ archivedAt: '2026-09-14T12:23:04.886000' }),
+              question({ questionId: 'q-2', text: 'Solo en el manifiesto' }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const destino = manifest([
+      instrument({
+        sections: [
+          section({
+            questions: [
+              question({ archivedAt: '2026-09-14T17:23:04.886000' }),
+              question({ questionId: 'q-3', text: 'Solo en el destino' }),
+            ],
+          }),
+        ],
+      }),
+    ]);
+    const { operations } = verifyAgainstTarget({
+      manifest: manifestado,
+      current: destino,
+    });
+    expect(operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ entity: 'question', id: 'q-1' }),
+        expect.objectContaining({ kind: 'create', id: 'q-2' }),
+        expect.objectContaining({ kind: 'delete', id: 'q-3' }),
+      ]),
+    );
   });
 });

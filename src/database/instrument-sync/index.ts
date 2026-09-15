@@ -10,7 +10,7 @@
  */
 export * from './types';
 export { exportManifest } from './export';
-export { buildPlan } from './plan';
+export { buildPlan, verifyAgainstTarget } from './plan';
 export { applyPlan, type ApplyOptions } from './apply';
 export { restoreFromBackup } from './restore';
 export { generateInventory } from './inventory';

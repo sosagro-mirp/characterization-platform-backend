@@ -30,6 +30,7 @@ import {
   Plan,
   restoreFromBackup,
   snapshot,
+  verifyAgainstTarget,
 } from './index';
 
 function parseArgs(argv: string[]): {
@@ -213,7 +214,10 @@ async function main() {
       await ds.initialize();
       const result = await restoreFromBackup(ds, backup);
       await ds.destroy();
-      console.log(`Restaurado: ${result.applied.length} operación(es).`);
+      console.log(
+        `Restaurado: ${result.applied.length} operación(es); ` +
+          `${result.removedInstrumentIds?.length ?? 0} instrumento(s) creado(s) por la promoción quitado(s).`,
+      );
       break;
     }
 
@@ -226,7 +230,7 @@ async function main() {
         instrumentIds: manifest.instruments.map((i) => i.instrumentId),
       });
       await ds.destroy();
-      const plan = buildPlan({ base: manifest, desired: manifest, current });
+      const plan = verifyAgainstTarget({ manifest, current });
       if (plan.operations.length === 0 && plan.conflicts.length === 0) {
         console.log('OK — el destino coincide con el manifiesto.');
       } else {

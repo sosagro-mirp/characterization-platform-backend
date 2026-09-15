@@ -72,6 +72,12 @@ export interface InstrumentManifest {
   formatVersion: 1;
   exportedAt: string;
   instruments: ManifestInstrument[];
+  /**
+   * Solo en respaldos de `apply`: instrumentos que ese `apply` creó. El
+   * respaldo no los contiene (no existían), así que sin esta lista `restore`
+   * no sabría que tiene que quitarlos (spec 84, TC-084-014).
+   */
+  createdInstrumentIds?: string[];
 }
 
 export type PlanEntityKind = 'instrument' | 'section' | 'question' | 'option';
@@ -122,4 +128,6 @@ export interface ApplyResult {
   /** Manifiesto del destino tomado justo antes de aplicar — permite restaurar. */
   backup: InstrumentManifest;
   applied: PlanOperation[];
+  /** Solo en `restore`: instrumentos creados por la promoción que se quitaron. */
+  removedInstrumentIds?: string[];
 }

@@ -123,15 +123,15 @@ export async function exportManifest(
   // migrarla (Fase 7), así que donde la columna no exista se exporta `null`
   // — que es su valor real: sin columna no hay nada archivado.
   const questionArchivedAt = (await hasColumn(ds, 'questions', 'archived_at'))
-    ? 'q.archived_at'
-    : 'NULL::timestamp AS archived_at';
+    ? archivedAtSelect('q.archived_at')
+    : 'NULL::text AS archived_at';
   const optionArchivedAt = (await hasColumn(
     ds,
     'options_question',
     'archived_at',
   ))
-    ? 'archived_at'
-    : 'NULL::timestamp AS archived_at';
+    ? archivedAtSelect('archived_at')
+    : 'NULL::text AS archived_at';
 
   const questionRows = sectionIds.length
     ? await ds.query<QuestionRow[]>(
@@ -274,4 +274,17 @@ export async function exportManifest(
     exportedAt: new Date().toISOString(),
     instruments,
   };
+}
+
+/**
+ * Expresión SQL que exporta `archived_at` tal como está guardado.
+ *
+ * Spec 84 (TC-084-014, 2026-09-15) — la columna es `timestamp` sin zona. Si
+ * se deja que `pg` la convierta a `Date`, la interpreta con la zona del
+ * proceso y el JSON sale con `Z`; al escribirla en otra base se pierde la
+ * zona y el valor queda corrido (5 horas entre desarrollo y Neon). Exportarla
+ * como texto sin zona conserva exactamente el mismo valor en cualquier base.
+ */
+export function archivedAtSelect(column: string): string {
+  return `to_char(${column}, 'YYYY-MM-DD"T"HH24:MI:SS.US') AS archived_at`;
 }

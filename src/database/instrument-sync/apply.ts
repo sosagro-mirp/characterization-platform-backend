@@ -48,7 +48,10 @@ export async function applyPlan(
   const live = await exportManifest(ds, { instrumentIds });
   assertNoDrift(plan.baseline, live);
 
-  const backup = live;
+  const backup: InstrumentManifest = {
+    ...live,
+    createdInstrumentIds: createdInstrumentIds(plan),
+  };
   if (options.onBackup) {
     await options.onBackup(backup);
   }
@@ -113,6 +116,13 @@ export async function applyPlan(
   });
 
   return { backup, applied: plan.operations };
+}
+
+/** Instrumentos que el plan crea: `restore` los quita al volver al respaldo. */
+export function createdInstrumentIds(plan: Plan): string[] {
+  return plan.operations
+    .filter((op) => op.entity === 'instrument' && op.kind === 'create')
+    .map((op) => op.id);
 }
 
 function assertNoDrift(

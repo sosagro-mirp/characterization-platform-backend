@@ -301,3 +301,22 @@ function classifyUpdate(
   }
   return desiredArchived ? 'archive' : 'unarchive';
 }
+
+/**
+ * Compara un manifiesto contra el estado actual de una base: las operaciones
+ * que devuelve son exactamente lo que falta para que el destino coincida.
+ *
+ * Spec 84 (TC-084-014, 2026-09-15) — `verify` usaba el manifiesto como `base`
+ * y como `desired`, así que `desiredChanged` nunca era verdadero y el
+ * resultado siempre era «coincide». La base correcta es el propio destino.
+ */
+export function verifyAgainstTarget(params: {
+  manifest: InstrumentManifest;
+  current: InstrumentManifest;
+}): Plan {
+  return buildPlan({
+    base: params.current,
+    desired: params.manifest,
+    current: params.current,
+  });
+}
