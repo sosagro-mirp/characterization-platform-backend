@@ -96,6 +96,9 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
   // Instrumento con code S_REG creado solo si el entorno no lo tiene.
   let createdSRegId: string | null = null;
 
+  // Constancia de consentimiento aceptada antes de existir el productor.
+  let orphanConsentId: string | undefined;
+
   const typeId: Record<string, string> = {};
 
   function http() {
@@ -405,11 +408,42 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
     await insertResponse(regSurveyId, qCrop, { optionId: optCafe });
     await insertResponse(regSurveyId, qProfile, { optionId: optProductor });
     await insertResponse(regSurveyId, qProfile, { optionId: optPropietario });
+
+    // Género (selección única con systemField): la 4.ª ronda de test-084
+    // mostró que `extractFarmer` descartaba las respuestas de selección y el
+    // productor quedaba sin género.
+    const qGender = await insertQuestion(
+      regSection,
+      'Género',
+      'single_choice',
+      10,
+      { systemField: 'farmer.gender' },
+    );
+    const optMujer = await insertOption(qGender, 'Mujer');
+    await insertResponse(regSurveyId, qGender, { optionId: optMujer });
+
+    // Flujo real: el consentimiento se acepta al inicio, antes de que exista
+    // el productor, y la extracción debe enlazarlo dentro de su transacción.
+    const consentDocs = await ds.query<{ consent_document_id: string }[]>(
+      `SELECT consent_document_id FROM consent_documents LIMIT 1`,
+    );
+    if (consentDocs.length) {
+      const consent = await ds.query<{ consent_record_id: string }[]>(
+        `INSERT INTO consent_records (consent_record_id, consent_document_id, session_id,
+           accepted_data_processing, accepted_at, recorded_by)
+         VALUES (gen_random_uuid(), $1, $2, true, now(), $3) RETURNING consent_record_id`,
+        [consentDocs[0].consent_document_id, sessionId, adminUserId],
+      );
+      orphanConsentId = consent[0].consent_record_id;
+    }
   });
 
   // Instrumento auxiliar del bloque de búsqueda — declarado aquí para que el
   // `afterAll` global también lo limpie.
   let searchInstrumentId: string | undefined;
+
+  // Encuesta del caso de envíos concurrentes (criterio 10).
+  let raceSurveyId: string | undefined;
 
   afterAll(async () => {
     const safe = async (sql: string, params: unknown[] = []) => {
@@ -438,9 +472,13 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
         await safe(`DELETE FROM farms WHERE farm_id = $1`, [f.farm_id]);
       }
     }
-    for (const surveyId of [editorSurveyId, regSurveyId]) {
-      await safe(`DELETE FROM surveys WHERE survey_id = $1`, [surveyId]);
+    for (const surveyId of [editorSurveyId, regSurveyId, raceSurveyId]) {
+      if (surveyId)
+        await safe(`DELETE FROM surveys WHERE survey_id = $1`, [surveyId]);
     }
+    await safe(`DELETE FROM consent_records WHERE session_id = $1`, [
+      sessionId,
+    ]);
     await safe(`DELETE FROM campaign_sessions WHERE session_id = $1`, [
       sessionId,
     ]);
@@ -551,6 +589,25 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
         [sessionId],
       );
       expect(sessionCrops.map((c) => c.crop_id)).toContain(cafeCropId);
+
+      // Selección única con systemField: se guarda el texto de la opción.
+      const gender = await ds.query<{ gender: string | null }[]>(
+        `SELECT gender FROM farmers WHERE document_id = $1`,
+        [regDocument],
+      );
+      expect(gender[0].gender).toBe('Mujer');
+
+      // Regresión `b2b1042`: sin el manager de la transacción, el UPDATE salía
+      // por otra conexión, la FK lo rechazaba y la constancia quedaba huérfana.
+      if (orphanConsentId) {
+        const linked = await ds.query<{ enlazada: boolean }[]>(
+          `SELECT c.farmer_id = f.id AS enlazada
+             FROM consent_records c JOIN farmers f ON f.document_id = $2
+            WHERE c.consent_record_id = $1`,
+          [orphanConsentId, regDocument],
+        );
+        expect(linked[0].enlazada).toBe(true);
+      }
     });
 
     /**
@@ -746,6 +803,30 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
         http().get(`/api/surveys/${editorSurveyId}/responses`),
       ).expect(200);
       expect(JSON.stringify(res.body)).toContain('borrador tardío');
+    });
+
+    /**
+     * Regresión de la ronda de pruebas del 2026-09-13 (`d938548`): la app
+     * móvil envió el mismo lote dos veces con un solo toque y la guarda de
+     * idempotencia, fuera de transacción, dejó cada respuesta duplicada.
+     */
+    it('dos envíos concurrentes del mismo lote no duplican respuestas', async () => {
+      raceSurveyId = await insertSurvey(editorInstrumentId);
+      const lote = [
+        {
+          surveyId: raceSurveyId,
+          questionId: qAnswered,
+          textValue: 'carrera e2e-084',
+        },
+        { surveyId: raceSurveyId, questionId: qChoice, optionId: optUsed },
+      ];
+      const [primero, segundo] = await Promise.all([
+        auth(http().post('/api/responses/batch')).send(lote),
+        auth(http().post('/api/responses/batch')).send(lote),
+      ]);
+      expect([200, 201]).toContain(primero.status);
+      expect([200, 201]).toContain(segundo.status);
+      expect(await countResponses(raceSurveyId)).toBe(2);
     });
   });
 
