@@ -10,7 +10,10 @@ import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { Question } from 'src/questions/entities/question.entity';
-import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
+import {
+  OPTION_ORIGINS,
+  OptionQuestion,
+} from 'src/options-question/entities/option-question.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { EntityManager, In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
@@ -357,6 +360,9 @@ export class InstrumentsService {
               }
 
               for (const option of question.options ?? []) {
+                // Spec 86 — las opciones creadas desde campo (origin='field')
+                // no son parte del instrumento: no se copian.
+                if (option.origin === OPTION_ORIGINS.FIELD) continue;
                 const optionCopy = manager.create(OptionQuestion, {
                   question: savedQuestion,
                   text: option.text,

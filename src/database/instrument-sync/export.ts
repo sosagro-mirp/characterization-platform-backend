@@ -48,6 +48,7 @@ interface OptionRow {
   is_other: boolean;
   metadata_id: string | null;
   archived_at: string | null;
+  origin: string;
 }
 
 /** ¿Existe la columna en el entorno conectado? Interpolar su nombre en SQL es seguro: ambos argumentos son literales de este módulo, nunca entrada del usuario. */
@@ -132,6 +133,10 @@ export async function exportManifest(
   ))
     ? archivedAtSelect('archived_at')
     : 'NULL::text AS archived_at';
+  // Spec 86 — mismo criterio: sin la columna, todas son del instrumento.
+  const optionOrigin = (await hasColumn(ds, 'options_question', 'origin'))
+    ? 'origin'
+    : "'instrument'::text AS origin";
 
   const questionRows = sectionIds.length
     ? await ds.query<QuestionRow[]>(
@@ -149,7 +154,7 @@ export async function exportManifest(
 
   const optionRows = questionIds.length
     ? await ds.query<OptionRow[]>(
-        `SELECT option_id, question_id, text, value, is_other, metadata_id, ${optionArchivedAt}
+        `SELECT option_id, question_id, text, value, is_other, metadata_id, ${optionArchivedAt}, ${optionOrigin}
          FROM options_question WHERE question_id = ANY($1::uuid[]) ORDER BY created_at`,
         [questionIds],
       )
@@ -199,6 +204,7 @@ export async function exportManifest(
       isOther: row.is_other,
       metadata,
       archivedAt: row.archived_at,
+      ...(row.origin === 'field' && { origin: 'field' as const }),
       responseCount: responseCountByOption.get(row.option_id) ?? 0,
     };
     const list = optionsByQuestion.get(row.question_id) ?? [];

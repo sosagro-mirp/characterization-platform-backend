@@ -13,6 +13,7 @@ import { InstrumentsService } from 'src/instruments/instruments.service';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { Response } from 'src/responses/entities/response.entity';
+import { resolveOtherAnswer } from 'src/responses/other-option';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { SubmitPublicSurveyDto } from './dto/submit-public-survey.dto';
 
@@ -205,11 +206,19 @@ export class PublicSurveysService {
           }
         }
 
+        // Spec 86 — misma regla de "Otros" que el canal de campo.
+        const resolved = await resolveOtherAnswer(
+          question,
+          option,
+          item.textValue,
+          manager,
+        );
+
         const response = manager.getRepository(Response).create({
           survey: savedSurvey,
           question,
-          option: option ?? undefined,
-          textValue: item.textValue,
+          option: resolved.option ?? undefined,
+          textValue: resolved.textValue,
           numericValue: item.numericValue,
           booleanValue: item.booleanValue,
         });

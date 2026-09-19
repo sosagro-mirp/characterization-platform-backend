@@ -70,3 +70,7 @@ src/database/seeds/run-*.ts
 # contener el contenido completo de instrumentos de producción; nunca en git)
 .instrument-sync/
 
+
+# Spec 86 — informes del script de opciones "Otros" legadas (contienen textos
+# libres escritos en campo, posibles datos personales; nunca en git)
+.other-options/

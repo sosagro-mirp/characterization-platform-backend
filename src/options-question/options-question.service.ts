@@ -10,7 +10,10 @@ import { Question } from 'src/questions/entities/question.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { CreateOptionQuestionDto } from './dto/create-option-question.dto';
 import { UpdateOptionQuestionDto } from './dto/update-option-question.dto';
-import { OptionQuestion } from './entities/option-question.entity';
+import {
+  OPTION_ORIGINS,
+  OptionQuestion,
+} from './entities/option-question.entity';
 
 @Injectable()
 export class OptionsQuestionService {
@@ -23,9 +26,16 @@ export class OptionsQuestionService {
     private readonly responsesRepository: Repository<Response>,
   ) {}
 
+  /**
+   * Spec 86 — con `quarantine` (encuestador con un cliente viejo que todavía
+   * crea la opción "Otros" dinámica) la opción nace archivada y con
+   * origin='field': no aparece en el instrumento y las respuestas que la usen
+   * se normalizan a la opción "Otros" (ver responses/other-option.ts).
+   */
   async create(
     questionId: string,
     createOptionQuestionDto: CreateOptionQuestionDto,
+    { quarantine = false }: { quarantine?: boolean } = {},
   ): Promise<OptionQuestion> {
     const question = await this.questionsRepository.findOne({
       where: { questionId },
@@ -33,6 +43,17 @@ export class OptionsQuestionService {
 
     if (!question) {
       throw new NotFoundException('Question not found');
+    }
+
+    if (quarantine) {
+      const option = this.optionsQuestionRepository.create({
+        text: createOptionQuestionDto.text.trim(),
+        isOther: false,
+        origin: OPTION_ORIGINS.FIELD,
+        archivedAt: new Date(),
+        question,
+      });
+      return await this.optionsQuestionRepository.save(option);
     }
 
     if (createOptionQuestionDto.isOther) {
@@ -69,6 +90,21 @@ export class OptionsQuestionService {
 
     if (!question) {
       throw new NotFoundException('Question not found');
+    }
+
+    // Spec 86 — una sola opción "Otros" por pregunta, también en lote.
+    const otherCount = createOptionQuestionDtos.filter(
+      (dto) => dto.isOther,
+    ).length;
+    if (otherCount > 0) {
+      const existing = await this.optionsQuestionRepository.count({
+        where: { question: { questionId }, isOther: true },
+      });
+      if (otherCount + existing > 1) {
+        throw new BadRequestException(
+          'This question already has an "other" option',
+        );
+      }
     }
 
     const options = this.optionsQuestionRepository.create(

@@ -9,6 +9,18 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+/**
+ * Spec 86 — origen de la opción. 'field' = creada desde campo (cliente viejo
+ * que todavía llama a POST /questions/:id/options, o migrada por el script de
+ * datos legados). Nace archivada y sus respuestas se normalizan a "Otros".
+ */
+export const OPTION_ORIGINS = {
+  INSTRUMENT: 'instrument',
+  FIELD: 'field',
+} as const;
+
+export type OptionOrigin = (typeof OPTION_ORIGINS)[keyof typeof OPTION_ORIGINS];
+
 @Entity({ name: 'options_question' })
 export class OptionQuestion {
   @PrimaryGeneratedColumn('uuid', {
@@ -66,6 +78,14 @@ export class OptionQuestion {
     nullable: true,
   })
   archivedAt?: Date | null;
+
+  // Spec 86 — ver OPTION_ORIGINS.
+  @Column({
+    type: 'varchar',
+    length: 16,
+    default: OPTION_ORIGINS.INSTRUMENT,
+  })
+  origin: OptionOrigin;
 
   @CreateDateColumn({
     name: 'created_at',

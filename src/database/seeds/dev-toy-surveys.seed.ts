@@ -42,6 +42,10 @@ const PROJECT_DEPARTMENTS = [
 const SURVEYS_PER_DEPARTMENT_S_DCU = 8;
 const TOTAL_SURVEYS_S1A = 12;
 
+// Spec 86 — textos de ejemplo para respuestas "Otros".
+const OTHER_ANSWER_RATE = 0.15;
+const OTHER_TEXTS = ['Arracacha', 'Aljibe comunitario', 'Plátano', 'Lulo'];
+
 function pickRandom<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -126,6 +130,19 @@ async function createResponsesForSurvey(
     }
 
     if (typeName === 'single_choice' || typeName === 'likert') {
+      // Spec 86 — de vez en cuando, "Otros" con su texto en la respuesta.
+      const otherOption = question.options.find((o) => o.isOther);
+      if (otherOption && Math.random() < OTHER_ANSWER_RATE) {
+        await responseRepo.save(
+          responseRepo.create({
+            survey,
+            question,
+            option: otherOption,
+            textValue: pickRandom(OTHER_TEXTS),
+          }),
+        );
+        continue;
+      }
       const options = question.options.filter((o) => !o.isOther);
       if (options.length === 0) continue;
       const option = pickRandom(options);
@@ -153,6 +170,18 @@ async function createResponsesForSurvey(
             survey,
             question,
             option,
+          }),
+        );
+      }
+      // Spec 86 — "Otros" marcado junto con las demás, con su texto.
+      const otherOption = question.options.find((o) => o.isOther);
+      if (otherOption && Math.random() < OTHER_ANSWER_RATE) {
+        await responseRepo.save(
+          responseRepo.create({
+            survey,
+            question,
+            option: otherOption,
+            textValue: pickRandom(OTHER_TEXTS),
           }),
         );
       }
