@@ -50,13 +50,16 @@ export async function resolveOtherAnswer(
     const otherOption = await manager.getRepository(OptionQuestion).findOne({
       where: { question: { questionId: question.questionId }, isOther: true },
     });
-    // Sin opción "Otros" hermana no hay a dónde normalizar: la respuesta se
-    // conserva tal cual (mismo criterio que el script de datos legados).
-    if (!otherOption) {
-      return { option, textValue: resolvedText };
+    if (otherOption) {
+      resolvedOption = otherOption;
+      resolvedText = resolvedText ?? option.text.trim();
+    } else if (resolvedText === undefined) {
+      // Sin opción "Otros" hermana no hay a dónde normalizar: la respuesta se
+      // conserva tal cual (mismo criterio que el script de datos legados).
+      return { option, textValue: undefined };
     }
-    resolvedOption = otherOption;
-    resolvedText = resolvedText ?? option.text.trim();
+    // Si además trae texto propio, se valida abajo como cualquier otra
+    // opción: `textValue` solo se admite en «Otros» y con el límite de largo.
   }
 
   if (resolvedText === undefined) {
