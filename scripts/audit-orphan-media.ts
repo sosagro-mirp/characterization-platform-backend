@@ -29,7 +29,7 @@
 import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as readline from 'readline';
-import { Client } from 'pg';
+import { DataSource } from 'typeorm';
 import {
   DeleteObjectsCommand,
   ListObjectsV2Command,
@@ -89,30 +89,30 @@ function buildS3(): { client: S3Client; bucket: string } {
   };
 }
 
-function buildPg(): { client: Client; label: string } {
+function buildPg(): { db: DataSource; label: string } {
+  const ssl =
+    process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false;
   const url = process.env.DATABASE_URL;
   if (url) {
     return {
-      client: new Client({
-        connectionString: url,
-        ssl:
-          process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
-      }),
+      db: new DataSource({ type: 'postgres', url, ssl }),
       label: new URL(url).host,
     };
   }
   const host = requireEnv('DB_HOST');
+  const port = parseInt(process.env.DB_PORT ?? '5432', 10);
+  const database = requireEnv('DB_NAME');
   return {
-    client: new Client({
+    db: new DataSource({
+      type: 'postgres',
       host,
-      port: parseInt(process.env.DB_PORT ?? '5432', 10),
-      user: requireEnv('DB_USER'),
+      port,
+      username: requireEnv('DB_USER'),
       password: requireEnv('DB_PASSWORD'),
-      database: requireEnv('DB_NAME'),
-      ssl:
-        process.env.DB_SSL === 'true' ? { rejectUnauthorized: false } : false,
+      database,
+      ssl,
     }),
-    label: `${host}:${process.env.DB_PORT ?? '5432'}/${requireEnv('DB_NAME')}`,
+    label: `${host}:${port}/${database}`,
   };
 }
 
@@ -154,8 +154,8 @@ async function ask(question: string): Promise<string> {
 async function audit(): Promise<Report> {
   const pendingDays = parseInt(arg('pending-days') ?? '7', 10);
   const { client: s3, bucket } = buildS3();
-  const { client: pg, label } = buildPg();
-  await pg.connect();
+  const { db, label } = buildPg();
+  await db.initialize();
 
   try {
     console.log(`Bucket: ${bucket}`);
@@ -164,12 +164,14 @@ async function audit(): Promise<Report> {
 
     const bucketKeys = await listBucketKeys(s3, bucket);
 
-    const attachments = await pg.query<{
-      attachment_id: string;
-      storage_key: string;
-      status: string;
-      created_at: Date;
-    }>(
+    const attachments = await db.query<
+      {
+        attachment_id: string;
+        storage_key: string;
+        status: string;
+        created_at: Date;
+      }[]
+    >(
       `SELECT attachment_id, storage_key, status, created_at FROM media_attachments`,
     );
 
@@ -177,17 +179,17 @@ async function audit(): Promise<Report> {
     // aplicó, se audita igual sin ella.
     let queued = new Set<string>();
     try {
-      const queue = await pg.query<{ storage_key: string }>(
+      const queue = await db.query<{ storage_key: string }[]>(
         `SELECT storage_key FROM media_deletion_queue WHERE deleted_at IS NULL`,
       );
-      queued = new Set(queue.rows.map((r) => r.storage_key));
+      queued = new Set(queue.map((r) => r.storage_key));
     } catch {
       console.log(
         '(aviso) media_deletion_queue no existe todavía; se omite.\n',
       );
     }
 
-    const knownKeys = new Set(attachments.rows.map((r) => r.storage_key));
+    const knownKeys = new Set(attachments.map((r) => r.storage_key));
     const bucketSet = new Set(bucketKeys);
     const cutoff = Date.now() - pendingDays * 24 * 60 * 60 * 1000;
 
@@ -200,11 +202,11 @@ async function audit(): Promise<Report> {
       pendingDays,
       totals: {
         bucketObjects: bucketKeys.length,
-        attachmentRows: attachments.rowCount ?? 0,
+        attachmentRows: attachments.length,
       },
       orphanObjects: withoutRow.filter((k) => !queued.has(k)),
       queuedObjects: withoutRow.filter((k) => queued.has(k)),
-      stalePending: attachments.rows
+      stalePending: attachments
         .filter(
           (r) => r.status === 'pending' && r.created_at.getTime() < cutoff,
         )
@@ -213,7 +215,7 @@ async function audit(): Promise<Report> {
           storageKey: r.storage_key,
           createdAt: r.created_at.toISOString(),
         })),
-      missingObjects: attachments.rows
+      missingObjects: attachments
         .filter((r) => r.status === 'uploaded' && !bucketSet.has(r.storage_key))
         .map((r) => ({
           attachmentId: r.attachment_id,
@@ -221,7 +223,7 @@ async function audit(): Promise<Report> {
         })),
     };
   } finally {
-    await pg.end();
+    await db.destroy();
   }
 }
 
