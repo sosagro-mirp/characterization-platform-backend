@@ -9,6 +9,7 @@ import { Survey } from 'src/surveys/entities/survey.entity';
 import { FarmersService } from './farmers.service';
 import { FarmersController } from './farmers.controller';
 import { ConsentsModule } from '../consents/consents.module';
+import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ConsentsModule } from '../consents/consents.module';
       Survey,
     ]),
     ConsentsModule,
+    MediaAttachmentsModule,
   ],
   controllers: [FarmersController],
   providers: [FarmersService],

@@ -2,9 +2,11 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
@@ -34,6 +36,9 @@ export class InstrumentsService {
     private readonly questionsRepository: Repository<Question>,
     @InjectRepository(Response)
     private readonly responsesRepository: Repository<Response>,
+    // `@Optional()` solo para no romper la suite unitaria que arma este
+    // servicio a mano; en la aplicación siempre está inyectado (spec 85).
+    @Optional() private readonly mediaCleanup?: MediaCleanupService,
   ) {}
 
   // Spec 79 — tipos de pregunta que exigen el flujo autenticado de
@@ -254,7 +259,18 @@ export class InstrumentsService {
       );
     }
 
+    // Spec 85: el instrumento cae con sus secciones y preguntas, y los
+    // adjuntos de esas preguntas por ON DELETE CASCADE. Sin recolectar las
+    // claves antes, sus objetos quedarían huérfanos en R2.
+    const mediaKeys =
+      (await this.mediaCleanup?.collectByInstrument(
+        this.instrumentsRepository.manager,
+        id,
+      )) ?? [];
+
     await this.instrumentsRepository.remove(instrument);
+
+    await this.mediaCleanup?.deleteAfterCommit(mediaKeys);
   }
 
   /**

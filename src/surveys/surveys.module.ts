@@ -15,6 +15,7 @@ import { SurveysController } from './surveys.controller';
 import { Survey } from './entities/survey.entity';
 import { SurveysService } from './surveys.service';
 import { ConsentsModule } from '../consents/consents.module';
+import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ConsentsModule } from '../consents/consents.module';
       Response,
     ]),
     ConsentsModule,
+    MediaAttachmentsModule,
   ],
   controllers: [SurveysController],
   providers: [SurveysService],
