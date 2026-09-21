@@ -959,7 +959,6 @@ export class SurveysService {
           optionText: r.option?.text ?? null,
           attachmentId: attachment?.attachmentId ?? null,
           attachmentStatus: attachment?.status ?? null,
-          publicUrl: attachment?.publicUrl ?? null,
           mimeType: attachment?.mimeType ?? null,
           originalFilename: attachment?.originalFilename ?? null,
         };
