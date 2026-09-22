@@ -227,6 +227,34 @@ async function audit(): Promise<Report> {
   }
 }
 
+/**
+ * ⚠️ El bucket de R2 es **compartido entre desarrollo y producción** (misma
+ * `R2_BUCKET_NAME` en ambos `.env`), pero este informe se calcula contra **una
+ * sola** base de datos. Un objeto que no tiene fila aquí puede tenerla en el
+ * otro entorno: la clase (a) NO es prueba suficiente de que el archivo sobre.
+ * Estas señales avisan cuando el informe casi con certeza mira la base
+ * equivocada.
+ */
+function printSharedBucketWarning(report: Report): void {
+  const { bucketObjects, attachmentRows } = report.totals;
+  const todosHuerfanos =
+    bucketObjects > 0 && report.orphanObjects.length === bucketObjects;
+
+  if (attachmentRows === 0 && bucketObjects > 0) {
+    console.log(
+      `\n⚠️  Esta base de datos (${report.database}) no tiene NINGUNA fila en\n` +
+        `    media_attachments, así que no puede decidir qué sobra en un bucket\n` +
+        `    compartido. Verifique contra el otro entorno antes de borrar nada.`,
+    );
+  } else if (todosHuerfanos) {
+    console.log(
+      `\n⚠️  Los ${bucketObjects} objetos del bucket quedaron marcados como\n` +
+        `    huérfanos. En un bucket compartido eso suele significar que se está\n` +
+        `    mirando la base equivocada. Confirme contra el otro entorno.`,
+    );
+  }
+}
+
 function printReport(report: Report): void {
   console.log(
     `Objetos en el bucket (${KEY_PREFIX}*): ${report.totals.bucketObjects}`,
@@ -246,6 +274,7 @@ function printReport(report: Report): void {
   console.log(
     `(c) Filas uploaded sin objeto:        ${report.missingObjects.length}`,
   );
+  printSharedBucketWarning(report);
 }
 
 async function deleteFromReport(path: string): Promise<void> {
@@ -262,6 +291,28 @@ async function deleteFromReport(path: string): Promise<void> {
       'El informe no lista objetos huérfanos (clase a). Nada que borrar.',
     );
     return;
+  }
+
+  // ⚠️ El bucket es compartido entre desarrollo y producción. Un informe
+  // generado contra una base sin filas no puede decidir qué sobra: borrar
+  // desde él arrasaría con la evidencia del otro entorno.
+  if (report.totals.attachmentRows === 0) {
+    throw new Error(
+      `El informe se generó contra «${report.database}», que no tiene ninguna fila en ` +
+        `media_attachments. En un bucket compartido eso no prueba que los objetos sobren. ` +
+        `Se aborta: regenere el informe contra la base que sí registra esos adjuntos.`,
+    );
+  }
+
+  // El informe debe haberse generado contra la MISMA base a la que apunta el
+  // .env actual; si no, se está cruzando el inventario de un entorno con la
+  // autorización de otro.
+  const { db, label } = buildPg();
+  await db.destroy().catch(() => undefined);
+  if (report.database !== label) {
+    throw new Error(
+      `El informe es de la base «${report.database}» pero el .env apunta a «${label}». Se aborta.`,
+    );
   }
 
   console.log(
