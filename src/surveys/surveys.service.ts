@@ -16,14 +16,20 @@ import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { FarmerDocumentCollision } from 'src/farmers/entities/farmer-document-collision.entity';
 import { isSameFarmerName } from 'src/farmers/name-matching';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
+import { MediaAttachmentStatus } from 'src/media-attachments/entities/media-attachment.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
 import { EntityManager, In, Repository } from 'typeorm';
+import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
+import { ROLES } from '../auth/constants';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { ExtractFarmerDto } from './dto/extract-farmer.dto';
+import { ListMySurveysQueryDto } from './dto/list-my-surveys-query.dto';
+import { MySurveysPageDto } from './dto/my-surveys-page.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
+import { PollsterSurveyResponseRowDto } from './dto/pollster-survey-response.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
 import { buildSystemFieldMap } from './system-field-map';
@@ -919,13 +925,117 @@ export class SurveysService {
     }
   }
 
-  async findSurveyResponses(surveyId: string) {
+  // Spec 92, Fase 1 — GET /api/surveys/mine. Ver D7 (paginación) y el punto 1
+  // de "Alcance" del spec para el detalle de cada filtro/campo.
+  async findMine(
+    userId: string,
+    query: ListMySurveysQueryDto,
+  ): Promise<MySurveysPageDto> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const qb = this.surveysRepository
+      .createQueryBuilder('survey')
+      .leftJoin('survey.farmer', 'surveyFarmer')
+      .leftJoin('survey.campaignSession', 'campaignSession')
+      .leftJoin('campaignSession.farmer', 'sessionFarmer')
+      .leftJoin('campaignSession.campaign', 'campaign')
+      .where('survey.user = :userId', { userId })
+      .andWhere('survey.origin = :origin', { origin: 'field' })
+      .andWhere(
+        'EXISTS (SELECT 1 FROM responses r WHERE r.survey_id = survey.survey_id)',
+      );
+
+    if (query.search) {
+      // Escapa los comodines de ILIKE antes de envolver en '%...%' — un
+      // '%' o '_' literal en la búsqueda no debe comportarse como comodín.
+      const escaped = query.search.replace(/[\\%_]/g, (c) => `\\${c}`);
+      qb.andWhere(
+        "(COALESCE(surveyFarmer.name, sessionFarmer.name) ILIKE :search ESCAPE '\\' " +
+          "OR COALESCE(surveyFarmer.documentId, sessionFarmer.documentId) ILIKE :search ESCAPE '\\')",
+        { search: `%${escaped}%` },
+      );
+    }
+
+    // Clonada antes de fijar el SELECT de la página — getCount() ignora los
+    // selects, pero clonar deja explícito que ambas consultas comparten
+    // exactamente los mismos joins/where.
+    const total = await qb.clone().getCount();
+
+    const rawRows = await qb
+      .select('survey.surveyId', 'surveyId')
+      .addSelect('survey.clientSurveyId', 'clientSurveyId')
+      .addSelect('survey.createdAt', 'createdAt')
+      .addSelect('survey.updatedAt', 'updatedAt')
+      .addSelect('surveyFarmer.id', 'surveyFarmerId')
+      .addSelect('surveyFarmer.name', 'surveyFarmerName')
+      .addSelect('sessionFarmer.id', 'sessionFarmerId')
+      .addSelect('sessionFarmer.name', 'sessionFarmerName')
+      .addSelect('campaign.name', 'campaignName')
+      .addSelect(
+        '(SELECT i.name FROM surveys_instruments si ' +
+          'JOIN instruments i ON i.instrument_id = si.instrument_id ' +
+          'WHERE si.survey_id = survey.survey_id LIMIT 1)',
+        'instrumentName',
+      )
+      // COUNT(DISTINCT question_id): una selección múltiple con varias
+      // opciones guarda varias filas de response para la misma pregunta y
+      // debe contar 1, no una por opción.
+      .addSelect(
+        '(SELECT COUNT(DISTINCT r.question_id) FROM responses r ' +
+          'WHERE r.survey_id = survey.survey_id)',
+        'responseCount',
+      )
+      .orderBy('survey.createdAt', 'DESC')
+      .addOrderBy('survey.surveyId', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit)
+      .getRawMany<{
+        surveyId: string;
+        clientSurveyId: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+        surveyFarmerId: string | null;
+        surveyFarmerName: string | null;
+        sessionFarmerId: string | null;
+        sessionFarmerName: string | null;
+        campaignName: string | null;
+        instrumentName: string | null;
+        responseCount: string;
+      }>();
+
+    const items = rawRows.map((row) => ({
+      surveyId: row.surveyId,
+      clientSurveyId: row.clientSurveyId ?? null,
+      instrumentName: row.instrumentName ?? null,
+      campaignName: row.campaignName ?? null,
+      farmer: row.surveyFarmerId
+        ? { farmerId: row.surveyFarmerId, name: row.surveyFarmerName! }
+        : row.sessionFarmerId
+          ? { farmerId: row.sessionFarmerId, name: row.sessionFarmerName! }
+          : null,
+      responseCount: Number(row.responseCount),
+      createdAt: new Date(row.createdAt).toISOString(),
+      updatedAt: new Date(row.updatedAt).toISOString(),
+    }));
+
+    return { items, total, page, limit };
+  }
+
+  async findSurveyResponses(surveyId: string, requester?: AuthenticatedUser) {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: { instruments: true },
+      relations: { instruments: true, user: true },
     });
 
     if (!survey) {
+      throw new NotFoundException('Survey not found');
+    }
+
+    // Spec 92, Fase 2 — un POLLSTER solo ve sus propias encuestas. 404, no
+    // 403: no debe revelar que una encuesta ajena existe.
+    const isPollster = requester?.role === ROLES.POLLSTER;
+    if (isPollster && survey.user?.userId !== requester?.userId) {
       throw new NotFoundException('Survey not found');
     }
 
@@ -941,27 +1051,49 @@ export class SurveysService {
       .addOrderBy('question.order', 'ASC')
       .getMany();
 
+    const rows = responses.map((r) => {
+      // Adjunto subido con éxito — no basta con que exista una fila: el spec
+      // 85 deja filas 'pending'/'failed' que nunca deben contar como evidencia.
+      const uploadedAttachment =
+        r.attachments?.find(
+          (a) => a.status === MediaAttachmentStatus.UPLOADED,
+        ) ?? null;
+      const attachment = r.attachments?.[0] ?? null;
+
+      return {
+        responseId: r.responseId,
+        questionId: r.question.questionId,
+        questionText: r.question.text,
+        questionType: r.question.type.name,
+        sectionId: r.question.section.sectionId,
+        sectionTitle: r.question.section.name,
+        sectionOrder: r.question.section.order,
+        textValue: r.textValue ?? null,
+        numericValue: r.numericValue ?? null,
+        booleanValue: r.booleanValue ?? null,
+        optionText: r.option?.text ?? null,
+        hasAttachment: uploadedAttachment !== null,
+        publicUrl: attachment?.publicUrl ?? null,
+        mimeType: attachment?.mimeType ?? null,
+        originalFilename: attachment?.originalFilename ?? null,
+      };
+    });
+
     return {
       surveyId: survey.surveyId,
       instrumentName: survey.instruments?.[0]?.name ?? null,
       syncedAt: survey.updatedAt.toISOString(),
-      responses: responses.map((r) => {
-        const attachment = r.attachments?.[0] ?? null;
-        return {
-          responseId: r.responseId,
-          questionId: r.question.questionId,
-          questionText: r.question.text,
-          questionType: r.question.type.name,
-          sectionTitle: r.question.section.name,
-          textValue: r.textValue ?? null,
-          numericValue: r.numericValue ?? null,
-          booleanValue: r.booleanValue ?? null,
-          optionText: r.option?.text ?? null,
-          publicUrl: attachment?.publicUrl ?? null,
-          mimeType: attachment?.mimeType ?? null,
-          originalFilename: attachment?.originalFilename ?? null,
-        };
-      }),
+      // D2 — al POLLSTER nunca le llega publicUrl/mimeType/originalFilename.
+      responses: isPollster
+        ? rows.map(
+            ({
+              publicUrl: _publicUrl,
+              mimeType: _mimeType,
+              originalFilename: _originalFilename,
+              ...whitelisted
+            }): PollsterSurveyResponseRowDto => whitelisted,
+          )
+        : rows,
     };
   }
 
