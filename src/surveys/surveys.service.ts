@@ -14,19 +14,42 @@ import { Department } from 'src/departments/entities/department.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { FarmerDocumentCollision } from 'src/farmers/entities/farmer-document-collision.entity';
-import { isSameFarmerName } from 'src/farmers/name-matching';
+import {
+  normalizeDocumentId,
+  selectFarmerByDocument,
+} from 'src/farmers/document-id';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
-import { EntityManager, In, Repository } from 'typeorm';
+import { DeepPartial, EntityManager, In, Repository } from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { resolveCropsFromResponses } from './crop-extraction';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
+import { ProcessPublicSubmissionDto } from './dto/process-public-submission.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
-import { buildSystemFieldMap } from './system-field-map';
+import {
+  buildPublicSubmissionPlan,
+  completeFields,
+  ExistingFarmCandidate,
+  FARM_COMPLETABLE_FIELDS,
+  FARMER_COMPLETABLE_FIELDS,
+  FieldToComplete,
+  normalizeFarmKey,
+  PendingSubmissionPeer,
+  PlanFarmerRecord,
+  ProcessPreview,
+} from './public-submission-plan';
+import {
+  buildSystemFieldMap,
+  buildSystemFieldMapWithWarnings,
+  SystemFieldValue,
+} from './system-field-map';
+import { convertAreaToHectares } from './unit-conversion';
 import { ConsentRecordsService } from '../consents/consent-records.service';
 
 export interface SurveyFilters {
@@ -47,6 +70,31 @@ export interface PublicSubmissionRow {
   createdAt: Date;
   responseCount: number;
   reviewStatus: string;
+  // Spec 93 — identidad declarada en el envío, para decidir desde la lista.
+  farmerName: string | null;
+  farmerDocumentId: string | null;
+}
+
+// Spec 93 — colisión de documento detectada dentro de la transacción. Se
+// separa detectar de registrar: la transacción se revierte y la fila de
+// colisión pendiente se escribe aparte (`toCollisionConflict`) antes del 409.
+class DocumentCollisionError extends Error {
+  constructor(
+    readonly surveyId: string,
+    readonly documentId: string,
+    readonly submittedName: string,
+    readonly existingFarmer: Farmer,
+  ) {
+    super('document collision');
+  }
+}
+
+interface FarmerIdentity {
+  respondentIsProducer: boolean;
+  name?: string;
+  phone?: string;
+  email?: string;
+  documentId?: string;
 }
 
 @Injectable()
@@ -316,17 +364,60 @@ export class SurveysService {
     surveyId: string,
     dto: ExtractFarmerDto = {},
   ): Promise<{ farmer: Farmer; existed: boolean }> {
-    return await this.surveysRepository.manager.transaction(async (manager) => {
-      // Lock por encuesta: dos llamadas concurrentes sobre la misma encuesta
-      // se serializan; sobre encuestas distintas no se estorban.
-      // Cota a la espera del lock: sin ella una petición colgada retiene
-      // una conexión del pool indefinidamente. Al expirar, Postgres lanza
-      // 55P03 y la petición falla rápido en vez de quedarse pendiente.
-      await manager.query("SET LOCAL lock_timeout = '10s'");
-      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-        `extract-farmer:${surveyId}`,
-      ]);
-      return await this.extractFarmerLocked(surveyId, dto, manager);
+    try {
+      return await this.surveysRepository.manager.transaction(
+        async (manager) => {
+          await this.lockSurvey(manager, surveyId);
+          return await this.extractFarmerLocked(surveyId, dto, manager);
+        },
+      );
+    } catch (err) {
+      throw await this.toCollisionConflict(err);
+    }
+  }
+
+  // Lock por encuesta: dos llamadas concurrentes sobre la misma encuesta se
+  // serializan; sobre encuestas distintas no se estorban.
+  // Cota a la espera del lock: sin ella una petición colgada retiene una
+  // conexión del pool indefinidamente. Al expirar, Postgres lanza 55P03 y la
+  // petición falla rápido en vez de quedarse pendiente.
+  private async lockSurvey(
+    manager: EntityManager,
+    surveyId: string,
+  ): Promise<void> {
+    await manager.query("SET LOCAL lock_timeout = '10s'");
+    await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+      `extract-farmer:${surveyId}`,
+    ]);
+  }
+
+  // Spec 68 — una colisión sin resolución nunca fusiona en silencio: se
+  // registra como pendiente y se rechaza con 409 sin haber mutado nada más.
+  // La transacción principal ya se revirtió; la fila se escribe en una
+  // transacción corta propia, bajo el mismo lock, para que un reintento
+  // simultáneo no duplique la fila pendiente.
+  private async toCollisionConflict(err: unknown): Promise<unknown> {
+    if (!(err instanceof DocumentCollisionError)) return err;
+    await this.documentCollisionsRepository.manager.transaction(
+      async (manager) => {
+        await this.lockSurvey(manager, err.surveyId);
+        await this.upsertDocumentCollision(manager, {
+          documentId: err.documentId,
+          submittedName: err.submittedName,
+          existingFarmer: err.existingFarmer,
+          resolution: null,
+          survey: { surveyId: err.surveyId } as Survey,
+        });
+      },
+    );
+    return new ConflictException({
+      message: 'El documento ya está registrado a nombre de otra persona',
+      documentId: err.documentId,
+      submittedName: err.submittedName,
+      existingFarmer: {
+        farmerId: err.existingFarmer.id,
+        name: err.existingFarmer.name,
+      },
     });
   }
 
@@ -403,49 +494,14 @@ export class SurveysService {
       }
     }
 
-    // Determine whether the respondent is the producer.
-    // undefined means Q9 was not in the instrument (other instruments) → treat as true.
-    const isRespondent = fieldMap['farmer.isRespondent'] as boolean | undefined;
-    const respondentIsProducer = isRespondent !== false;
-
-    let farmerName: string | undefined;
-    let farmerPhone: string | undefined;
-    let farmerEmail: string | undefined;
-    let farmerDocumentId: string | undefined;
-
-    if (respondentIsProducer) {
-      farmerName = fieldMap['farmer.name'] as string | undefined;
-      farmerPhone = fieldMap['farmer.phone'] as string | undefined;
-      farmerEmail = fieldMap['farmer.email'] as string | undefined;
-      farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
-    } else {
-      // Q9 = false: use producer fields; persist respondent data on the Survey
-      farmerName = fieldMap['farmer.producerName'] as string | undefined;
-      farmerPhone = fieldMap['farmer.producerPhone'] as string | undefined;
-      farmerEmail = fieldMap['farmer.producerEmail'] as string | undefined;
-      farmerDocumentId = fieldMap['farmer.producerDocumentId'] as
-        | string
-        | undefined;
-
-      // Fallback: if producer name/documentId unknown, use respondent's as provisional
-      if (!farmerName) {
-        farmerName = fieldMap['farmer.name'] as string | undefined;
-      }
-      if (!farmerDocumentId) {
-        farmerDocumentId = fieldMap['farmer.documentId'] as string | undefined;
-      }
-
-      await manager.update(Survey, surveyId, {
-        respondentName:
-          (fieldMap['farmer.name'] as string | undefined) || undefined,
-        respondentPhone:
-          (fieldMap['farmer.phone'] as string | undefined) || undefined,
-        respondentDocumentId:
-          (fieldMap['farmer.documentId'] as string | undefined) || undefined,
-        respondentEmail:
-          (fieldMap['farmer.email'] as string | undefined) || undefined,
-      });
+    const identity = this.pickFarmerIdentity(fieldMap);
+    if (!identity.respondentIsProducer) {
+      await this.persistRespondentData(manager, surveyId, fieldMap);
     }
+    const farmerName = identity.name;
+    const farmerPhone = identity.phone;
+    const farmerEmail = identity.email;
+    const farmerDocumentId = identity.documentId;
 
     if (!farmerName) {
       throw new UnprocessableEntityException(
@@ -453,80 +509,23 @@ export class SurveysService {
       );
     }
 
-    // Dedup by two levels when Q9=false and producerDocumentId absent
-    let farmer: Farmer | null = null;
-    let existed = false;
+    // Dedup by two levels (documentId, then name + phone). Spec 68 — a shared
+    // documentId is no longer treated as absolute identity: an existing farmer
+    // with that document but a name that doesn't reasonably match is a
+    // collision, not automatically the same person. See
+    // `resolveExistingFarmer`, which throws when it is unresolved.
+    const resolved = await this.resolveExistingFarmer(manager, {
+      surveyId,
+      documentId: farmerDocumentId,
+      name: farmerName,
+      phone: farmerPhone,
+      resolution: dto.resolution,
+    });
+    let farmer: Farmer | null = resolved.farmer;
+    const existed = resolved.existed;
     // Farmer this documentId already belonged to, set only when a
     // collision was detected — used below to record/resolve it.
-    let collisionWithFarmer: Farmer | null = null;
-
-    // Level 1: dedup by documentId. Spec 68 — a shared documentId is no
-    // longer treated as absolute identity ("solid"): if an existing farmer
-    // has that document but a name that doesn't reasonably match, this is a
-    // documentId collision (typo, reused test data, two different people),
-    // not automatically the same person. See farmers/name-matching.ts.
-    if (farmerDocumentId) {
-      const existingByDocument = await manager.findOne(Farmer, {
-        where: { documentId: farmerDocumentId },
-      });
-
-      if (existingByDocument) {
-        if (isSameFarmerName(existingByDocument.name, farmerName)) {
-          farmer = existingByDocument;
-          existed = true;
-        } else {
-          collisionWithFarmer = existingByDocument;
-
-          if (dto.resolution === 'same_person') {
-            farmer = existingByDocument;
-            existed = true;
-          } else if (dto.resolution === 'separate_person') {
-            // Force the creation path below with this same documentId — the
-            // level 2 (name+phone) dedup right below is also skipped for
-            // this resolution, so this always creates a brand new farmer.
-            farmer = null;
-            existed = false;
-          } else {
-            // No resolution declared — never fuse in silence. Record the
-            // (still-pending) collision and reject without mutating
-            // anything else (no farmer created/modified, no CampaignSession
-            // linked).
-            await this.upsertDocumentCollision({
-              documentId: farmerDocumentId,
-              submittedName: farmerName,
-              existingFarmer: existingByDocument,
-              resolution: null,
-              survey,
-            });
-            throw new ConflictException({
-              message:
-                'El documento ya está registrado a nombre de otra persona',
-              documentId: farmerDocumentId,
-              submittedName: farmerName,
-              existingFarmer: {
-                farmerId: existingByDocument.id,
-                name: existingByDocument.name,
-              },
-            });
-          }
-        }
-      }
-    }
-
-    // Level 2: dedup by name + phone (heuristic fallback when no documentId).
-    // Spec 68 — skipped when `separate_person` forced the creation path
-    // above: that resolution means "always create a new farmer with this
-    // documentId", and letting this heuristic silently reuse a different
-    // pre-existing farmer instead (matched by name+phone) would contradict
-    // the encuestador's explicit decision and criterion 5, undetected —
-    // the collision would still get recorded as "separate_person" even
-    // though no new farmer was actually created.
-    if (!farmer && farmerPhone && dto.resolution !== 'separate_person') {
-      farmer = await manager.findOne(Farmer, {
-        where: { name: farmerName, phone: farmerPhone },
-      });
-      if (farmer) existed = true;
-    }
+    const collisionWithFarmer: Farmer | null = resolved.collisionWith;
 
     if (!farmer) {
       // Create Farm if at least a farm name is available
@@ -642,7 +641,7 @@ export class SurveysService {
     // it as resolved (creates the row if this is the first and only call,
     // e.g. a resolution submitted without a prior 409 round-trip).
     if (collisionWithFarmer && dto.resolution) {
-      await this.upsertDocumentCollision({
+      await this.upsertDocumentCollision(manager, {
         documentId: farmerDocumentId!,
         submittedName: farmerName,
         existingFarmer: collisionWithFarmer,
@@ -654,19 +653,152 @@ export class SurveysService {
     return { farmer, existed };
   }
 
+  // Quién es el respondiente y con qué datos se identifica. Q9 = false (otros
+  // instrumentos): el productor es otra persona y se usan sus campos; si faltan
+  // nombre o documento se toman provisionalmente los del respondiente.
+  private pickFarmerIdentity(
+    fieldMap: Record<string, SystemFieldValue>,
+  ): FarmerIdentity {
+    const str = (key: string): string | undefined => {
+      const value = fieldMap[key];
+      return value === undefined ? undefined : String(value);
+    };
+    // undefined means Q9 was not in the instrument (other instruments) → treat as true.
+    const respondentIsProducer = fieldMap['farmer.isRespondent'] !== false;
+    if (respondentIsProducer) {
+      return {
+        respondentIsProducer,
+        name: str('farmer.name'),
+        phone: str('farmer.phone'),
+        email: str('farmer.email'),
+        documentId: str('farmer.documentId'),
+      };
+    }
+    return {
+      respondentIsProducer,
+      name: str('farmer.producerName') || str('farmer.name'),
+      phone: str('farmer.producerPhone'),
+      email: str('farmer.producerEmail'),
+      documentId: str('farmer.producerDocumentId') || str('farmer.documentId'),
+    };
+  }
+
+  // Q9 = false: persist respondent data on the Survey.
+  private async persistRespondentData(
+    manager: EntityManager,
+    surveyId: string,
+    fieldMap: Record<string, SystemFieldValue>,
+  ): Promise<void> {
+    await manager.update(Survey, surveyId, {
+      respondentName:
+        (fieldMap['farmer.name'] as string | undefined) || undefined,
+      respondentPhone:
+        (fieldMap['farmer.phone'] as string | undefined) || undefined,
+      respondentDocumentId:
+        (fieldMap['farmer.documentId'] as string | undefined) || undefined,
+      respondentEmail:
+        (fieldMap['farmer.email'] as string | undefined) || undefined,
+    });
+  }
+
+  // Spec 93 (D-H2-8) — el documento se compara normalizado (sin puntos,
+  // espacios ni guiones; lo guardado no se reescribe) y con orden determinista:
+  // el más antiguo primero, con el id como desempate.
+  private async findFarmersByDocument(
+    manager: EntityManager,
+    documentKey: string,
+    withFarm = false,
+  ): Promise<Farmer[]> {
+    const qb = manager
+      .createQueryBuilder(Farmer, 'f')
+      .where(
+        "regexp_replace(f.document_id, '[.\\s-]', '', 'g') = :documentKey",
+        {
+          documentKey,
+        },
+      )
+      .orderBy('f.createdAt', 'ASC')
+      .addOrderBy('f.id', 'ASC');
+    if (withFarm) {
+      qb.leftJoinAndSelect('f.farm', 'farm').leftJoinAndSelect(
+        'farm.town',
+        'farmTown',
+      );
+    }
+    return qb.getMany();
+  }
+
+  // Dedup por documento y luego por nombre + teléfono. Con varios productores
+  // del mismo documento prefiere al que coincide en nombre. Lanza
+  // `DocumentCollisionError` ante una colisión sin resolución; con
+  // `separate_person` fuerza la creación de un productor nuevo (también se
+  // omite el nivel 2, que reutilizaría en silencio a otro por nombre + teléfono
+  // y contradiría la decisión explícita, spec 68 criterio 5).
+  private async resolveExistingFarmer(
+    manager: EntityManager,
+    params: {
+      surveyId: string;
+      documentId?: string;
+      name: string;
+      phone?: string;
+      resolution?: 'same_person' | 'separate_person';
+    },
+  ): Promise<{
+    farmer: Farmer | null;
+    existed: boolean;
+    collisionWith: Farmer | null;
+  }> {
+    let farmer: Farmer | null = null;
+    let collisionWith: Farmer | null = null;
+
+    const documentKey = normalizeDocumentId(params.documentId);
+    if (documentKey) {
+      const candidates = await this.findFarmersByDocument(manager, documentKey);
+      const selection = selectFarmerByDocument(candidates, params.name);
+      if (selection.match) {
+        farmer = selection.match;
+      } else if (selection.collisionWith) {
+        collisionWith = selection.collisionWith;
+        if (params.resolution === 'same_person') {
+          farmer = collisionWith;
+        } else if (params.resolution !== 'separate_person') {
+          throw new DocumentCollisionError(
+            params.surveyId,
+            params.documentId!,
+            params.name,
+            collisionWith,
+          );
+        }
+      }
+    }
+
+    if (!farmer && params.phone && params.resolution !== 'separate_person') {
+      farmer = await manager.findOne(Farmer, {
+        where: { name: params.name, phone: params.phone },
+        order: { createdAt: 'ASC', id: 'ASC' },
+      });
+    }
+
+    return { farmer, existed: farmer !== null, collisionWith };
+  }
+
   // Spec 68 — one pending (unresolved) row per (documentId, submittedName,
   // existingFarmer) combination: a retry without a resolution (e.g. the
   // mobile sync queue retrying a deferred collision) updates the same row
   // instead of piling up duplicates. Resolving it later updates that same
   // row rather than inserting a second one.
-  private async upsertDocumentCollision(params: {
-    documentId: string;
-    submittedName: string;
-    existingFarmer: Farmer;
-    resolution: 'same_person' | 'separate_person' | null;
-    survey: Survey;
-  }): Promise<void> {
-    const existingRow = await this.documentCollisionsRepository.findOne({
+  private async upsertDocumentCollision(
+    manager: EntityManager,
+    params: {
+      documentId: string;
+      submittedName: string;
+      existingFarmer: Farmer;
+      resolution: 'same_person' | 'separate_person' | null;
+      survey: Survey;
+    },
+  ): Promise<void> {
+    const repository = manager.getRepository(FarmerDocumentCollision);
+    const existingRow = await repository.findOne({
       where: {
         documentId: params.documentId,
         submittedName: params.submittedName,
@@ -681,15 +813,20 @@ export class SurveysService {
       // partial entity back could null out `survey_id` on a repeated
       // pending hit (e.g. a retried 409 without a resolution). `.update()`
       // only touches the columns given here.
-      await this.documentCollisionsRepository.update(existingRow.collisionId, {
+      //
+      // Spec 93 — la fila pasa a apuntar a la encuesta que la vuelve a
+      // disparar: el mismo documento + nombre llega en envíos distintos y
+      // quien la resuelve la ve desde el envío que está revisando.
+      await repository.update(existingRow.collisionId, {
         resolution: params.resolution,
         resolvedAt: params.resolution ? new Date() : null,
+        survey: params.survey,
       });
       return;
     }
 
-    await this.documentCollisionsRepository.save(
-      this.documentCollisionsRepository.create({
+    await repository.save(
+      repository.create({
         documentId: params.documentId,
         submittedName: params.submittedName,
         existingFarmer: params.existingFarmer,
@@ -978,63 +1115,39 @@ export class SurveysService {
 
     if (!survey) throw new NotFoundException('Survey not found');
 
-    // Maps ASCII camelCase systemField keys to TypeOfCrop display names in DB
-    const CROP_FIELD_MAP: Record<string, string> = {
-      cacao: 'Cacao',
-      cafe: 'Café',
-      cannabis: 'Cannabis',
-      canamo: 'Cáñamo',
-    };
-
-    // Collect crop names from affirmative yes/no responses with systemField 'crop.*'
-    // Also collect farm.* fields to create/update Farm if the instrument includes them
-    const cropNames: string[] = [];
-    // Spec 84 — instrumento de Registro (S_REG): cultivo principal como
-    // pregunta de selección única, con `metadataId` = cropId. Convive con
-    // el mecanismo `crop.*` de arriba (usado por S2 y el taller).
-    const mainCropIds = new Set<string>();
+    // Collect farm.* fields to create/update Farm if the instrument includes
+    // them. Los cultivos (`crop.*` y `farm.mainCrop`, este último del
+    // instrumento de Registro S_REG, spec 84) los resuelve
+    // `resolveCropsFromResponses` (spec 93), compartido con el canal público.
     const farmFieldMap: Record<string, string | number | boolean> = {};
     for (const response of survey.responses ?? []) {
       const sf = response.question?.systemField;
-      if (!sf) continue;
-      if (sf.startsWith('crop.')) {
-        if (response.booleanValue === true) {
-          const key = sf.split('.')[1];
-          const resolved = CROP_FIELD_MAP[key] ?? key;
-          cropNames.push(resolved);
-        }
-      } else if (sf === 'farm.mainCrop') {
-        if (response.option?.metadataId) {
-          mainCropIds.add(response.option.metadataId);
-        }
-      } else if (sf.startsWith('farm.')) {
+      if (!sf || sf.startsWith('crop.') || sf === 'farm.mainCrop') continue;
+      if (sf.startsWith('farm.')) {
         const value =
           response.textValue ?? response.numericValue ?? response.booleanValue;
-        if (value !== undefined && value !== null) {
-          farmFieldMap[sf] = value;
+        if (value === undefined || value === null) continue;
+        if (
+          sf === 'farm.area' &&
+          typeof response.numericValue === 'number' &&
+          response.option?.text
+        ) {
+          // Spec 93 — el área se guarda en hectáreas; unidad desconocida → sin área.
+          const { hectares } = convertAreaToHectares(
+            response.numericValue,
+            response.option.text,
+          );
+          if (hectares !== null) farmFieldMap[sf] = hectares;
+          continue;
         }
+        farmFieldMap[sf] = value;
       }
     }
 
-    // Load matching TypeOfCrop entities, por nombre (crop.*) y por cropId
-    // (farm.mainCrop), deduplicando.
-    const cropsByName =
-      cropNames.length > 0
-        ? await this.typesOfCropsRepository.find({
-            where: { name: In(cropNames) },
-          })
-        : [];
-    const cropsByMainCrop =
-      mainCropIds.size > 0
-        ? await this.typesOfCropsRepository.find({
-            where: { cropId: In([...mainCropIds]) },
-          })
-        : [];
-    const cropsById = new Map<string, TypeOfCrop>();
-    for (const crop of [...cropsByName, ...cropsByMainCrop]) {
-      cropsById.set(crop.cropId, crop);
-    }
-    const crops = [...cropsById.values()];
+    const { crops } = resolveCropsFromResponses(
+      survey.responses ?? [],
+      await this.typesOfCropsRepository.find(),
+    );
 
     // Assign crops to CampaignSession via direct relation update to avoid cascading nulls
     if (survey.campaignSession) {
@@ -1199,6 +1312,40 @@ export class SurveysService {
       counts.map((row) => [row.surveyId, Number(row.count)]),
     );
 
+    // Spec 93 — nombre y documento declarados, en una sola consulta para todo el lote.
+    const identityRows = await this.surveysRepository.manager.query<
+      {
+        surveyId: string;
+        systemField: string;
+        textValue: string | null;
+        numericValue: number | null;
+      }[]
+    >(
+      `SELECT r.survey_id AS "surveyId", q.system_field AS "systemField",
+              r.text_value AS "textValue", r.numeric_value AS "numericValue"
+         FROM responses r
+         JOIN questions q ON q.question_id = r.question_id
+        WHERE r.survey_id = ANY($1::uuid[])
+          AND q.system_field IN ('farmer.name', 'farmer.documentId')`,
+      [surveys.map((s) => s.surveyId)],
+    );
+    const identityBySurveyId = new Map<
+      string,
+      { name: string | null; documentId: string | null }
+    >();
+    for (const row of identityRows) {
+      const identity = identityBySurveyId.get(row.surveyId) ?? {
+        name: null,
+        documentId: null,
+      };
+      const value =
+        row.textValue ??
+        (row.numericValue !== null ? String(row.numericValue) : null);
+      if (row.systemField === 'farmer.name') identity.name = value;
+      else identity.documentId = value;
+      identityBySurveyId.set(row.surveyId, identity);
+    }
+
     return surveys.map((survey) => ({
       surveyId: survey.surveyId,
       instrumentId: survey.instruments?.[0]?.instrumentId ?? '',
@@ -1206,6 +1353,9 @@ export class SurveysService {
       createdAt: survey.createdAt,
       responseCount: countBySurveyId.get(survey.surveyId) ?? 0,
       reviewStatus: survey.reviewStatus ?? 'pending',
+      farmerName: identityBySurveyId.get(survey.surveyId)?.name ?? null,
+      farmerDocumentId:
+        identityBySurveyId.get(survey.surveyId)?.documentId ?? null,
     }));
   }
 
@@ -1225,16 +1375,30 @@ export class SurveysService {
     return survey;
   }
 
-  // Criterio 11/12 — reutiliza extractFarmer (misma detección de colisiones
-  // del spec 68) y extractCrops. Ante colisión pendiente, extractFarmer
-  // lanza 409 y este método deja el envío sin tocar — no se marca
-  // 'processed' hasta que el 409 se resuelve con `resolution`.
-  async processPublicSubmission(
+  // Spec 93 — carga un envío público pendiente con lo que necesitan tanto la
+  // vista previa como el procesado. Con `manager` dentro de una transacción
+  // lee el estado ya bloqueado.
+  private async loadPendingPublicSubmission(
+    manager: EntityManager,
     surveyId: string,
-    dto: ExtractFarmerDto,
-    reviewedByUserId?: string,
-  ): Promise<{ farmer: Farmer; existed: boolean }> {
-    const survey = await this.findPublicSurveyOrThrow(surveyId);
+  ): Promise<Survey> {
+    const survey = await manager.findOne(Survey, {
+      where: { surveyId },
+      relations: [
+        'responses',
+        'responses.question',
+        'responses.option',
+        'farmer',
+      ],
+    });
+
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    if (survey.origin !== 'public') {
+      throw new ConflictException(
+        'Esta encuesta no es un envío del canal público.',
+      );
+    }
 
     if (survey.reviewStatus !== 'pending') {
       throw new ConflictException(
@@ -1242,17 +1406,487 @@ export class SurveysService {
       );
     }
 
-    const result = await this.extractFarmer(surveyId, dto);
+    return survey;
+  }
 
-    await this.consentRecordsService.linkOrphansToFarmerBySurvey(
-      surveyId,
-      result.farmer.id,
+  // El municipio del envío (por el `metadataId` de su opción) tiene prioridad;
+  // si no lo trae, el que indicó el administrador.
+  private async resolveSubmissionTown(
+    manager: EntityManager,
+    responses: Response[],
+    adminTownId?: string,
+  ): Promise<Town | null> {
+    const metadataId = responses.find(
+      (r) => r.question?.systemField === 'farm.town',
+    )?.option?.metadataId;
+    if (metadataId) {
+      const town = await manager.findOne(Town, {
+        where: { townId: metadataId },
+      });
+      if (town) return town;
+      this.logger.warn(
+        `Town not found for metadataId=${metadataId} — farm.town left null`,
+      );
+    }
+    if (adminTownId) {
+      const town = await manager.findOne(Town, {
+        where: { townId: adminTownId },
+      });
+      if (!town) throw new NotFoundException('Town not found');
+      return town;
+    }
+    return null;
+  }
+
+  private submittedFarmerValues(
+    fieldMap: Record<string, SystemFieldValue>,
+    identity: FarmerIdentity,
+  ): Record<string, unknown> {
+    return {
+      phone: identity.phone,
+      email: identity.email,
+      gender: fieldMap['farmer.gender'],
+      age: fieldMap['farmer.age'],
+      experienceYears: fieldMap['farmer.experienceYears'],
+      isMainIncome: fieldMap['farmer.isMainIncome'],
+      educationLevel: fieldMap['farmer.educationLevel'],
+    };
+  }
+
+  private submittedFarmValues(
+    fieldMap: Record<string, SystemFieldValue>,
+    townId: string | null,
+  ): Record<string, unknown> {
+    return {
+      vereda: fieldMap['farm.vereda'],
+      corregimiento: fieldMap['farm.corregimiento'],
+      latitude: fieldMap['farm.latitude'],
+      longitude: fieldMap['farm.longitude'],
+      altitude: fieldMap['farm.altitude'],
+      area: fieldMap['farm.area'],
+      waterAccess: fieldMap['farm.waterAccess'],
+      internetAccess: fieldMap['farm.internetAccess'],
+      hasElectricityAccess: fieldMap['farm.hasElectricityAccess'],
+      mainAccessType: fieldMap['farm.mainAccessType'],
+      electricitySourceType: fieldMap['farm.electricitySourceType'],
+      waterSourceType: fieldMap['farm.waterSourceType'],
+      plotCount: fieldMap['farm.plotCount'],
+      townId,
+    };
+  }
+
+  // Lo que hoy tiene el productor / la finca en las columnas completables.
+  // El productor debe venir con `farm` y `farm.town` cargados.
+  private toPlanFarmer(farmer: Farmer): PlanFarmerRecord {
+    const pick = (
+      source: object,
+      fields: readonly string[],
+    ): Record<string, unknown> => {
+      const record = source as Record<string, unknown>;
+      return Object.fromEntries(fields.map((f) => [f, record[f] ?? null]));
+    };
+    return {
+      farmerId: farmer.id,
+      name: farmer.name,
+      values: pick(farmer, FARMER_COMPLETABLE_FIELDS),
+      farm: farmer.farm
+        ? {
+            farmId: farmer.farm.farmId,
+            name: farmer.farm.name,
+            values: {
+              ...pick(farmer.farm, FARM_COMPLETABLE_FIELDS),
+              townId: farmer.farm.town?.townId ?? null,
+            },
+          }
+        : null,
+    };
+  }
+
+  private async reloadFarmerWithFarm(
+    manager: EntityManager,
+    farmerId: string,
+  ): Promise<Farmer> {
+    return manager.findOneOrFail(Farmer, {
+      where: { id: farmerId },
+      relations: ['farm', 'farm.town'],
+    });
+  }
+
+  // Otro envío pendiente del canal público, resumido a lo que sirve para
+  // detectar documentos repetidos y fincas compartidas.
+  private async loadPendingPeers(
+    manager: EntityManager,
+    excludeSurveyId: string,
+  ): Promise<PendingSubmissionPeer[]> {
+    const rows = await manager.query<
+      {
+        surveyId: string;
+        systemField: string;
+        textValue: string | null;
+        numericValue: number | null;
+        metadataId: string | null;
+      }[]
+    >(
+      `SELECT s.survey_id AS "surveyId", q.system_field AS "systemField",
+              r.text_value AS "textValue", r.numeric_value AS "numericValue",
+              o.metadata_id AS "metadataId"
+         FROM surveys s
+         JOIN responses r ON r.survey_id = s.survey_id
+         JOIN questions q ON q.question_id = r.question_id
+         LEFT JOIN options_question o ON o.option_id = r.option_id
+        WHERE s.origin = 'public' AND s.review_status = 'pending'
+          AND s.survey_id <> $1
+          AND q.system_field IN ('farmer.documentId', 'farm.name', 'farm.vereda', 'farm.town')`,
+      [excludeSurveyId],
     );
 
-    await this.extractCrops(surveyId);
+    const peers = new Map<string, PendingSubmissionPeer>();
+    for (const row of rows) {
+      const peer = peers.get(row.surveyId) ?? {
+        surveyId: row.surveyId,
+        documentId: null,
+        name: '',
+        vereda: null,
+        townId: null,
+      };
+      if (row.systemField === 'farmer.documentId') {
+        peer.documentId = normalizeDocumentId(
+          row.textValue ?? row.numericValue,
+        );
+      } else if (row.systemField === 'farm.name') {
+        peer.name = row.textValue ?? '';
+      } else if (row.systemField === 'farm.vereda') {
+        peer.vereda = row.textValue;
+      } else {
+        peer.townId = row.metadataId;
+      }
+      peers.set(row.surveyId, peer);
+    }
+    return [...peers.values()];
+  }
 
-    await this.surveysRepository.update(surveyId, {
-      farmer: { id: result.farmer.id } as Farmer,
+  // Fincas con el mismo nombre normalizado. El filtro SQL replica de forma
+  // aproximada `normalizeFarmKey` (tildes y signos); la comparación final,
+  // con vereda y municipio, la hace el planificador.
+  private async findFarmsByNormalizedName(
+    manager: EntityManager,
+    nameKey: string,
+  ): Promise<ExistingFarmCandidate[]> {
+    if (!nameKey) return [];
+    return manager.query<ExistingFarmCandidate[]>(
+      `SELECT f.farm_id AS "farmId", f.name AS name, f.vereda AS vereda,
+              f.town_id AS "townId"
+         FROM farms f
+        WHERE btrim(regexp_replace(
+                translate(lower(f.name), 'áéíóúüñ', 'aeiouun'),
+                '[^a-z0-9]+', ' ', 'g')) = $1
+        LIMIT 50`,
+      [nameKey],
+    );
+  }
+
+  // Spec 93 (D-H2-13) — solo lectura: anticipa lo que hará `process-public`
+  // con las mismas decisiones. No escribe nada, ni la fila de colisión.
+  async previewPublicSubmission(
+    surveyId: string,
+    query: { townId?: string } = {},
+  ): Promise<ProcessPreview> {
+    const manager = this.surveysRepository.manager;
+    const survey = await this.loadPendingPublicSubmission(manager, surveyId);
+    const responses = survey.responses ?? [];
+
+    const { fieldMap, warnings } = buildSystemFieldMapWithWarnings(responses);
+    const identity = this.pickFarmerIdentity(fieldMap);
+    const town = await this.resolveSubmissionTown(
+      manager,
+      responses,
+      query.townId,
+    );
+    const { crops, unmapped } = resolveCropsFromResponses(
+      responses,
+      await manager.find(TypeOfCrop),
+    );
+
+    const documentKey = normalizeDocumentId(identity.documentId);
+    let linkedFarmer: PlanFarmerRecord | null = null;
+    let documentCandidates: PlanFarmerRecord[] = [];
+    let phoneMatch: PlanFarmerRecord | null = null;
+    if (survey.farmer) {
+      linkedFarmer = this.toPlanFarmer(
+        await this.reloadFarmerWithFarm(manager, survey.farmer.id),
+      );
+    } else {
+      if (documentKey) {
+        documentCandidates = (
+          await this.findFarmersByDocument(manager, documentKey, true)
+        ).map((f) => this.toPlanFarmer(f));
+      }
+      if (documentCandidates.length === 0 && identity.name && identity.phone) {
+        const byPhone = await manager.findOne(Farmer, {
+          where: { name: identity.name, phone: identity.phone },
+          relations: ['farm', 'farm.town'],
+          order: { createdAt: 'ASC', id: 'ASC' },
+        });
+        phoneMatch = byPhone ? this.toPlanFarmer(byPhone) : null;
+      }
+    }
+
+    const farmName = fieldMap['farm.name'] as string | undefined;
+    const vereda = fieldMap['farm.vereda'] as string | undefined;
+    const actorTypes = new Map(
+      (await manager.find(ActorType)).map((a) => [a.actorTypeId, a.name]),
+    );
+
+    return buildPublicSubmissionPlan({
+      surveyId,
+      identity: {
+        name: identity.name ?? null,
+        documentId: documentKey,
+        phone: identity.phone ?? null,
+      },
+      documentCandidates,
+      phoneMatch,
+      linkedFarmer,
+      submission: {
+        farmerValues: this.submittedFarmerValues(fieldMap, identity),
+        farm: {
+          name: farmName ?? null,
+          vereda: vereda ?? null,
+          townId: town?.townId ?? null,
+          values: this.submittedFarmValues(fieldMap, town?.townId ?? null),
+        },
+      },
+      crops: {
+        resolved: crops.map((c) => ({ cropId: c.cropId, name: c.name })),
+        unmapped,
+      },
+      respondentProfiles: responses.flatMap((r) => {
+        const actorType = r.option?.metadataId
+          ? actorTypes.get(r.option.metadataId)
+          : undefined;
+        return actorType && r.option
+          ? [{ optionText: r.option.text, actorType }]
+          : [];
+      }),
+      fieldWarnings: warnings,
+      existingFarmCandidates: farmName
+        ? await this.findFarmsByNormalizedName(
+            manager,
+            normalizeFarmKey(farmName),
+          )
+        : [],
+      pendingPeers: await this.loadPendingPeers(manager, surveyId),
+    });
+  }
+
+  private async applyCompletion(
+    manager: EntityManager,
+    entity: 'farmer' | 'farm',
+    id: string,
+    target: Farmer | Farm,
+    fields: FieldToComplete[],
+    town: Town | null,
+  ): Promise<void> {
+    if (fields.length === 0) return;
+    const patch: Record<string, unknown> = {};
+    for (const { field, value } of fields) {
+      if (field === 'townId') patch.town = town;
+      else patch[field] = value;
+    }
+    if (entity === 'farmer') {
+      await manager.update(Farmer, id, patch as QueryDeepPartialEntity<Farmer>);
+    } else {
+      await manager.update(Farm, id, patch as QueryDeepPartialEntity<Farm>);
+    }
+    Object.assign(target, patch);
+  }
+
+  // Suma cultivos a la finca sin quitar ninguno. No toca `campaign_sessions_crops`.
+  private async addCropsToFarm(
+    manager: EntityManager,
+    farmId: string,
+    crops: TypeOfCrop[],
+  ): Promise<void> {
+    if (crops.length === 0) return;
+    await manager.query(
+      `INSERT INTO farms_crops (farm_id, crop_id)
+       SELECT $1::uuid, c.crop_id FROM unnest($2::uuid[]) AS c(crop_id)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM farms_crops fc
+           WHERE fc.farm_id = $1::uuid AND fc.crop_id = c.crop_id)`,
+      [farmId, crops.map((c) => c.cropId)],
+    );
+  }
+
+  // Finca para un productor que aún no tiene: vincular a una existente (el
+  // administrador la eligió, y no se le modifica ninguna columna) o crear la
+  // del envío si trae nombre.
+  private async createOrLinkFarm(
+    manager: EntityManager,
+    decision: ProcessPublicSubmissionDto['farm'],
+    fieldMap: Record<string, SystemFieldValue>,
+    town: Town | null,
+  ): Promise<Farm | null> {
+    if (decision?.mode === 'link') {
+      const farm = await manager.findOne(Farm, {
+        where: { farmId: decision.farmId },
+      });
+      if (!farm) throw new NotFoundException('Farm not found');
+      return farm;
+    }
+
+    const farmName = fieldMap['farm.name'] as string | undefined;
+    if (!farmName) return null;
+    const values = this.submittedFarmValues(fieldMap, null);
+    delete values.townId;
+    return manager.save<Farm>(
+      manager.create(Farm, {
+        ...(values as DeepPartial<Farm>),
+        name: farmName,
+        location: null,
+        town: town ?? undefined,
+      }),
+    );
+  }
+
+  // Criterio 11/12 — mismo criterio de colisión del spec 68 que `extractFarmer`.
+  // Spec 93: todo ocurre en UNA transacción bajo el lock de la encuesta —
+  // comprobar el estado, extraer, actuar sobre la finca, sumar cultivos,
+  // reanclar la constancia y marcar `processed`. Si algo falla no queda nada;
+  // ante colisión sin resolver responde 409 y el envío queda `pending`.
+  async processPublicSubmission(
+    surveyId: string,
+    dto: ProcessPublicSubmissionDto,
+    reviewedByUserId?: string,
+  ): Promise<{ farmer: Farmer; existed: boolean }> {
+    try {
+      return await this.surveysRepository.manager.transaction(
+        async (manager) => {
+          await this.lockSurvey(manager, surveyId);
+          return await this.processPublicLocked(
+            manager,
+            surveyId,
+            dto,
+            reviewedByUserId,
+          );
+        },
+      );
+    } catch (err) {
+      throw await this.toCollisionConflict(err);
+    }
+  }
+
+  private async processPublicLocked(
+    manager: EntityManager,
+    surveyId: string,
+    dto: ProcessPublicSubmissionDto,
+    reviewedByUserId?: string,
+  ): Promise<{ farmer: Farmer; existed: boolean }> {
+    // Se relee dentro del lock: un procesado concurrente ya pudo terminar.
+    const survey = await this.loadPendingPublicSubmission(manager, surveyId);
+    const responses = survey.responses ?? [];
+
+    const { fieldMap } = buildSystemFieldMapWithWarnings(responses);
+    const identity = this.pickFarmerIdentity(fieldMap);
+    if (!identity.name) {
+      throw new UnprocessableEntityException(
+        'farmer.name is required to extract farmer',
+      );
+    }
+    if (!identity.respondentIsProducer) {
+      await this.persistRespondentData(manager, surveyId, fieldMap);
+    }
+
+    const town = await this.resolveSubmissionTown(
+      manager,
+      responses,
+      dto.townId,
+    );
+    const { crops } = resolveCropsFromResponses(
+      responses,
+      await manager.find(TypeOfCrop),
+    );
+
+    let farmer: Farmer | null = survey.farmer ?? null;
+    let existed = farmer !== null;
+    let collisionWith: Farmer | null = null;
+    if (!farmer) {
+      const resolved = await this.resolveExistingFarmer(manager, {
+        surveyId,
+        documentId: identity.documentId,
+        name: identity.name,
+        phone: identity.phone,
+        resolution: dto.resolution,
+      });
+      farmer = resolved.farmer;
+      existed = resolved.existed;
+      collisionWith = resolved.collisionWith;
+    }
+
+    let farm: Farm | null;
+    if (farmer) {
+      // Misma persona: completa solo lo vacío, nunca pisa un valor no nulo.
+      farmer = await this.reloadFarmerWithFarm(manager, farmer.id);
+      const plan = this.toPlanFarmer(farmer);
+      await this.applyCompletion(
+        manager,
+        'farmer',
+        farmer.id,
+        farmer,
+        completeFields(
+          'farmer',
+          plan.values,
+          this.submittedFarmerValues(fieldMap, identity),
+        ),
+        town,
+      );
+      farm = farmer.farm ?? null;
+      if (farm && plan.farm) {
+        await this.applyCompletion(
+          manager,
+          'farm',
+          farm.farmId,
+          farm,
+          completeFields(
+            'farm',
+            plan.farm.values,
+            this.submittedFarmValues(fieldMap, town?.townId ?? null),
+          ),
+          town,
+        );
+      } else {
+        // Una finca por productor hasta H3: si ya tiene, no se crea otra.
+        farm = await this.createOrLinkFarm(manager, dto.farm, fieldMap, town);
+        if (farm) {
+          await manager.update(Farmer, farmer.id, { farm });
+          farmer.farm = farm;
+        }
+      }
+    } else {
+      farm = await this.createOrLinkFarm(manager, dto.farm, fieldMap, town);
+      farmer = await manager.save<Farmer>(
+        manager.create(Farmer, {
+          name: identity.name,
+          documentId: identity.documentId ?? null,
+          phone: identity.phone ?? null,
+          email: identity.email ?? null,
+          gender: (fieldMap['farmer.gender'] as string | undefined) ?? null,
+          age: (fieldMap['farmer.age'] as number | undefined) ?? null,
+          experienceYears:
+            (fieldMap['farmer.experienceYears'] as number | undefined) ?? null,
+          isMainIncome:
+            (fieldMap['farmer.isMainIncome'] as boolean | undefined) ?? null,
+          educationLevel:
+            (fieldMap['farmer.educationLevel'] as string | undefined) ?? null,
+          farm: farm ?? undefined,
+        }),
+      );
+    }
+
+    if (farm) await this.addCropsToFarm(manager, farm.farmId, crops);
+
+    await manager.update(Survey, surveyId, {
+      farmer: { id: farmer.id } as Farmer,
       reviewStatus: 'processed',
       reviewedBy: reviewedByUserId
         ? ({ userId: reviewedByUserId } as User)
@@ -1260,7 +1894,23 @@ export class SurveysService {
       reviewedAt: new Date(),
     });
 
-    return result;
+    await this.consentRecordsService.linkOrphansToFarmerBySurvey(
+      surveyId,
+      farmer.id,
+      manager,
+    );
+
+    if (collisionWith && dto.resolution) {
+      await this.upsertDocumentCollision(manager, {
+        documentId: identity.documentId!,
+        submittedName: identity.name,
+        existingFarmer: collisionWith,
+        resolution: dto.resolution,
+        survey,
+      });
+    }
+
+    return { farmer, existed };
   }
 
   // Criterio 13 — descartar es un cambio de estado, no un borrado: la
