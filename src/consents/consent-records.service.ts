@@ -293,11 +293,18 @@ export class ConsentRecordsService {
   // constancia se registra anclada a `survey` (no existe session), y se
   // reancla al agricultor al procesar el envío desde la bandeja de
   // revisión (SurveysService.processPublicSubmission).
+  //
+  // Spec 93 — `manager` permite reanclar dentro de la transacción del
+  // procesado: el agricultor aún no está confirmado y otra conexión no lo vería.
   async linkOrphansToFarmerBySurvey(
     surveyId: string,
     farmerId: string,
+    manager?: EntityManager,
   ): Promise<void> {
-    await this.consentRecordsRepository.update(
+    const repository = manager
+      ? manager.getRepository(ConsentRecord)
+      : this.consentRecordsRepository;
+    await repository.update(
       {
         survey: { surveyId },
         farmer: IsNull(),
