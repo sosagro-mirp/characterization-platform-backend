@@ -179,6 +179,9 @@ describe('buildPublicSubmissionPlan', () => {
     );
     expect(p.farm.action).toBe('complete');
     expect(codes(p)).toContain('different_farm_name_existing_farmer');
+    // D-H2-3: el envío queda "como respuesta" — no propone completar ningún
+    // campo de la finca existente (aunque estén vacíos), solo la advertencia.
+    expect(p.fieldsToComplete.some((f) => f.entity === 'farm')).toBe(false);
   });
 
   it('productor sin finca: crea', () => {

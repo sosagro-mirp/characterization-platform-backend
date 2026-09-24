@@ -1527,6 +1527,13 @@ describe('spec-093 — incorporación de los envíos del taller (e2e)', () => {
       expect(await farmCropIds(farmId)).toEqual(
         sortedCropIds(['Café', 'Cacao']),
       );
+      // D-H2-3: con otro nombre de finca, el resto del envío queda "como
+      // respuesta" — no se completan vereda, área ni municipio de la finca
+      // original (a diferencia de C03, donde el nombre sí coincide).
+      const farmAfter = await farmRow(farmId);
+      expect(farmAfter.vereda).toBeNull();
+      expect(farmAfter.area).toBeNull();
+      expect(farmAfter.town_id).toBeNull();
     });
   });
 

@@ -1842,18 +1842,29 @@ export class SurveysService {
       );
       farm = farmer.farm ?? null;
       if (farm && plan.farm) {
-        await this.applyCompletion(
-          manager,
-          'farm',
-          farm.farmId,
-          farm,
-          completeFields(
+        // D-H2-3: con otra finca de otro nombre no se crea una segunda ni se
+        // completan sus campos (vereda, área, coordenadas, municipio) — solo
+        // la advertencia `different_farm_name_existing_farmer`. Los cultivos
+        // del envío sí se suman (son aditivos y no pisan nada; cubierto por
+        // el propio criterio 2 y el caso C06c).
+        const submittedFarmName = fieldMap['farm.name'] as string | undefined;
+        const farmNameDiffers =
+          !!submittedFarmName &&
+          normalizeFarmKey(submittedFarmName) !== normalizeFarmKey(farm.name);
+        if (!farmNameDiffers) {
+          await this.applyCompletion(
+            manager,
             'farm',
-            plan.farm.values,
-            this.submittedFarmValues(fieldMap, town?.townId ?? null),
-          ),
-          town,
-        );
+            farm.farmId,
+            farm,
+            completeFields(
+              'farm',
+              plan.farm.values,
+              this.submittedFarmValues(fieldMap, town?.townId ?? null),
+            ),
+            town,
+          );
+        }
       } else {
         // Una finca por productor hasta H3: si ya tiene, no se crea otra.
         farm = await this.createOrLinkFarm(manager, dto.farm, fieldMap, town);

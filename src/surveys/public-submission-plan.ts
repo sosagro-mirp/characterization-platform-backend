@@ -220,14 +220,21 @@ export function buildPublicSubmissionPlan(
   const submittedFarmName = submission.farm.name;
   let action: FarmAction;
   let farmId: string | null = null;
+  // D-H2-3: si el envío trae otra finca con otro nombre, no se crea una segunda
+  // *ni se tocan* los campos de la finca existente — el envío queda como
+  // respuesta, solo con la advertencia. `farmNameDiffers` gatea también
+  // `fieldsToComplete` más abajo, para que la vista previa y `process-public`
+  // coincidan en no completar esa finca.
+  let farmNameDiffers = false;
   if (matched?.farm) {
     action = 'complete';
     farmId = matched.farm.farmId;
-    if (
+    farmNameDiffers = Boolean(
       submittedFarmName &&
       normalizeFarmKey(submittedFarmName) !==
-        normalizeFarmKey(matched.farm.name)
-    ) {
+        normalizeFarmKey(matched.farm.name),
+    );
+    if (farmNameDiffers) {
       warnings.push({
         code: 'different_farm_name_existing_farmer',
         message: `El productor ya tiene la finca «${matched.farm.name}»; el envío trae «${submittedFarmName}» y no se crea una segunda.`,
@@ -272,7 +279,7 @@ export function buildPublicSubmissionPlan(
   const fieldsToComplete: FieldToComplete[] = matched
     ? [
         ...completeFields('farmer', matched.values, submission.farmerValues),
-        ...(matched.farm
+        ...(matched.farm && !farmNameDiffers
           ? completeFields('farm', matched.farm.values, submission.farm.values)
           : []),
       ]
