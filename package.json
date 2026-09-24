@@ -33,7 +33,10 @@
     "instruments:apply": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts apply",
     "instruments:restore": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts restore",
     "instruments:verify": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts verify",
-    "instruments:inventory": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts inventory"
+    "instruments:inventory": "ts-node -r tsconfig-paths/register src/database/instrument-sync/cli.ts inventory",
+    "public-submissions:plan": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts plan",
+    "public-submissions:apply": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts apply",
+    "public-submissions:revert": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts revert"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1070.0",
