@@ -2,15 +2,14 @@
  * Spec 93 — Incorporación de los envíos del taller como productores.
  * `spec/93_incorporacion_envios_taller_productores.md` (raíz del ecosistema).
  *
- * ESTAS PRUEBAS NACEN EN ROJO (enfoque test-first). Compilan hoy, pero fallan
- * en ejecución porque el comportamiento todavía no existe: `metadataId` no es
- * escribible en los DTOs de opciones, `GET /api/surveys/:id/process-preview`
- * no existe, `process-public` no acepta `farm` ni `townId`, los cultivos no
- * llegan a la finca sin sesión, el procesado no es atómico, la búsqueda por
- * documento no normaliza, el área no se convierte, etc. Las fases 1 y 2 del
- * spec las ponen en verde. Algunos casos (C03 y la regresión de
+ * Nacieron en rojo (enfoque test-first): `metadataId` no era escribible en los
+ * DTOs de opciones, `GET /api/surveys/:id/process-preview` no existía,
+ * `process-public` no aceptaba `farm` ni `townId`, los cultivos no llegaban a
+ * la finca sin sesión, el procesado no era atómico, la búsqueda por documento
+ * no normalizaba, el área no se convertía, etc. Las fases 1 y 2 del spec los
+ * pusieron en verde (44/44, 2026-09-24). Algunos casos (C03 y la regresión de
  * `extract-crops` con sesión, parte de C17) protegen comportamiento que ya
- * existe y pueden pasar desde el principio: son guardas de regresión.
+ * existía y pasaban desde el principio: son guardas de regresión.
  *
  * Criterios cubiertos: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 y 17 (un
  * `describe` por criterio, prefijo `Cnn`). El 14 (bandeja) lo cubren el
@@ -169,6 +168,7 @@ describe('spec-093 — incorporación de los envíos del taller (e2e)', () => {
   let ds: DataSource;
   let adminToken: string;
   let adminUserId: string;
+  let pollsterToken: string;
 
   const typeId: Record<string, string> = {};
   const cropId = {} as Record<CropName, string>;
@@ -615,6 +615,29 @@ describe('spec-093 — incorporación de los envíos del taller (e2e)', () => {
       .expect(200);
     adminToken = (login.body as LoginResponse).accessToken;
 
+    // ── encuestador (solo para C09 — process-preview le está vedado) ──────
+    const pollsterRoles = await ds.query<{ role_id: string }[]>(
+      `SELECT role_id FROM roles WHERE name = 'pollster'`,
+    );
+    const pollsterEmail = `${PREFIX}-pollster@test.local`;
+    const existingPollster = await ds.query<{ user_id: string }[]>(
+      `SELECT user_id FROM users WHERE email = $1`,
+      [pollsterEmail],
+    );
+    if (!existingPollster.length) {
+      const hash = await bcrypt.hash(TEST_PASSWORD, 10);
+      await ds.query(
+        `INSERT INTO users (user_id, name, last_name, email, password, role_id, must_change_password)
+         VALUES (gen_random_uuid(), 'E2E', 'Spec93', $1, $2, $3, false)`,
+        [pollsterEmail, hash, pollsterRoles[0].role_id],
+      );
+    }
+    const pollsterLogin = await http()
+      .post('/api/auth/login')
+      .send({ email: pollsterEmail, password: TEST_PASSWORD })
+      .expect(200);
+    pollsterToken = (pollsterLogin.body as LoginResponse).accessToken;
+
     // ── catálogos ────────────────────────────────────────────────────────
     for (const row of await ds.query<{ type_id: string; name: string }[]>(
       `SELECT type_id, name FROM types_of_questions`,
@@ -1022,6 +1045,25 @@ describe('spec-093 — incorporación de los envíos del taller (e2e)', () => {
         .send({ metadataId: cropId['Café'] })
         .expect(400);
       expect(await optionMetadata(optionId)).toBe(townA.departmentId);
+    });
+
+    it('PATCH con metadataId: null limpia un valor ya fijado', async () => {
+      const created = await auth(
+        http().post(`/api/questions/${q.mapDept}/options`),
+      ).send({
+        text: 'Departamento a limpiar',
+        metadataId: townA.departmentId,
+      });
+      expect(created.status).toBe(201);
+      const { optionId } = created.body as { optionId: string };
+      expect(await optionMetadata(optionId)).toBe(townA.departmentId);
+
+      await auth(
+        http().patch(`/api/questions/${q.mapDept}/options/${optionId}`),
+      )
+        .send({ metadataId: null })
+        .expect(200);
+      expect(await optionMetadata(optionId)).toBeNull();
     });
 
     it('sin systemField: acepta un tipo de actor y rechaza un UUID de ningún catálogo', async () => {
@@ -1726,6 +1768,14 @@ describe('spec-093 — incorporación de los envíos del taller (e2e)', () => {
     it('exige autenticación', async () => {
       const surveyId = await submit(workshop('C09d'));
       await http().get(`/api/surveys/${surveyId}/process-preview`).expect(401);
+    });
+
+    it('un encuestador (POLLSTER) no puede consultarla', async () => {
+      const surveyId = await submit(workshop('C09e'));
+      await http()
+        .get(`/api/surveys/${surveyId}/process-preview`)
+        .set('Authorization', `Bearer ${pollsterToken}`)
+        .expect(403);
     });
   });
 
