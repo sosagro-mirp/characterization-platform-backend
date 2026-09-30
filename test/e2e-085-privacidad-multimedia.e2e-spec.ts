@@ -589,6 +589,61 @@ describe('spec-085 — privacidad de multimedia: URL firmada y borrado efectivo 
     });
   });
 
+  // ── Revisión 2026-09-30 — la evidencia no es descargable con API key ──────
+  // El MCP autentica con API key: «visible pero no descargable» exige que
+  // `download-url` y `purge-pending` sean solo JWT (`@JwtOnly()`).
+  describe('download-url y purge-pending rechazan API keys (revisión @reviewer)', () => {
+    let attachmentId: string;
+    let readKey: string;
+    let readWriteKey: string;
+
+    beforeAll(async () => {
+      const uploaded = await uploadAttachment(
+        adminToken,
+        farmerSurveyId,
+        imageQuestionId,
+        'api-key.jpg',
+      );
+      attachmentId = uploaded.attachmentId;
+
+      // Las keys cuelgan del admin de prueba (FK en CASCADE): se limpian al
+      // borrar los usuarios en `afterAll`.
+      const adminRows: { user_id: string }[] = await ds.query(
+        `SELECT user_id FROM users WHERE email = $1`,
+        [testEmail('admin')],
+      );
+      const adminUserId = adminRows[0].user_id;
+      const createKey = async (scopes: string[]) => {
+        const res = await request(app.getHttpServer())
+          .post('/api/api-keys')
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send({
+            name: `${PREFIX} ${scopes.join('+')}`,
+            scopes,
+            userId: adminUserId,
+          })
+          .expect(201);
+        return (res.body as { key: string }).key;
+      };
+      readKey = await createKey(['read']);
+      readWriteKey = await createKey(['read', 'write']);
+    });
+
+    it('TC-085-E17 · download-url responde 403 con una API key de scope read', async () => {
+      await request(app.getHttpServer())
+        .get(`/api/media-attachments/${attachmentId}/download-url`)
+        .set('X-API-Key', readKey)
+        .expect(403);
+    });
+
+    it('TC-085-E18 · purge-pending responde 403 con una API key de scope write', async () => {
+      await request(app.getHttpServer())
+        .post('/api/media-attachments/purge-pending')
+        .set('X-API-Key', readWriteKey)
+        .expect(403);
+    });
+  });
+
   // ── Criterio 4 — el payload deja de filtrar URLs y claves ─────────────────
 
   describe('payloads sin URL pública ni storageKey (criterio 4)', () => {

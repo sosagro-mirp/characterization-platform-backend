@@ -17,6 +17,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtOnly } from '../auth/decorators/jwt-only.decorator';
 import { ConfirmUploadDto } from './dto/confirm-upload.dto';
 import { CreatePresignedUrlDto } from './dto/create-presigned-url.dto';
 import { DownloadUrlResponseDto } from './dto/download-url-response.dto';
@@ -59,6 +60,7 @@ export class MediaAttachmentsController {
 
   @Post('media-attachments/purge-pending')
   @Roles(ROLES.ADMIN)
+  @JwtOnly()
   @ApiOperation({
     summary:
       'Reprocesar la cola de objetos de R2 cuyo borrado falló (sin cron: se invoca a mano)',
@@ -73,6 +75,9 @@ export class MediaAttachmentsController {
 
   @Get('media-attachments/:attachmentId/download-url')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  // Solo JWT: el MCP autentica con API key y la evidencia debe ser visible
+  // pero no descargable para un agente (spec 85, Evaluación MCP).
+  @JwtOnly()
   @ApiOperation({
     summary:
       'Emitir una URL firmada de lectura (vida corta) para un archivo multimedia',
