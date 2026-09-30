@@ -16,12 +16,17 @@
  *   pnpm audit:orphan-media --out=informe.json    # además guarda el JSON
  *   pnpm audit:orphan-media --pending-days=14     # umbral de la clase (b)
  *
- * Borrado (acción SEPARADA, solo sobre un informe ya revisado):
+ * Borrado (acción SEPARADA, solo sobre informes ya revisados):
  *
- *   pnpm audit:orphan-media --delete --from-report=informe.json
+ *   pnpm audit:orphan-media --delete \
+ *     --from-report=informe-de-este-entorno.json \
+ *     --cross-report=informe-del-otro-entorno.json
  *
- * `--delete` solo elimina del bucket las claves de la clase (a) listadas en el
- * informe, pide reescribir el nombre del bucket como confirmación, y nunca toca
+ * El bucket es compartido entre desarrollo y producción, así que `--delete`
+ * exige dos informes del mismo bucket, contra bases distintas y de menos de
+ * 24 horas, y solo elimina las claves que son huérfanas en AMBOS
+ * (`selectCrossCheckedOrphans`). `--from-report` debe ser de la base del `.env`
+ * actual. Pide reescribir el nombre del bucket como confirmación y nunca toca
  * la base de datos. Contra producción requiere confirmación explícita del
  * usuario en la sesión de trabajo (ver spec 85, «Puntos que exigen
  * confirmación»).
@@ -30,6 +35,7 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as readline from 'readline';
 import { DataSource } from 'typeorm';
+import { selectCrossCheckedOrphans } from '../src/media-attachments/orphan-report-cross-check';
 import {
   DeleteObjectsCommand,
   ListObjectsV2Command,
@@ -244,7 +250,7 @@ function printSharedBucketWarning(report: Report): void {
     console.log(
       `\n⚠️  Esta base de datos (${report.database}) no tiene NINGUNA fila en\n` +
         `    media_attachments, así que no puede decidir qué sobra en un bucket\n` +
-        `    compartido. Verifique contra el otro entorno antes de borrar nada.`,
+        `    compartido. Para borrar, cruce con el informe del otro entorno (--cross-report).`,
     );
   } else if (todosHuerfanos) {
     console.log(
@@ -277,47 +283,39 @@ function printReport(report: Report): void {
   printSharedBucketWarning(report);
 }
 
-async function deleteFromReport(path: string): Promise<void> {
-  const report = JSON.parse(fs.readFileSync(path, 'utf8')) as Report;
+async function deleteFromReports(
+  primaryPath: string,
+  crossPath: string,
+): Promise<void> {
+  const primary = JSON.parse(fs.readFileSync(primaryPath, 'utf8')) as Report;
+  const cross = JSON.parse(fs.readFileSync(crossPath, 'utf8')) as Report;
   const { client: s3, bucket } = buildS3();
+  const { db, label } = buildPg();
+  await db.destroy().catch(() => undefined);
 
-  if (report.bucket !== bucket) {
-    throw new Error(
-      `El informe es del bucket «${report.bucket}» pero el .env apunta a «${bucket}». Se aborta.`,
+  // ⚠️ El bucket es compartido entre desarrollo y producción: solo se borra lo
+  // que es huérfano en los dos entornos (ver `selectCrossCheckedOrphans`).
+  const keys = selectCrossCheckedOrphans({
+    primary,
+    cross,
+    envBucket: bucket,
+    envDatabase: label,
+    now: new Date(),
+  });
+  const skipped = primary.orphanObjects.length - keys.length;
+  if (skipped > 0) {
+    console.log(
+      `${skipped} objeto(s) huérfanos en «${primary.database}» tienen fila en «${cross.database}»: no se tocan.`,
     );
   }
-  if (!report.orphanObjects.length) {
-    console.log(
-      'El informe no lista objetos huérfanos (clase a). Nada que borrar.',
-    );
+  if (!keys.length) {
+    console.log('No hay objetos huérfanos en ambos entornos. Nada que borrar.');
     return;
   }
 
-  // ⚠️ El bucket es compartido entre desarrollo y producción. Un informe
-  // generado contra una base sin filas no puede decidir qué sobra: borrar
-  // desde él arrasaría con la evidencia del otro entorno.
-  if (report.totals.attachmentRows === 0) {
-    throw new Error(
-      `El informe se generó contra «${report.database}», que no tiene ninguna fila en ` +
-        `media_attachments. En un bucket compartido eso no prueba que los objetos sobren. ` +
-        `Se aborta: regenere el informe contra la base que sí registra esos adjuntos.`,
-    );
-  }
-
-  // El informe debe haberse generado contra la MISMA base a la que apunta el
-  // .env actual; si no, se está cruzando el inventario de un entorno con la
-  // autorización de otro.
-  const { db, label } = buildPg();
-  await db.destroy().catch(() => undefined);
-  if (report.database !== label) {
-    throw new Error(
-      `El informe es de la base «${report.database}» pero el .env apunta a «${label}». Se aborta.`,
-    );
-  }
-
   console.log(
-    `Se borrarán ${report.orphanObjects.length} objetos del bucket «${bucket}» ` +
-      `listados en la clase (a) del informe del ${report.generatedAt}.`,
+    `Se borrarán ${keys.length} objetos del bucket «${bucket}», huérfanos en ` +
+      `«${primary.database}» (${primary.generatedAt}) y en «${cross.database}» (${cross.generatedAt}).`,
   );
   console.log(
     'La base de datos NO se modifica. El borrado en R2 es irreversible.',
@@ -332,8 +330,8 @@ async function deleteFromReport(path: string): Promise<void> {
 
   let deleted = 0;
   const failed: string[] = [];
-  for (let i = 0; i < report.orphanObjects.length; i += DELETE_BATCH_SIZE) {
-    const batch = report.orphanObjects.slice(i, i + DELETE_BATCH_SIZE);
+  for (let i = 0; i < keys.length; i += DELETE_BATCH_SIZE) {
+    const batch = keys.slice(i, i + DELETE_BATCH_SIZE);
     const result = await s3.send(
       new DeleteObjectsCommand({
         Bucket: bucket,
@@ -351,12 +349,13 @@ async function deleteFromReport(path: string): Promise<void> {
 async function main(): Promise<void> {
   if (flag('delete')) {
     const from = arg('from-report');
-    if (!from) {
+    const crossFrom = arg('cross-report');
+    if (!from || !crossFrom) {
       throw new Error(
-        '--delete exige --from-report=<informe.json> (un informe ya revisado).',
+        '--delete exige --from-report=<informe de este entorno> y --cross-report=<informe del otro entorno>.',
       );
     }
-    await deleteFromReport(from);
+    await deleteFromReports(from, crossFrom);
     return;
   }
 
