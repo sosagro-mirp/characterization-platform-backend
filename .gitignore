@@ -70,3 +70,7 @@ src/database/seeds/run-*.ts
 # contener el contenido completo de instrumentos de producción; nunca en git)
 .instrument-sync/
 
+# Spec 93 — reportes, decisiones y logs de public-submissions (contienen datos
+# personales de productores; nunca en git)
+.public-submissions/
+

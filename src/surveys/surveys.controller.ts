@@ -25,6 +25,11 @@ import { CreateSurveyDto } from './dto/create-survey.dto';
 import { CheckDuplicateQueryDto } from './dto/check-duplicate-query.dto';
 import { ExtractFarmerDto } from './dto/extract-farmer.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
+import { ProcessPreviewResponseDto } from './dto/process-preview-response.dto';
+import {
+  ProcessPreviewQueryDto,
+  ProcessPublicSubmissionDto,
+} from './dto/process-public-submission.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
 import { SurveyFilters, SurveysService } from './surveys.service';
 
@@ -195,7 +200,8 @@ export class SurveysController {
   @ApiResponse({
     status: 200,
     description:
-      'Array de { surveyId, instrumentId, instrumentName, createdAt, responseCount, reviewStatus }.',
+      'Array de { surveyId, instrumentId, instrumentName, createdAt, responseCount, reviewStatus, ' +
+      'farmerName, farmerDocumentId } (nombre y documento declarados en el envío, o null).',
   })
   findPublicSubmissions(
     @Query('instrumentId') instrumentId?: string,
@@ -207,16 +213,53 @@ export class SurveysController {
     });
   }
 
+  @Get(':id/process-preview')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Vista previa del procesado de un envío público',
+    description:
+      'Solo lectura: anticipa lo que hará process-public sin escribir nada (ni la fila de colisión). ' +
+      'Devuelve la identidad extraída (documento normalizado), el estado del documento ' +
+      '(new | same_person_match | collision, con candidatos), la acción sobre la finca y las fincas ' +
+      'candidatas a compartida, los cultivos resueltos y no mapeados, los campos vacíos que se ' +
+      'completarían y las advertencias. `townId` simula el municipio que el administrador asignaría. ' +
+      'Expone nombre, documento y teléfono: solo administradores e investigadores. Spec 93.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    description: 'ID de la encuesta pública',
+  })
+  @ApiResponse({ status: 200, type: ProcessPreviewResponseDto })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta o municipio no encontrado.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'La encuesta no es de origen público o ya fue revisada.',
+  })
+  previewPublicSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ProcessPreviewQueryDto,
+  ) {
+    return this.surveysService.previewPublicSubmission(id, query);
+  }
+
   @Post(':id/process-public')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({
     summary: 'Procesar un envío público: crear/vincular agricultor',
     description:
-      'Reutiliza extractFarmer (misma detección de colisiones del spec 68) sobre un envío del ' +
-      'canal público, reancla su constancia de consentimiento al agricultor resultante, ejecuta ' +
-      'extractCrops y marca el envío como reviewStatus="processed". Ante colisión de documentId ' +
-      'sin resolución declarada, responde 409 y el envío queda pending. Spec 79.',
+      'En una sola transacción (con el lock de la encuesta): aplica la detección de colisiones del ' +
+      'spec 68, crea o reutiliza el agricultor, actúa sobre la finca, suma los cultivos a la finca ' +
+      '(sin sesión de campaña), reancla la constancia de consentimiento y marca el envío ' +
+      'reviewStatus="processed". Con un productor existente completa solo columnas vacías y no ' +
+      'crea una segunda finca. Cuerpo opcional: `resolution` (colisión), `farm` ' +
+      '{ mode: create | link, farmId } y `townId` (municipio cuando el envío no lo trae). Ante ' +
+      'colisión de documentId sin resolución, responde 409 y el envío queda pending. Specs 79 y 93.',
   })
   @ApiParam({
     name: 'id',
@@ -224,7 +267,10 @@ export class SurveysController {
     description: 'ID de la encuesta pública',
   })
   @ApiResponse({ status: 201, description: '{ farmer, existed: boolean }' })
-  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta, municipio o finca no encontrados.',
+  })
   @ApiResponse({
     status: 409,
     description:
@@ -232,7 +278,7 @@ export class SurveysController {
   })
   processPublicSubmission(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ExtractFarmerDto,
+    @Body() dto: ProcessPublicSubmissionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.surveysService.processPublicSubmission(id, dto, user.userId);
