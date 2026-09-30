@@ -11,6 +11,7 @@ import { Response } from 'src/responses/entities/response.entity';
 import { CreateOptionQuestionDto } from './dto/create-option-question.dto';
 import { UpdateOptionQuestionDto } from './dto/update-option-question.dto';
 import { OptionQuestion } from './entities/option-question.entity';
+import { catalogsForSystemField, METADATA_CATALOGS } from './metadata-catalogs';
 
 @Injectable()
 export class OptionsQuestionService {
@@ -46,6 +47,11 @@ export class OptionsQuestionService {
       }
     }
 
+    await this.assertValidMetadataId(
+      question,
+      createOptionQuestionDto.metadataId,
+    );
+
     const option = this.optionsQuestionRepository.create({
       ...createOptionQuestionDto,
       text: createOptionQuestionDto.text.trim(),
@@ -69,6 +75,13 @@ export class OptionsQuestionService {
 
     if (!question) {
       throw new NotFoundException('Question not found');
+    }
+
+    // Se validan todos antes de guardar: un solo id inválido no deja opciones a medias.
+    for (const id of new Set(
+      createOptionQuestionDtos.map((dto) => dto.metadataId),
+    )) {
+      await this.assertValidMetadataId(question, id);
     }
 
     const options = this.optionsQuestionRepository.create(
@@ -117,6 +130,11 @@ export class OptionsQuestionService {
   ): Promise<OptionQuestion> {
     const option = await this.findOne(questionId, optionId);
 
+    await this.assertValidMetadataId(
+      option.question,
+      updateOptionQuestionDto.metadataId,
+    );
+
     Object.assign(option, updateOptionQuestionDto);
 
     return await this.optionsQuestionRepository.save(option);
@@ -156,6 +174,33 @@ export class OptionsQuestionService {
     const option = await this.findOne(questionId, optionId);
     option.archivedAt = null;
     return this.optionsQuestionRepository.save(option);
+  }
+
+  /**
+   * Spec 93 — `metadataId` debe existir en el catálogo que corresponde al
+   * `systemField` de la pregunta. `null` y `undefined` no se validan.
+   */
+  private async assertValidMetadataId(
+    question: Pick<Question, 'systemField'>,
+    metadataId: string | null | undefined,
+  ): Promise<void> {
+    if (!metadataId) return;
+
+    const kinds = catalogsForSystemField(question.systemField);
+    for (const kind of kinds) {
+      const { table, idColumn } = METADATA_CATALOGS[kind];
+      const rows: unknown[] =
+        await this.optionsQuestionRepository.manager.query(
+          `SELECT 1 FROM ${table} WHERE ${idColumn} = $1::uuid LIMIT 1`,
+          [metadataId],
+        );
+      if (rows.length > 0) return;
+    }
+
+    const expected = kinds.map((k) => METADATA_CATALOGS[k].label).join(', ');
+    throw new BadRequestException(
+      `metadataId no existe en el catálogo esperado (${expected})`,
+    );
   }
 
   private async ensureQuestionExists(questionId: string): Promise<void> {
