@@ -6,6 +6,7 @@ import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question
 import { Response } from 'src/responses/entities/response.entity';
 import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
 import { Question } from './entities/question.entity';
+import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.module';
 import { QuestionsController } from './questions.controller';
 import { QuestionsSearchController } from './questions-search.controller';
 import { QuestionsService } from './questions.service';
@@ -22,6 +23,7 @@ import { QuestionsService } from './questions.service';
       Response,
       StepCondition,
     ]),
+    MediaAttachmentsModule,
   ],
   controllers: [QuestionsController, QuestionsSearchController],
   providers: [QuestionsService],

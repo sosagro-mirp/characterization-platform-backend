@@ -17,6 +17,7 @@ import { ConsentDocument } from 'src/consents/entities/consent-document.entity';
 import { ConsentDocumentsService } from 'src/consents/consent-documents.service';
 import { ConsentRecordsService } from 'src/consents/consent-records.service';
 import { SurveysService } from 'src/surveys/surveys.service';
+import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 
 export type CliFlags = Record<string, string | boolean>;
 
@@ -112,6 +113,21 @@ export function connect(url: string): DataSource {
   });
 }
 
+/**
+ * La CLI nunca borra encuestas ni sus adjuntos, y no tiene credenciales de R2.
+ * Si algún día llegara a llamar a `MediaCleanupService` (spec 85), debe fallar
+ * en voz alta en lugar de dejar objetos huérfanos sin aviso.
+ */
+function unavailableMediaCleanup(): MediaCleanupService {
+  return new Proxy({} as MediaCleanupService, {
+    get: (_target, prop) => () => {
+      throw new Error(
+        `MediaCleanupService.${String(prop)} no está disponible en la CLI de envíos públicos.`,
+      );
+    },
+  });
+}
+
 /** Mismo servicio y misma lógica que la API: la CLI no reimplementa el procesado. */
 export function createSurveysService(ds: DataSource): SurveysService {
   const consentDocuments = new ConsentDocumentsService(
@@ -135,5 +151,6 @@ export function createSurveysService(ds: DataSource): SurveysService {
     ds.getRepository(Response),
     ds.getRepository(FarmerDocumentCollision),
     consentRecords,
+    unavailableMediaCleanup(),
   );
 }

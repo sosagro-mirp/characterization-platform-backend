@@ -119,7 +119,7 @@ export class MediaAttachmentsService {
   async confirmUpload(
     attachmentId: string,
     dto: ConfirmUploadDto,
-  ): Promise<{ attachmentId: string; publicUrl: string }> {
+  ): Promise<{ attachmentId: string; publicUrl: null }> {
     const attachment = await this.attachmentRepository.findOne({
       where: { attachmentId },
     });
@@ -127,24 +127,23 @@ export class MediaAttachmentsService {
     if (!attachment) throw new NotFoundException('Media attachment not found');
 
     if (attachment.status === MediaAttachmentStatus.UPLOADED) {
-      return { attachmentId, publicUrl: attachment.publicUrl! };
+      return { attachmentId, publicUrl: null };
     }
 
     if (attachment.status === MediaAttachmentStatus.FAILED) {
       throw new BadRequestException('Upload previously marked as failed');
     }
 
-    const publicUrl = this.storageService.buildPublicUrl(attachment.storageKey);
-
     attachment.status = MediaAttachmentStatus.UPLOADED;
-    attachment.publicUrl = publicUrl;
     if (dto.actualFileSizeBytes) {
       attachment.fileSizeBytes = dto.actualFileSizeBytes;
     }
 
     await this.attachmentRepository.save(attachment);
 
-    return { attachmentId, publicUrl };
+    // Se conserva la clave `publicUrl` (siempre null) para no romper el contrato
+    // del APK de campo, que tipa la respuesta aunque la descarte (spec 85, D1).
+    return { attachmentId, publicUrl: null };
   }
 
   /**

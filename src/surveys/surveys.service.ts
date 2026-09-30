@@ -50,6 +50,7 @@ import {
   SystemFieldValue,
 } from './system-field-map';
 import { convertAreaToHectares } from './unit-conversion';
+import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 import { ConsentRecordsService } from '../consents/consent-records.service';
 
 export interface SurveyFilters {
@@ -127,6 +128,7 @@ export class SurveysService {
     @InjectRepository(FarmerDocumentCollision)
     private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
     private readonly consentRecordsService: ConsentRecordsService,
+    private readonly mediaCleanup: MediaCleanupService,
   ) {}
 
   async create(
@@ -898,10 +900,19 @@ export class SurveysService {
       );
     }
 
+    // Claves de multimedia en R2: se recolectan antes de borrar las filas y el
+    // borrado real ocurre después (spec 85, D4).
+    const mediaKeys = await this.mediaCleanup.collectBySurveys(
+      this.surveysRepository.manager,
+      [dto.surveyId],
+    );
+
     // Clear pivot table rows before removing to avoid FK constraint violations
     survey.instruments = [];
     await this.surveysRepository.save(survey);
     await this.surveysRepository.remove(survey);
+
+    await this.mediaCleanup.deleteAfterCommit(mediaKeys);
 
     return { discardedSurveyId: dto.surveyId };
   }
@@ -987,10 +998,17 @@ export class SurveysService {
       );
     }
 
+    const mediaKeys = await this.mediaCleanup.collectBySurveys(
+      this.surveysRepository.manager,
+      [surveyId],
+    );
+
     // Clear pivot table rows before removing to avoid FK constraint violations
     survey.instruments = [];
     await this.surveysRepository.save(survey);
     await this.surveysRepository.remove(survey);
+
+    await this.mediaCleanup.deleteAfterCommit(mediaKeys);
 
     return { deletedSurveyId: surveyId };
   }
@@ -1096,7 +1114,6 @@ export class SurveysService {
           optionText: r.option?.text ?? null,
           attachmentId: attachment?.attachmentId ?? null,
           attachmentStatus: attachment?.status ?? null,
-          publicUrl: attachment?.publicUrl ?? null,
           mimeType: attachment?.mimeType ?? null,
           originalFilename: attachment?.originalFilename ?? null,
         };

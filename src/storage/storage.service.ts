@@ -16,7 +16,6 @@ const DELETE_BATCH_SIZE = 1000;
 export class StorageService {
   private readonly client: S3Client;
   private readonly bucket: string;
-  private readonly publicBaseUrl: string;
   private readonly defaultExpiresIn: number;
   private readonly downloadExpiresIn: number;
 
@@ -35,8 +34,6 @@ export class StorageService {
     });
 
     this.bucket = this.configService.getOrThrow<string>('R2_BUCKET_NAME');
-    this.publicBaseUrl =
-      this.configService.getOrThrow<string>('R2_PUBLIC_BASE_URL');
     this.defaultExpiresIn = parseInt(
       this.configService.get<string>('R2_PRESIGNED_URL_EXPIRES_SECONDS') ??
         '300',
@@ -84,10 +81,6 @@ export class StorageService {
     });
 
     return getSignedUrl(this.client, command, { expiresIn });
-  }
-
-  buildPublicUrl(key: string): string {
-    return `${this.publicBaseUrl.replace(/\/$/, '')}/${key}`;
   }
 
   async deleteObject(key: string): Promise<void> {

@@ -2,6 +2,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, IsNull, Repository } from 'typeorm';
@@ -10,6 +11,7 @@ import { Section } from 'src/sections/entities/section.entity';
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
+import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { SearchQuestionsDto } from './dto/search-questions.dto';
@@ -88,6 +90,9 @@ export class QuestionsService {
     private readonly responsesRepository: Repository<Response>,
     @InjectRepository(StepCondition)
     private readonly stepConditionsRepository: Repository<StepCondition>,
+    // `@Optional()` solo para no romper la suite unitaria que arma este
+    // servicio a mano; en la aplicación siempre está inyectado (spec 85).
+    @Optional() private readonly mediaCleanup?: MediaCleanupService,
   ) {}
 
   private async seedLikertOptions(question: Question): Promise<void> {
@@ -467,8 +472,19 @@ export class QuestionsService {
       });
     }
 
+    // Spec 85: un adjunto existe desde `presigned-url`, antes de cualquier
+    // `Response`, así que la guarda de «no borrar con respuestas» no lo
+    // protege — y `media_attachments.question_id` es ON DELETE CASCADE.
+    const mediaKeys =
+      (await this.mediaCleanup?.collectByQuestion(
+        this.questionsRepository.manager,
+        questionId,
+      )) ?? [];
+
     await this.questionsRepository.remove(question);
     await this.compactOrder(sectionId);
+
+    await this.mediaCleanup?.deleteAfterCommit(mediaKeys);
   }
 
   /**

@@ -22,6 +22,7 @@ import { CreatePresignedUrlDto } from './dto/create-presigned-url.dto';
 import { DownloadUrlResponseDto } from './dto/download-url-response.dto';
 import { MediaAttachmentResponseDto } from './dto/media-attachment-response.dto';
 import { MediaAttachmentsService } from './media-attachments.service';
+import { MediaCleanupService } from './media-cleanup.service';
 
 @ApiTags('Media Attachments')
 @ApiBearerAuth()
@@ -29,6 +30,7 @@ import { MediaAttachmentsService } from './media-attachments.service';
 export class MediaAttachmentsController {
   constructor(
     private readonly mediaAttachmentsService: MediaAttachmentsService,
+    private readonly mediaCleanupService: MediaCleanupService,
   ) {}
 
   @Post('media-attachments/presigned-url')
@@ -53,6 +55,20 @@ export class MediaAttachmentsController {
     @Body() dto: ConfirmUploadDto,
   ) {
     return this.mediaAttachmentsService.confirmUpload(attachmentId, dto);
+  }
+
+  @Post('media-attachments/purge-pending')
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary:
+      'Reprocesar la cola de objetos de R2 cuyo borrado falló (sin cron: se invoca a mano)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '{ deleted, failed, remaining }',
+  })
+  purgePending() {
+    return this.mediaCleanupService.purgePending();
   }
 
   @Get('media-attachments/:attachmentId/download-url')
