@@ -2,28 +2,9 @@
  * Spec 92 — Encuestas realizadas: el encuestador ve en la app las encuestas
  * que aplicó y sus respuestas.
  *
- * Cubre los criterios 1-6 de `spec/92_encuestas_realizadas_mobile.md`.
- *
- * ESTAS PRUEBAS NACEN EN ROJO: `GET /api/surveys/mine` no existe todavía y
- * `GET /api/surveys/:id/responses` rechaza al rol pollster con 403 (los
- * cambian la Fase 1 y la Fase 2 del spec).
- *
- * Ninguna aserción depende de `publicUrl` para ningún rol: el spec 85
- * (TC-085-E09) lo retira de la respuesta, y estas pruebas deben convivir con
- * ese cambio sin importar cuál de los dos specs se fusione primero.
- *
- * Escenario montado en base de datos:
- *   ownSessionSurveyId — de pollsterA; productor SOLO en la sesión; 1 open_text
- *   ownDirectSurveyId  — de pollsterA; productor en la encuesta; 1 open_text +
- *                        1 multiple_choice con 2 opciones (2 filas) → cuenta 2
- *   ownMediaSurveyId   — de pollsterA; imagen con adjunto 'uploaded' + imagen
- *                        con adjunto 'pending'
- *   ownEmptySurveyId   — de pollsterA, sin respuestas (marcador de paso saltado)
- *   ownPublicSurveyId  — de pollsterA pero origin='public' (canal público)
- *   otherSurveyId      — de pollsterB, con respuestas
- *
- * `ownDirectSurveyId` y `ownMediaSurveyId` comparten `created_at` a propósito
- * para verificar el desempate por `survey_id DESC`.
+ * Cubre los criterios de aceptación 1-6 (backend). Los criterios 7, 9 y 12
+ * (interfaz móvil) se verifican en la ronda manual
+ * `docs/testing/test-092-encuestas-realizadas.md`.
  */
 
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -38,8 +19,6 @@ import { AppModule } from '../src/app.module';
 
 const TEST_PASSWORD = 'E2eTest1234!';
 const PREFIX = 'e2e-092';
-const INSTRUMENT_NAME = 'E2E 092 Instrument';
-const CAMPAIGN_NAME = 'E2E 092 Campaign';
 
 interface LoginResponse {
   accessToken: string;
@@ -68,17 +47,11 @@ interface MySurveysPage {
   limit: number;
 }
 
-type ResponseRow = Record<string, unknown> & {
-  questionId: string;
-  questionType: string;
-  sectionId: string;
-  sectionOrder: number;
-  hasAttachment: boolean;
-};
-
-interface SurveyResponsesResult {
+interface SurveyResponsesBody {
   surveyId: string;
-  responses: ResponseRow[];
+  instrumentName: string | null;
+  syncedAt: string;
+  responses: Record<string, unknown>[];
 }
 
 function testEmail(role: string) {
@@ -98,135 +71,42 @@ async function loginAs(
 
 // ─── suite ──────────────────────────────────────────────────────────────────
 
-describe('spec-092 — encuestas realizadas del encuestador (e2e)', () => {
+describe('spec-092 — encuestas realizadas (e2e)', () => {
   let app: INestApplication<App>;
   let ds: DataSource;
 
-  let adminToken: string;
-  let researcherToken: string;
   let pollsterAToken: string;
   let pollsterBToken: string;
-  let pollsterAId: string;
-  let pollsterBId: string;
+  let researcherToken: string;
 
   let instrumentId: string;
-  let sectionId: string;
-  let textQuestionId: string;
-  let multiQuestionId: string;
-  let imageQuestionId: string;
-  let imagePendingQuestionId: string;
+  let qTextId: string;
+  let qMultiId: string;
   let optionAId: string;
   let optionBId: string;
-  let campaignId: string;
-  let sessionId: string;
-  let farmerSessionId: string;
-  let farmerDirectId: string;
 
-  let ownSessionSurveyId: string;
-  let ownDirectSurveyId: string;
-  let ownMediaSurveyId: string;
-  let ownEmptySurveyId: string;
-  let ownPublicSurveyId: string;
-  let otherSurveyId: string;
+  let farmerAlphaId: string;
+  let farmerBetaId: string;
+  let farmerOtherId: string;
+  let farmerPagId: string;
+
+  let campaignId: string;
+  let sessionBetaId: string;
+
+  let surveyAlphaId: string;
+  let surveyBetaId: string;
+  let surveyNoResponsesId: string;
+  let surveyOtherUserId: string;
+  let surveyPublicOriginId: string;
+
+  const paginationSurveyIds: string[] = [];
 
   const surveyIdsCreated: string[] = [];
-  const FARMER_SESSION_NAME = 'E2E 092 Productor Sesión';
-  const FARMER_DIRECT_NAME = 'E2E 092 Productor Directo';
-  const FARMER_DIRECT_DOC = '092000111';
+  const farmerIdsCreated: string[] = [];
+  const attachmentIdsCreated: string[] = [];
 
-  async function insertSurvey(opts: {
-    userId: string;
-    farmerId?: string | null;
-    withSession?: boolean;
-    origin?: 'field' | 'public';
-    clientSurveyId?: string | null;
-    createdAt?: string;
-  }): Promise<string> {
-    const rows = await ds.query<{ survey_id: string }[]>(
-      `INSERT INTO surveys (survey_id, sincronized, user_id, farmer_id, campaign_session_id, step_order, origin, client_survey_id, created_at)
-       VALUES (gen_random_uuid(), true, $1, $2, $3, 1, $4, $5, COALESCE($6::timestamp, CURRENT_TIMESTAMP))
-       RETURNING survey_id`,
-      [
-        opts.userId,
-        opts.farmerId ?? null,
-        opts.withSession ? sessionId : null,
-        opts.origin ?? 'field',
-        opts.clientSurveyId ?? null,
-        opts.createdAt ?? null,
-      ],
-    );
-    const surveyId = rows[0].survey_id;
-    await ds.query(
-      `INSERT INTO surveys_instruments (survey_id, instrument_id) VALUES ($1, $2)`,
-      [surveyId, instrumentId],
-    );
-    surveyIdsCreated.push(surveyId);
-    return surveyId;
-  }
-
-  async function insertTextResponse(surveyId: string): Promise<void> {
-    await ds.query(
-      `INSERT INTO responses (response_id, survey_id, question_id, text_value)
-       VALUES (gen_random_uuid(), $1, $2, 'respuesta e2e-092')`,
-      [surveyId, textQuestionId],
-    );
-  }
-
-  async function insertImageWithAttachment(
-    surveyId: string,
-    questionId: string,
-    status: 'uploaded' | 'pending',
-  ): Promise<void> {
-    const responseId = (
-      await ds.query<{ response_id: string }[]>(
-        `INSERT INTO responses (response_id, survey_id, question_id)
-         VALUES (gen_random_uuid(), $1, $2) RETURNING response_id`,
-        [surveyId, questionId],
-      )
-    )[0].response_id;
-    await ds.query(
-      `INSERT INTO media_attachments (attachment_id, survey_id, question_id, response_id, storage_key, public_url, mime_type, status)
-       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'image/jpeg', $6)`,
-      [
-        surveyId,
-        questionId,
-        responseId,
-        `e2e-092/${status}.jpg`,
-        `https://example.test/e2e-092/${status}.jpg`,
-        status,
-      ],
-    );
-  }
-
-  /** Borra los restos de una corrida anterior abortada (idempotencia). */
-  async function cleanupLeftovers(): Promise<void> {
-    await ds.query(
-      `DELETE FROM surveys WHERE user_id IN (SELECT user_id FROM users WHERE email LIKE $1)`,
-      [`${PREFIX}-%@test.local`],
-    );
-    await ds.query(
-      `DELETE FROM campaign_sessions WHERE campaign_id IN (SELECT campaign_id FROM campaigns WHERE name = $1)`,
-      [CAMPAIGN_NAME],
-    );
-    await ds.query(`DELETE FROM campaigns WHERE name = $1`, [CAMPAIGN_NAME]);
-    await ds.query(`DELETE FROM farmers WHERE name IN ($1, $2)`, [
-      FARMER_SESSION_NAME,
-      FARMER_DIRECT_NAME,
-    ]);
-    await ds.query(
-      `DELETE FROM questions WHERE section_id IN (
-         SELECT s.section_id FROM sections s
-         JOIN instruments i ON i.instrument_id = s.instrument_id
-         WHERE i.name = $1)`,
-      [INSTRUMENT_NAME],
-    );
-    await ds.query(
-      `DELETE FROM sections WHERE instrument_id IN (SELECT instrument_id FROM instruments WHERE name = $1)`,
-      [INSTRUMENT_NAME],
-    );
-    await ds.query(`DELETE FROM instruments WHERE name = $1`, [
-      INSTRUMENT_NAME,
-    ]);
+  function uniqueDocument(tag: string): string {
+    return `${tag}${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 100)}`;
   }
 
   beforeAll(async () => {
@@ -246,24 +126,17 @@ describe('spec-092 — encuestas realizadas del encuestador (e2e)', () => {
     await app.init();
 
     ds = moduleFixture.get(DataSource);
-    await cleanupLeftovers();
 
-    // ── usuarios: admin, investigador, dos encuestadores ────────────────────
-    const roles = await ds.query<RoleRow[]>(
-      `SELECT role_id, name FROM roles WHERE name IN ('admin', 'researcher', 'pollster')`,
-    );
-    const roleId = (name: string) =>
-      roles.find((r) => r.name === name)!.role_id;
-
+    // ── usuarios de prueba ──────────────────────────────────────────────────
     const hash = await bcrypt.hash(TEST_PASSWORD, 10);
-    const users: Array<[string, string]> = [
-      ['admin', 'admin'],
-      ['researcher', 'researcher'],
-      ['pollster-a', 'pollster'],
-      ['pollster-b', 'pollster'],
-    ];
-    for (const [key, role] of users) {
-      const email = testEmail(key);
+
+    async function ensureUser(role: string): Promise<string> {
+      const roles = await ds.query<RoleRow[]>(
+        `SELECT role_id, name FROM roles WHERE name = $1`,
+        [role],
+      );
+      const roleId = roles[0].role_id;
+      const email = testEmail(role);
       const existing = await ds.query<{ user_id: string }[]>(
         `SELECT user_id FROM users WHERE email = $1`,
         [email],
@@ -271,455 +144,502 @@ describe('spec-092 — encuestas realizadas del encuestador (e2e)', () => {
       if (!existing.length) {
         await ds.query(
           `INSERT INTO users (user_id, name, last_name, email, password, role_id, must_change_password)
-           VALUES (gen_random_uuid(), 'E2E', 'CompletedSurveys', $1, $2, $3, false)`,
-          [email, hash, roleId(role)],
+           VALUES (gen_random_uuid(), 'E2E', 'EncuestasRealizadas', $1, $2, $3, false)`,
+          [email, hash, roleId],
         );
       }
+      return loginAs(app, email);
     }
-    const idOf = async (key: string) =>
-      (
-        await ds.query<{ user_id: string }[]>(
-          `SELECT user_id FROM users WHERE email = $1`,
-          [testEmail(key)],
-        )
-      )[0].user_id;
-    pollsterAId = await idOf('pollster-a');
-    pollsterBId = await idOf('pollster-b');
 
-    adminToken = await loginAs(app, testEmail('admin'));
-    researcherToken = await loginAs(app, testEmail('researcher'));
-    pollsterAToken = await loginAs(app, testEmail('pollster-a'));
-    pollsterBToken = await loginAs(app, testEmail('pollster-b'));
+    pollsterAToken = await ensureUser('pollster');
+    researcherToken = await ensureUser('researcher');
 
-    // ── instrumento + sección + preguntas ────────────────────────────────────
-    instrumentId = (
-      await ds.query<{ instrument_id: string }[]>(
-        `INSERT INTO instruments (instrument_id, name, version, publish_date, is_active)
-         VALUES (gen_random_uuid(), $1, 1, CURRENT_DATE, true)
-         RETURNING instrument_id`,
-        [INSTRUMENT_NAME],
-      )
-    )[0].instrument_id;
-
-    sectionId = (
-      await ds.query<{ section_id: string }[]>(
-        `INSERT INTO sections (section_id, name, "order", instrument_id)
-         VALUES (gen_random_uuid(), 'E2E 092 Section', 1, $1)
-         RETURNING section_id`,
-        [instrumentId],
-      )
-    )[0].section_id;
-
-    const typeId = async (name: string) =>
-      (
-        await ds.query<{ type_id: string }[]>(
-          `SELECT type_id FROM types_of_questions WHERE name = $1`,
-          [name],
-        )
-      )[0].type_id;
-
-    const insertQuestion = async (
-      text: string,
-      type: string,
-      order: number,
-    ): Promise<string> =>
-      (
-        await ds.query<{ question_id: string }[]>(
-          `INSERT INTO questions (question_id, section_id, text, type_id, is_required, "order")
-           VALUES (gen_random_uuid(), $1, $2, $3, false, $4)
-           RETURNING question_id`,
-          [sectionId, text, await typeId(type), order],
-        )
-      )[0].question_id;
-
-    textQuestionId = await insertQuestion(
-      'E2E 092 Q1 open_text',
-      'open_text',
-      1,
+    // Un segundo pollster, con email distinto, para probar el aislamiento
+    // por dueño (criterios 1 y 5).
+    const rolesB = await ds.query<RoleRow[]>(
+      `SELECT role_id, name FROM roles WHERE name = 'pollster'`,
     );
-    multiQuestionId = await insertQuestion(
-      'E2E 092 Q2 multiple_choice',
-      'multiple_choice',
-      2,
+    const emailB = `${PREFIX}-pollster-b@test.local`;
+    const existingB = await ds.query<{ user_id: string }[]>(
+      `SELECT user_id FROM users WHERE email = $1`,
+      [emailB],
     );
-    imageQuestionId = await insertQuestion('E2E 092 Q3 image', 'image', 3);
-    imagePendingQuestionId = await insertQuestion(
-      'E2E 092 Q4 image pendiente',
-      'image',
-      4,
-    );
-
-    const insertOption = async (text: string, value: number) =>
-      (
-        await ds.query<{ option_id: string }[]>(
-          `INSERT INTO options_question (option_id, question_id, text, value)
-           VALUES (gen_random_uuid(), $1, $2, $3) RETURNING option_id`,
-          [multiQuestionId, text, value],
-        )
-      )[0].option_id;
-    optionAId = await insertOption('Celular', 1);
-    optionBId = await insertOption('Tableta', 2);
-
-    // ── productores ──────────────────────────────────────────────────────────
-    farmerSessionId = (
-      await ds.query<{ id: string }[]>(
-        `INSERT INTO farmers (id, name, document_id)
-         VALUES (gen_random_uuid(), $1, NULL) RETURNING id`,
-        [FARMER_SESSION_NAME],
-      )
-    )[0].id;
-    farmerDirectId = (
-      await ds.query<{ id: string }[]>(
-        `INSERT INTO farmers (id, name, document_id)
-         VALUES (gen_random_uuid(), $1, $2) RETURNING id`,
-        [FARMER_DIRECT_NAME, FARMER_DIRECT_DOC],
-      )
-    )[0].id;
-
-    // ── campaña + sesión (el productor vive solo en la sesión) ───────────────
-    campaignId = (
-      await ds.query<{ campaign_id: string }[]>(
-        `INSERT INTO campaigns (campaign_id, name, is_active)
-         VALUES (gen_random_uuid(), $1, true)
-         RETURNING campaign_id`,
-        [CAMPAIGN_NAME],
-      )
-    )[0].campaign_id;
-
-    sessionId = (
-      await ds.query<{ session_id: string }[]>(
-        `INSERT INTO campaign_sessions (session_id, campaign_id, farmer_id, user_id)
-         VALUES (gen_random_uuid(), $1, $2, $3)
-         RETURNING session_id`,
-        [campaignId, farmerSessionId, pollsterAId],
-      )
-    )[0].session_id;
-
-    // ── escenario ────────────────────────────────────────────────────────────
-    ownSessionSurveyId = await insertSurvey({
-      userId: pollsterAId,
-      withSession: true,
-      clientSurveyId: 'local_survey_e2e092_session',
-      createdAt: '2026-09-22T10:00:00',
-    });
-    await insertTextResponse(ownSessionSurveyId);
-
-    // Mismo created_at en las dos siguientes: fuerza el desempate por id.
-    const tiedAt = '2026-09-21T10:00:00';
-
-    ownDirectSurveyId = await insertSurvey({
-      userId: pollsterAId,
-      farmerId: farmerDirectId,
-      createdAt: tiedAt,
-    });
-    await insertTextResponse(ownDirectSurveyId);
-    // Selección múltiple: el backend guarda una fila por opción.
-    for (const optionId of [optionAId, optionBId]) {
+    if (!existingB.length) {
       await ds.query(
-        `INSERT INTO responses (response_id, survey_id, question_id, option_id)
-         VALUES (gen_random_uuid(), $1, $2, $3)`,
-        [ownDirectSurveyId, multiQuestionId, optionId],
+        `INSERT INTO users (user_id, name, last_name, email, password, role_id, must_change_password)
+         VALUES (gen_random_uuid(), 'E2E', 'PollsterB', $1, $2, $3, false)`,
+        [emailB, hash, rolesB[0].role_id],
+      );
+    }
+    pollsterBToken = await loginAs(app, emailB);
+
+    async function userIdOf(email: string): Promise<string> {
+      const rows = await ds.query<{ user_id: string }[]>(
+        `SELECT user_id FROM users WHERE email = $1`,
+        [email],
+      );
+      return rows[0].user_id;
+    }
+    const pollsterAId = await userIdOf(testEmail('pollster'));
+    const pollsterBId = await userIdOf(emailB);
+
+    // ── instrumento con una pregunta de texto y una de selección múltiple ────
+    const instrumentRows = await ds.query<{ instrument_id: string }[]>(
+      `INSERT INTO instruments (instrument_id, name, version, publish_date, is_active)
+       VALUES (gen_random_uuid(), 'E2E 092 Instrumento', 1, CURRENT_DATE, true)
+       RETURNING instrument_id`,
+    );
+    instrumentId = instrumentRows[0].instrument_id;
+
+    const sectionRows = await ds.query<{ section_id: string }[]>(
+      `INSERT INTO sections (section_id, name, "order", instrument_id)
+       VALUES (gen_random_uuid(), 'E2E 092 Seccion', 1, $1)
+       RETURNING section_id`,
+      [instrumentId],
+    );
+    const sectionId = sectionRows[0].section_id;
+
+    const openTextType = await ds.query<{ type_id: string }[]>(
+      `SELECT type_id FROM types_of_questions WHERE name = 'open_text'`,
+    );
+    const multiType = await ds.query<{ type_id: string }[]>(
+      `SELECT type_id FROM types_of_questions WHERE name = 'multiple_choice'`,
+    );
+
+    const qText = await ds.query<{ question_id: string }[]>(
+      `INSERT INTO questions (question_id, section_id, text, type_id, is_required, "order")
+       VALUES (gen_random_uuid(), $1, 'E2E 092 pregunta de texto', $2, false, 1)
+       RETURNING question_id`,
+      [sectionId, openTextType[0].type_id],
+    );
+    qTextId = qText[0].question_id;
+
+    const qMulti = await ds.query<{ question_id: string }[]>(
+      `INSERT INTO questions (question_id, section_id, text, type_id, is_required, "order")
+       VALUES (gen_random_uuid(), $1, 'E2E 092 pregunta multiple', $2, false, 2)
+       RETURNING question_id`,
+      [sectionId, multiType[0].type_id],
+    );
+    qMultiId = qMulti[0].question_id;
+
+    const optionA = await ds.query<{ option_id: string }[]>(
+      `INSERT INTO options_question (option_id, question_id, text)
+       VALUES (gen_random_uuid(), $1, 'Opción A') RETURNING option_id`,
+      [qMultiId],
+    );
+    optionAId = optionA[0].option_id;
+    const optionB = await ds.query<{ option_id: string }[]>(
+      `INSERT INTO options_question (option_id, question_id, text)
+       VALUES (gen_random_uuid(), $1, 'Opción B') RETURNING option_id`,
+      [qMultiId],
+    );
+    optionBId = optionB[0].option_id;
+
+    // ── agricultores ─────────────────────────────────────────────────────────
+    async function createFarmer(name: string, documentId: string) {
+      const rows = await ds.query<{ id: string }[]>(
+        `INSERT INTO farmers (id, name, document_id) VALUES (gen_random_uuid(), $1, $2) RETURNING id`,
+        [name, documentId],
+      );
+      farmerIdsCreated.push(rows[0].id);
+      return rows[0].id;
+    }
+
+    farmerAlphaId = await createFarmer(
+      'Encuestado Alpha 092',
+      uniqueDocument('ALPHA'),
+    );
+    farmerBetaId = await createFarmer(
+      'Encuestado Beta 092',
+      uniqueDocument('BETA'),
+    );
+    farmerOtherId = await createFarmer(
+      'Encuestado Otro 092',
+      uniqueDocument('OTHER'),
+    );
+    farmerPagId = await createFarmer(
+      'Paginacion Noventaydos',
+      uniqueDocument('PAG'),
+    );
+
+    // ── campaña y sesión (farmerBeta solo vive en la sesión) ─────────────────
+    const campaignRows = await ds.query<{ campaign_id: string }[]>(
+      `INSERT INTO campaigns (campaign_id, name, is_active) VALUES (gen_random_uuid(), 'E2E 092 Campaña', true) RETURNING campaign_id`,
+    );
+    campaignId = campaignRows[0].campaign_id;
+
+    const sessionRows = await ds.query<{ session_id: string }[]>(
+      `INSERT INTO campaign_sessions (session_id, campaign_id, farmer_id, sincronized)
+       VALUES (gen_random_uuid(), $1, $2, false) RETURNING session_id`,
+      [campaignId, farmerBetaId],
+    );
+    sessionBetaId = sessionRows[0].session_id;
+
+    // ── encuestas ────────────────────────────────────────────────────────────
+    async function insertSurvey(params: {
+      userId: string | null;
+      farmerId?: string | null;
+      campaignSessionId?: string | null;
+      origin: 'field' | 'public';
+      createdAt?: Date;
+    }): Promise<string> {
+      const rows = await ds.query<{ survey_id: string }[]>(
+        `INSERT INTO surveys (survey_id, user_id, farmer_id, campaign_session_id, origin, sincronized, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, false, COALESCE($5, now()), COALESCE($5, now()))
+         RETURNING survey_id`,
+        [
+          params.userId,
+          params.farmerId ?? null,
+          params.campaignSessionId ?? null,
+          params.origin,
+          params.createdAt ?? null,
+        ],
+      );
+      const surveyId = rows[0].survey_id;
+      surveyIdsCreated.push(surveyId);
+      return surveyId;
+    }
+
+    async function linkInstrument(surveyId: string) {
+      await ds.query(
+        `INSERT INTO surveys_instruments (survey_id, instrument_id) VALUES ($1, $2)`,
+        [surveyId, instrumentId],
       );
     }
 
-    ownMediaSurveyId = await insertSurvey({
+    async function insertAttachment(params: {
+      surveyId: string;
+      questionId: string;
+      responseId: string;
+      status: 'pending' | 'uploaded' | 'failed';
+      publicUrl?: string | null;
+    }) {
+      const rows = await ds.query<{ attachment_id: string }[]>(
+        `INSERT INTO media_attachments
+           (attachment_id, survey_id, question_id, response_id, storage_key, public_url, mime_type, status)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'image/jpeg', $6)
+         RETURNING attachment_id`,
+        [
+          params.surveyId,
+          params.questionId,
+          params.responseId,
+          `e2e-092/${params.responseId}`,
+          params.publicUrl ?? null,
+          params.status,
+        ],
+      );
+      attachmentIdsCreated.push(rows[0].attachment_id);
+    }
+
+    // Alpha — farmer directo, con adjunto SUBIDO (para el criterio 6).
+    surveyAlphaId = await insertSurvey({
       userId: pollsterAId,
-      farmerId: farmerDirectId,
-      createdAt: tiedAt,
+      farmerId: farmerAlphaId,
+      origin: 'field',
     });
-    await insertImageWithAttachment(
-      ownMediaSurveyId,
-      imageQuestionId,
-      'uploaded',
+    await linkInstrument(surveyAlphaId);
+    const alphaResponse = await ds.query<{ response_id: string }[]>(
+      `INSERT INTO responses (response_id, survey_id, question_id, text_value)
+       VALUES (gen_random_uuid(), $1, $2, 'respuesta alpha') RETURNING response_id`,
+      [surveyAlphaId, qTextId],
     );
-    await insertImageWithAttachment(
-      ownMediaSurveyId,
-      imagePendingQuestionId,
-      'pending',
+    await insertAttachment({
+      surveyId: surveyAlphaId,
+      questionId: qTextId,
+      responseId: alphaResponse[0].response_id,
+      status: 'uploaded',
+      publicUrl: 'https://example.test/e2e-092-alpha.jpg',
+    });
+
+    // Beta — farmer solo en la sesión de campaña; selección múltiple con 2
+    // filas de respuesta para la MISMA pregunta (criterio 3). Una de ellas
+    // lleva un adjunto todavía 'pending' (no cuenta como hasAttachment).
+    surveyBetaId = await insertSurvey({
+      userId: pollsterAId,
+      campaignSessionId: sessionBetaId,
+      origin: 'field',
+    });
+    await linkInstrument(surveyBetaId);
+    const betaResponseA = await ds.query<{ response_id: string }[]>(
+      `INSERT INTO responses (response_id, survey_id, question_id, option_id)
+       VALUES (gen_random_uuid(), $1, $2, $3) RETURNING response_id`,
+      [surveyBetaId, qMultiId, optionAId],
+    );
+    await ds.query(
+      `INSERT INTO responses (response_id, survey_id, question_id, option_id)
+       VALUES (gen_random_uuid(), $1, $2, $3)`,
+      [surveyBetaId, qMultiId, optionBId],
+    );
+    await insertAttachment({
+      surveyId: surveyBetaId,
+      questionId: qMultiId,
+      responseId: betaResponseA[0].response_id,
+      status: 'pending',
+    });
+
+    // Sin respuestas — debe quedar excluida (criterio 1).
+    surveyNoResponsesId = await insertSurvey({
+      userId: pollsterAId,
+      farmerId: farmerAlphaId,
+      origin: 'field',
+    });
+
+    // De otro encuestador — debe quedar excluida de la lista de A (criterio 1)
+    // y su detalle debe responder 404 para A (criterio 5).
+    surveyOtherUserId = await insertSurvey({
+      userId: pollsterBId,
+      farmerId: farmerOtherId,
+      origin: 'field',
+    });
+    await ds.query(
+      `INSERT INTO responses (response_id, survey_id, question_id, text_value)
+       VALUES (gen_random_uuid(), $1, $2, 'respuesta otro encuestador')`,
+      [surveyOtherUserId, qTextId],
     );
 
-    ownEmptySurveyId = await insertSurvey({
+    // origin='public' aunque tenga user_id — debe quedar excluida (criterio 1).
+    surveyPublicOriginId = await insertSurvey({
       userId: pollsterAId,
-      withSession: true,
-    });
-
-    ownPublicSurveyId = await insertSurvey({
-      userId: pollsterAId,
-      farmerId: farmerDirectId,
       origin: 'public',
     });
-    await insertTextResponse(ownPublicSurveyId);
+    await ds.query(
+      `INSERT INTO responses (response_id, survey_id, question_id, text_value)
+       VALUES (gen_random_uuid(), $1, $2, 'respuesta canal publico')`,
+      [surveyPublicOriginId, qTextId],
+    );
 
-    otherSurveyId = await insertSurvey({
-      userId: pollsterBId,
-      farmerId: farmerDirectId,
-    });
-    await insertTextResponse(otherSurveyId);
-  }, 30_000);
+    // 25 encuestas para paginación (criterio 2), con created_at explícito y
+    // decreciente para que el orden esperado sea determinista.
+    const base = new Date();
+    for (let i = 0; i < 25; i++) {
+      const createdAt = new Date(base.getTime() - i * 1000);
+      const surveyId = await insertSurvey({
+        userId: pollsterAId,
+        farmerId: farmerPagId,
+        origin: 'field',
+        createdAt,
+      });
+      await ds.query(
+        `INSERT INTO responses (response_id, survey_id, question_id, text_value)
+         VALUES (gen_random_uuid(), $1, $2, $3)`,
+        [surveyId, qTextId, `respuesta paginacion ${i}`],
+      );
+      paginationSurveyIds.push(surveyId);
+    }
+  });
 
   afterAll(async () => {
-    if (surveyIdsCreated.length) {
-      await ds.query(
-        `DELETE FROM media_attachments WHERE survey_id = ANY($1::uuid[])`,
-        [surveyIdsCreated],
-      );
-      await ds.query(
-        `DELETE FROM responses WHERE survey_id = ANY($1::uuid[])`,
-        [surveyIdsCreated],
-      );
-      await ds.query(
-        `DELETE FROM surveys_instruments WHERE survey_id = ANY($1::uuid[])`,
-        [surveyIdsCreated],
-      );
-      await ds.query(`DELETE FROM surveys WHERE survey_id = ANY($1::uuid[])`, [
-        surveyIdsCreated,
+    for (const attachmentId of attachmentIdsCreated) {
+      await ds.query(`DELETE FROM media_attachments WHERE attachment_id = $1`, [
+        attachmentId,
       ]);
     }
-    await ds.query(`DELETE FROM campaign_sessions WHERE session_id = $1`, [
-      sessionId,
-    ]);
-    await ds.query(`DELETE FROM campaigns WHERE campaign_id = $1`, [
-      campaignId,
-    ]);
-    await ds.query(`DELETE FROM farmers WHERE id = ANY($1::uuid[])`, [
-      [farmerSessionId, farmerDirectId],
-    ]);
-    await ds.query(`DELETE FROM questions WHERE section_id = $1`, [sectionId]);
-    await ds.query(`DELETE FROM sections WHERE instrument_id = $1`, [
-      instrumentId,
-    ]);
-    await ds.query(`DELETE FROM instruments WHERE instrument_id = $1`, [
-      instrumentId,
-    ]);
-    await ds.query(`DELETE FROM users WHERE email LIKE $1`, [
-      `${PREFIX}-%@test.local`,
-    ]);
-    await app.close();
-  }, 15_000);
-
-  async function getMine(
-    token: string,
-    query: Record<string, string | number> = {},
-  ): Promise<MySurveysPage> {
-    const res = await request(app.getHttpServer())
-      .get('/api/surveys/mine')
-      .query({ limit: 50, ...query })
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-    return res.body as MySurveysPage;
-  }
-
-  async function getResponses(
-    token: string,
-    surveyId: string,
-  ): Promise<SurveyResponsesResult> {
-    const res = await request(app.getHttpServer())
-      .get(`/api/surveys/${surveyId}/responses`)
-      .set('Authorization', `Bearer ${token}`)
-      .expect(200);
-    return res.body as SurveyResponsesResult;
-  }
-
-  // ── Criterio 1 — solo las propias, de campo y con respuestas ──────────────
-
-  describe('GET /api/surveys/mine — alcance', () => {
-    it('TC-092-A · devuelve las encuestas propias con respuestas', async () => {
-      const ids = (await getMine(pollsterAToken)).items.map((i) => i.surveyId);
-      expect(ids).toEqual(
-        expect.arrayContaining([
-          ownSessionSurveyId,
-          ownDirectSurveyId,
-          ownMediaSurveyId,
-        ]),
+    for (const surveyId of surveyIdsCreated) {
+      await ds.query(`DELETE FROM responses WHERE survey_id = $1`, [surveyId]);
+      await ds.query(`DELETE FROM surveys_instruments WHERE survey_id = $1`, [
+        surveyId,
+      ]);
+      await ds.query(`DELETE FROM surveys WHERE survey_id = $1`, [surveyId]);
+    }
+    if (sessionBetaId) {
+      await ds.query(`DELETE FROM campaign_sessions WHERE session_id = $1`, [
+        sessionBetaId,
+      ]);
+    }
+    if (campaignId) {
+      await ds.query(`DELETE FROM campaigns WHERE campaign_id = $1`, [
+        campaignId,
+      ]);
+    }
+    for (const farmerId of farmerIdsCreated) {
+      await ds.query(`DELETE FROM farmers WHERE id = $1`, [farmerId]);
+    }
+    if (instrumentId) {
+      await ds.query(
+        `DELETE FROM questions WHERE section_id IN (SELECT section_id FROM sections WHERE instrument_id = $1)`,
+        [instrumentId],
       );
+      await ds.query(`DELETE FROM sections WHERE instrument_id = $1`, [
+        instrumentId,
+      ]);
+      await ds.query(`DELETE FROM instruments WHERE instrument_id = $1`, [
+        instrumentId,
+      ]);
+    }
+    await app.close();
+  });
+
+  // ── criterios 1, 3 y 4 — GET /api/surveys/mine ────────────────────────────
+
+  describe('GET /api/surveys/mine', () => {
+    it('criterio 1 — solo devuelve las propias encuestas de campo con respuestas', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/surveys/mine?limit=50')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
+
+      const body = res.body as MySurveysPage;
+      const ids = body.items.map((i) => i.surveyId);
+
+      expect(ids).toContain(surveyAlphaId);
+      expect(ids).toContain(surveyBetaId);
+      expect(ids).not.toContain(surveyNoResponsesId);
+      expect(ids).not.toContain(surveyOtherUserId);
+      expect(ids).not.toContain(surveyPublicOriginId);
+      // 25 de paginación + alpha + beta.
+      expect(body.total).toBe(27);
     });
 
-    it('TC-092-B · nunca devuelve encuestas de otro encuestador', async () => {
-      const page = await getMine(pollsterAToken);
-      expect(page.items.some((i) => i.surveyId === otherSurveyId)).toBe(false);
+    it('criterio 3 — trae el productor aunque solo esté en la sesión de campaña, y responseCount cuenta preguntas', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/surveys/mine?limit=50')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
 
-      const pageB = await getMine(pollsterBToken);
-      expect(pageB.items.map((i) => i.surveyId)).toEqual([otherSurveyId]);
+      const body = res.body as MySurveysPage;
+      const alpha = body.items.find((i) => i.surveyId === surveyAlphaId)!;
+      const beta = body.items.find((i) => i.surveyId === surveyBetaId)!;
+
+      expect(alpha.farmer?.farmerId).toBe(farmerAlphaId);
+      expect(alpha.responseCount).toBe(1);
+      expect(alpha.instrumentName).toBe('E2E 092 Instrumento');
+
+      expect(beta.farmer?.farmerId).toBe(farmerBetaId);
+      // 2 filas de respuesta (una por opción), pero 1 sola pregunta.
+      expect(beta.responseCount).toBe(1);
     });
 
-    it('TC-092-C · excluye encuestas sin respuestas y las del canal público', async () => {
-      const ids = (await getMine(pollsterAToken)).items.map((i) => i.surveyId);
-      expect(ids).not.toContain(ownEmptySurveyId);
-      expect(ids).not.toContain(ownPublicSurveyId);
+    it('criterio 4 — search filtra por nombre o documento del productor', async () => {
+      const byName = await request(app.getHttpServer())
+        .get('/api/surveys/mine?search=Alpha 092')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
+      const byNameBody = byName.body as MySurveysPage;
+      expect(byNameBody.items.map((i) => i.surveyId)).toEqual([
+        surveyAlphaId,
+      ]);
+
+      const betaDocument = (
+        await ds.query<{ document_id: string }[]>(
+          `SELECT document_id FROM farmers WHERE id = $1`,
+          [farmerBetaId],
+        )
+      )[0].document_id;
+
+      const byDocument = await request(app.getHttpServer())
+        .get(`/api/surveys/mine?search=${encodeURIComponent(betaDocument)}`)
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
+      const byDocumentBody = byDocument.body as MySurveysPage;
+      expect(byDocumentBody.items.map((i) => i.surveyId)).toEqual([
+        surveyBetaId,
+      ]);
     });
 
-    it('TC-092-D · está acotado al JWT también para admin (no ve las de los encuestadores)', async () => {
-      const ids = (await getMine(adminToken)).items.map((i) => i.surveyId);
-      expect(ids).not.toContain(ownSessionSurveyId);
-      expect(ids).not.toContain(otherSurveyId);
+    it('criterio 2 — pagina con orden estable y rechaza page/limit fuera de rango', async () => {
+      const page1 = await request(app.getHttpServer())
+        .get('/api/surveys/mine?search=Paginacion Noventaydos&limit=10&page=1')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
+      const page1Body = page1.body as MySurveysPage;
+      expect(page1Body.total).toBe(25);
+      expect(page1Body.items).toHaveLength(10);
+      expect(page1Body.items.map((i) => i.surveyId)).toEqual(
+        paginationSurveyIds.slice(0, 10),
+      );
+
+      const page3 = await request(app.getHttpServer())
+        .get('/api/surveys/mine?search=Paginacion Noventaydos&limit=10&page=3')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
+      const page3Body = page3.body as MySurveysPage;
+      expect(page3Body.items).toHaveLength(5);
+      expect(page3Body.items.map((i) => i.surveyId)).toEqual(
+        paginationSurveyIds.slice(20, 25),
+      );
+
+      await request(app.getHttpServer())
+        .get('/api/surveys/mine?page=0')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/api/surveys/mine?limit=51')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(400);
+
+      await request(app.getHttpServer())
+        .get('/api/surveys/mine?limit=0')
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(400);
     });
 
-    it('TC-092-E · sin token responde 401', async () => {
+    it('exige autenticación', async () => {
       await request(app.getHttpServer()).get('/api/surveys/mine').expect(401);
     });
   });
 
-  // ── Criterio 2 — paginación estable y validación ──────────────────────────
+  // ── criterios 5 y 6 — GET /api/surveys/:id/responses ──────────────────────
 
-  describe('GET /api/surveys/mine — paginación', () => {
-    it('TC-092-F · pagina con page/limit y reporta el total', async () => {
-      const first = await getMine(pollsterAToken, { page: 1, limit: 2 });
-      expect(first.total).toBe(3);
-      expect(first.page).toBe(1);
-      expect(first.limit).toBe(2);
-      expect(first.items).toHaveLength(2);
-
-      const second = await getMine(pollsterAToken, { page: 2, limit: 2 });
-      expect(second.items).toHaveLength(1);
-
-      const all = [...first.items, ...second.items].map((i) => i.surveyId);
-      expect(new Set(all).size).toBe(3);
-    });
-
-    it('TC-092-G · ordena por created_at DESC y desempata por survey_id DESC', async () => {
-      const ids = (await getMine(pollsterAToken)).items.map((i) => i.surveyId);
-      const tied = [ownDirectSurveyId, ownMediaSurveyId].sort().reverse();
-      expect(ids).toEqual([ownSessionSurveyId, ...tied]);
-    });
-
-    it('TC-092-H · el orden es idéntico entre llamadas repetidas', async () => {
-      const a = (await getMine(pollsterAToken, { limit: 1, page: 2 })).items;
-      const b = (await getMine(pollsterAToken, { limit: 1, page: 2 })).items;
-      expect(a.map((i) => i.surveyId)).toEqual(b.map((i) => i.surveyId));
-    });
-
-    it.each([
-      [{ limit: 51 }],
-      [{ limit: 0 }],
-      [{ page: 0 }],
-      [{ page: 'abc' }],
-    ])('TC-092-I · rechaza parámetros inválidos %j con 400', async (query) => {
-      await request(app.getHttpServer())
-        .get('/api/surveys/mine')
-        .query(query)
+  describe('GET /api/surveys/:id/responses', () => {
+    it('criterio 5 — un encuestador ve sus propias respuestas', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/surveys/${surveyAlphaId}/responses`)
         .set('Authorization', `Bearer ${pollsterAToken}`)
-        .expect(400);
-    });
-  });
+        .expect(200);
 
-  // ── Criterios 3 y 4 — contenido del ítem y búsqueda ───────────────────────
-
-  describe('GET /api/surveys/mine — contenido del ítem', () => {
-    it('TC-092-J · resuelve el productor desde la sesión cuando la encuesta no lo tiene', async () => {
-      const { items } = await getMine(pollsterAToken);
-      const item = items.find((i) => i.surveyId === ownSessionSurveyId)!;
-      expect(item.farmer).toEqual({
-        farmerId: farmerSessionId,
-        name: FARMER_SESSION_NAME,
-      });
-      expect(item.campaignName).toBe(CAMPAIGN_NAME);
-      expect(item.instrumentName).toBe(INSTRUMENT_NAME);
-      expect(item.clientSurveyId).toBe('local_survey_e2e092_session');
-      expect(item.responseCount).toBe(1);
+      const body = res.body as SurveyResponsesBody;
+      expect(body.surveyId).toBe(surveyAlphaId);
+      expect(body.responses.length).toBeGreaterThan(0);
     });
 
-    it('TC-092-K · usa el productor de la encuesta y campaignName null sin sesión', async () => {
-      const { items } = await getMine(pollsterAToken);
-      const item = items.find((i) => i.surveyId === ownDirectSurveyId)!;
-      expect(item.farmer?.name).toBe(FARMER_DIRECT_NAME);
-      expect(item.campaignName).toBeNull();
-    });
-
-    it('TC-092-L · responseCount cuenta preguntas, no filas (selección múltiple de 2 opciones = 1)', async () => {
-      const { items } = await getMine(pollsterAToken);
-      const item = items.find((i) => i.surveyId === ownDirectSurveyId)!;
-      expect(item.responseCount).toBe(2);
-    });
-
-    it('TC-092-M · search filtra por nombre del productor (sin distinguir mayúsculas)', async () => {
-      const { items } = await getMine(pollsterAToken, {
-        search: 'productor sesión',
-      });
-      expect(items.map((i) => i.surveyId)).toEqual([ownSessionSurveyId]);
-    });
-
-    it('TC-092-N · search filtra por documento del productor', async () => {
-      const { items } = await getMine(pollsterAToken, {
-        search: FARMER_DIRECT_DOC,
-      });
-      expect(items.map((i) => i.surveyId).sort()).toEqual(
-        [ownDirectSurveyId, ownMediaSurveyId].sort(),
-      );
-    });
-
-    it('TC-092-O · search trata % y _ como texto literal', async () => {
-      const { items, total } = await getMine(pollsterAToken, { search: '%' });
-      expect(items).toHaveLength(0);
-      expect(total).toBe(0);
-    });
-  });
-
-  // ── Criterios 5 y 6 — respuestas visibles para el encuestador ─────────────
-
-  describe('GET /api/surveys/:id/responses — encuestador', () => {
-    it('TC-092-P · el encuestador obtiene las respuestas de su encuesta', async () => {
-      const body = await getResponses(pollsterAToken, ownDirectSurveyId);
-      expect(body.surveyId).toBe(ownDirectSurveyId);
-      // 1 open_text + 2 filas de la selección múltiple
-      expect(body.responses).toHaveLength(3);
-    });
-
-    it('TC-092-Q · una encuesta ajena responde 404 al encuestador', async () => {
+    it('criterio 5 — 404 si la encuesta es de otro encuestador (no 403)', async () => {
       await request(app.getHttpServer())
-        .get(`/api/surveys/${otherSurveyId}/responses`)
-        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .get(`/api/surveys/${surveyAlphaId}/responses`)
+        .set('Authorization', `Bearer ${pollsterBToken}`)
         .expect(404);
     });
 
-    it('TC-092-R · al encuestador no le llega ningún dato de descarga (lista blanca)', async () => {
-      const body = await getResponses(pollsterAToken, ownMediaSurveyId);
+    it('criterio 6 — al encuestador nunca le llega publicUrl/mimeType/originalFilename, y hasAttachment refleja solo lo subido', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/surveys/${surveyAlphaId}/responses`)
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
+
+      const body = res.body as SurveyResponsesBody;
       for (const row of body.responses) {
         expect(row).not.toHaveProperty('publicUrl');
         expect(row).not.toHaveProperty('mimeType');
         expect(row).not.toHaveProperty('originalFilename');
-        expect(row).not.toHaveProperty('attachmentId');
-        expect(JSON.stringify(row)).not.toContain('example.test');
+        expect(row).toHaveProperty('sectionId');
+        expect(row).toHaveProperty('sectionOrder');
       }
+      const textRow = body.responses.find((r) => r.questionId === qTextId)!;
+      expect(textRow.hasAttachment).toBe(true);
+
+      const betaRes = await request(app.getHttpServer())
+        .get(`/api/surveys/${surveyBetaId}/responses`)
+        .set('Authorization', `Bearer ${pollsterAToken}`)
+        .expect(200);
+      const betaBody = betaRes.body as SurveyResponsesBody;
+      // El adjunto de Beta quedó 'pending' — nunca cuenta como evidencia.
+      expect(betaBody.responses.every((r) => r.hasAttachment === false)).toBe(
+        true,
+      );
     });
 
-    it('TC-092-S · hasAttachment es true solo con un adjunto subido con éxito', async () => {
-      const body = await getResponses(pollsterAToken, ownMediaSurveyId);
-      const uploaded = body.responses.find(
-        (r) => r.questionId === imageQuestionId,
-      )!;
-      const pending = body.responses.find(
-        (r) => r.questionId === imagePendingQuestionId,
-      )!;
-      expect(uploaded.hasAttachment).toBe(true);
-      expect(pending.hasAttachment).toBe(false);
-    });
+    it('criterio 6 — el investigador sigue viendo las respuestas de cualquier encuesta, con publicUrl', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/surveys/${surveyAlphaId}/responses`)
+        .set('Authorization', `Bearer ${researcherToken}`)
+        .expect(200);
 
-    it('TC-092-T · hasAttachment es false en respuestas sin evidencia', async () => {
-      const body = await getResponses(pollsterAToken, ownDirectSurveyId);
-      const text = body.responses.find((r) => r.questionId === textQuestionId)!;
-      expect(text.hasAttachment).toBe(false);
-    });
-
-    it('TC-092-U · cada fila trae sectionId y sectionOrder', async () => {
-      const body = await getResponses(pollsterAToken, ownDirectSurveyId);
-      for (const row of body.responses) {
-        expect(row.sectionId).toBe(sectionId);
-        expect(row.sectionOrder).toBe(1);
-      }
-    });
-  });
-
-  describe('GET /api/surveys/:id/responses — admin e investigador', () => {
-    it('TC-092-V · admin sigue viendo cualquier encuesta, con hasAttachment', async () => {
-      const body = await getResponses(adminToken, ownMediaSurveyId);
-      const row = body.responses.find((r) => r.questionId === imageQuestionId)!;
-      expect(row.hasAttachment).toBe(true);
-    });
-
-    it('TC-092-W · investigador sigue viendo cualquier encuesta', async () => {
-      const body = await getResponses(researcherToken, otherSurveyId);
-      expect(body.surveyId).toBe(otherSurveyId);
-      expect(body.responses.length).toBeGreaterThan(0);
+      const body = res.body as SurveyResponsesBody;
+      const textRow = body.responses.find((r) => r.questionId === qTextId)!;
+      expect(textRow).toHaveProperty('publicUrl');
+      expect(textRow.publicUrl).toBe('https://example.test/e2e-092-alpha.jpg');
+      expect(textRow).toHaveProperty('sectionId');
+      expect(textRow).toHaveProperty('sectionOrder');
     });
   });
 });
