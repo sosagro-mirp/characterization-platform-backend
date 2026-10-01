@@ -17,6 +17,10 @@ import { AppModule } from '../src/app.module';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
+// La base de desarrollo es remota (túnel SSH): el montaje y la limpieza hacen
+// decenas de consultas y no caben en los 5 s por defecto de Jest.
+jest.setTimeout(30_000);
+
 const TEST_PASSWORD = 'E2eTest1234!';
 const PREFIX = 'e2e-092';
 
@@ -426,7 +430,7 @@ describe('spec-092 — encuestas realizadas (e2e)', () => {
       );
       paginationSurveyIds.push(surveyId);
     }
-  });
+  }, 120_000);
 
   afterAll(async () => {
     for (const attachmentId of attachmentIdsCreated) {
@@ -467,7 +471,7 @@ describe('spec-092 — encuestas realizadas (e2e)', () => {
       ]);
     }
     await app.close();
-  });
+  }, 60_000);
 
   // ── criterios 1, 3 y 4 — GET /api/surveys/mine ────────────────────────────
 
