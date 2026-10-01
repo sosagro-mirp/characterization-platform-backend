@@ -498,10 +498,10 @@ async function applyOptionWrite(
     : null;
 
   await manager.query(
-    `INSERT INTO options_question (option_id, question_id, text, value, is_other, metadata_id, archived_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO options_question (option_id, question_id, text, value, is_other, metadata_id, archived_at, origin)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (option_id) DO UPDATE SET
-       question_id = $2, text = $3, value = $4, is_other = $5, metadata_id = $6, archived_at = $7`,
+       question_id = $2, text = $3, value = $4, is_other = $5, metadata_id = $6, archived_at = $7, origin = $8`,
     [
       option.optionId,
       wrapper.questionId,
@@ -510,6 +510,8 @@ async function applyOptionWrite(
       option.isOther,
       metadataId,
       option.archivedAt,
+      // Spec 86 — ausente en el manifiesto = opción del instrumento.
+      option.origin ?? 'instrument',
     ],
   );
 }

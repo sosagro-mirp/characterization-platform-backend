@@ -23,6 +23,12 @@ export interface ManifestOption {
   isOther: boolean;
   metadata: ManifestMetadata | null;
   archivedAt: string | null;
+  /**
+   * Spec 86 — solo presente en opciones creadas desde campo ('field'). Se
+   * omite en las del instrumento para no alterar el hash de los manifiestos
+   * ya exportados.
+   */
+  origin?: 'field';
   /** Respuestas que usan esta opción al momento de exportar. */
   responseCount: number;
   hash: string;

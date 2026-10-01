@@ -1228,6 +1228,8 @@ export class SurveysService {
         numericValue: r.numericValue ?? null,
         booleanValue: r.booleanValue ?? null,
         optionText: r.option?.text ?? null,
+        // Spec 89 — la respuesta "Otros" lleva su texto en textValue.
+        isOther: r.option?.isOther ?? false,
         hasAttachment: uploadedAttachment !== null,
         // Spec 85: sin publicUrl; la evidencia se pide con URL firmada.
         attachmentId: attachment?.attachmentId ?? null,
