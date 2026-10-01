@@ -519,9 +519,7 @@ describe('spec-092 — encuestas realizadas (e2e)', () => {
         .set('Authorization', `Bearer ${pollsterAToken}`)
         .expect(200);
       const byNameBody = byName.body as MySurveysPage;
-      expect(byNameBody.items.map((i) => i.surveyId)).toEqual([
-        surveyAlphaId,
-      ]);
+      expect(byNameBody.items.map((i) => i.surveyId)).toEqual([surveyAlphaId]);
 
       const betaDocument = (
         await ds.query<{ document_id: string }[]>(
