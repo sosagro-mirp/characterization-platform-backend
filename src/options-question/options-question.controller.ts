@@ -18,7 +18,10 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
-import { Public } from '../auth/decorators/public.decorator';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../auth/decorators/current-user.decorator';
 import { CreateOptionQuestionDto } from './dto/create-option-question.dto';
 import { UpdateOptionQuestionDto } from './dto/update-option-question.dto';
 import { OptionsQuestionService } from './options-question.service';
@@ -32,12 +35,16 @@ export class OptionsQuestionController {
     private readonly optionsQuestionService: OptionsQuestionService,
   ) {}
 
-  @Public()
   @Post()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({
     summary: 'Crear opción de pregunta',
     description:
-      'Público: usado por el flujo de encuesta en campo para registrar la opción "Otro" con texto libre.',
+      'Admin/Investigador: crea una opción visible del instrumento. ' +
+      'Encuestador (spec 86, cuarentena para clientes viejos que aún crean la ' +
+      'opción "Otros" dinámica): responde 201, pero la opción nace archivada ' +
+      'con origin=\'field\' y sus respuestas se normalizan a la opción "Otros" ' +
+      'de la pregunta con este texto.',
   })
   @ApiParam({
     name: 'questionId',
@@ -46,14 +53,17 @@ export class OptionsQuestionController {
   })
   @ApiResponse({ status: 201, description: 'Opción creada.' })
   @ApiResponse({ status: 400, description: 'Datos de entrada inválidos.' })
+  @ApiResponse({ status: 401, description: 'Sin sesión.' })
   @ApiResponse({ status: 404, description: 'Pregunta no encontrada.' })
   create(
     @Param('questionId', new ParseUUIDPipe()) questionId: string,
     @Body() createOptionQuestionDto: CreateOptionQuestionDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.optionsQuestionService.create(
       questionId,
       createOptionQuestionDto,
+      { quarantine: user?.role === ROLES.POLLSTER },
     );
   }
 

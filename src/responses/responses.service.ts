@@ -14,6 +14,7 @@ import {
 } from 'src/media-attachments/entities/media-attachment.entity';
 import { CreateResponseDto } from './dto/create-response.dto';
 import { Response } from './entities/response.entity';
+import { resolveOtherAnswer } from './other-option';
 
 @Injectable()
 export class ResponsesService {
@@ -239,6 +240,15 @@ export class ResponsesService {
       }
     }
 
+    // Spec 86 — "Otros": texto en la respuesta, normalización de opciones
+    // `field` de clientes viejos y validación de longitud.
+    const resolved = await resolveOtherAnswer(
+      question,
+      option,
+      textValue,
+      manager,
+    );
+
     let attachment: MediaAttachment | null = null;
 
     if (attachmentId) {
@@ -260,8 +270,8 @@ export class ResponsesService {
     const response = manager.getRepository(Response).create({
       survey,
       question,
-      option: option ?? undefined,
-      textValue,
+      option: resolved.option ?? undefined,
+      textValue: resolved.textValue,
       numericValue,
       booleanValue,
     });
