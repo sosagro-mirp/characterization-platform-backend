@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Response } from 'src/responses/entities/response.entity';
+import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.module';
 import { SectionsController } from './sections.controller';
 import { Question } from 'src/questions/entities/question.entity';
 import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
@@ -19,6 +20,7 @@ import { SectionsService } from './sections.service';
       Question,
       StepCondition,
     ]),
+    MediaAttachmentsModule,
   ],
   controllers: [SectionsController],
   providers: [SectionsService],

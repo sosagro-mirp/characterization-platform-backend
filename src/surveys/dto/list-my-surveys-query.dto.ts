@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsInt,
   IsOptional,
@@ -23,7 +23,12 @@ export class ListMySurveysQueryDto {
   @Max(50)
   limit?: number = 20;
 
+  // Se recorta ANTES de validar el largo; un texto de solo espacios queda vacío
+  // y el servicio lo ignora (spec 92, Alcance 1).
   @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MaxLength(100)
   search?: string;
