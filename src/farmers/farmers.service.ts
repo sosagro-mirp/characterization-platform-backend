@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, In, Repository } from 'typeorm';
@@ -16,6 +17,7 @@ import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
 import { FarmerDeletionPreviewDto } from './dto/deletion-preview.dto';
 import { ConsentRecordsService } from '../consents/consent-records.service';
+import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 
 const FARMER_RELATIONS = ['farm', 'farm.town', 'farm.crops'];
 
@@ -62,6 +64,9 @@ export class FarmersService {
     @InjectRepository(FarmerDocumentCollision)
     private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
     private readonly consentRecordsService: ConsentRecordsService,
+    // `@Optional()` solo para no romper las suites unitarias que arman este
+    // servicio a mano; en la aplicación siempre está inyectado (spec 85).
+    @Optional() private readonly mediaCleanup?: MediaCleanupService,
   ) {}
 
   // Spec 68 — colisiones de documentId detectadas por
@@ -372,8 +377,15 @@ export class FarmersService {
     const { farmer, sessionIds, surveys, documentCollisionsCount, farmInfo } =
       await this.computeDeletionPlan(id);
     const surveyIds = surveys.map((s) => s.surveyId);
+    let mediaKeys: string[] = [];
 
     await this.farmersRepository.manager.transaction(async (manager) => {
+      // 0. Claves de multimedia en R2, recolectadas ANTES de borrar las filas
+      // de `media_attachments` (caen por CASCADE con la encuesta). El borrado
+      // real en R2 ocurre después del commit (spec 85, D4).
+      mediaKeys =
+        (await this.mediaCleanup?.collectBySurveys(manager, surveyIds)) ?? [];
+
       // 1. Colisiones — RESTRICT, bloquean el borrado del agricultor.
       await manager.delete(FarmerDocumentCollision, {
         existingFarmer: { id },
@@ -426,10 +438,15 @@ export class FarmersService {
       }
     });
 
+    const mediaObjects = (await this.mediaCleanup?.deleteAfterCommit(
+      mediaKeys,
+    )) ?? { deleted: 0, queued: 0 };
+
     this.logger.log(
       `Borrado en cascada: farmerId=${id} actor=${actor ?? 'desconocido'} ` +
         `sesiones=${sessionIds.length} encuestas=${surveyIds.length} ` +
         `colisiones=${documentCollisionsCount} ` +
+        `multimedia=${mediaObjects.deleted} borrados/${mediaObjects.queued} en cola ` +
         `finca=${farmInfo?.willBeDeleted ? farmInfo.farmId : 'conservada'}`,
     );
 
@@ -448,6 +465,7 @@ export class FarmersService {
       },
       farm: farmInfo,
       preserved: { changeRequests: 0 },
+      mediaObjects,
     };
   }
 

@@ -305,7 +305,8 @@ export async function seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioPr
     const q_1ecaf425_1aa3_47fb_95eb_3f7fb5f4a9de = await saveQuestion(manager, {
       text: `¿Pertenece el productor a alguno de los siguientes grupos o territorios? (Puede marcar más de una opción)`,
       type: types.multiple_choice,
-      isRequired: true,
+      // Dato sensible (Ley 1581/2012): su respuesta no puede ser obligatoria. Spec 85.
+      isRequired: false,
       isKeyQuestion: true,
       order: o++,
       section: sec1,
@@ -318,6 +319,7 @@ export async function seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioPr
       { text: `Municipio en zona PDET` },
       { text: `Municipio en zona ZOMAC` },
       { text: `Ninguna de las anteriores` },
+      { text: `Prefiero no responder` },
     ]);
 
     await saveQuestion(manager, {

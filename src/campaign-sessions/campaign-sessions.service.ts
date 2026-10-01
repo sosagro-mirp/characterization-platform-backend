@@ -308,6 +308,10 @@ export class CampaignSessionsService {
         );
       }
 
+      // Spec 85: este camino no alcanza adjuntos de multimedia. Los
+      // `media_attachments` cuelgan de una encuesta, y arriba se rechaza el
+      // borrado si la sesión tiene alguna: sin encuestas no hay adjuntos cuyos
+      // objetos deban borrarse en R2.
       await manager.remove(session);
     });
   }

@@ -7,6 +7,7 @@ import { Section } from 'src/sections/entities/section.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { OptionQuestion } from 'src/options-question/entities/option-question.entity';
 import { Response } from 'src/responses/entities/response.entity';
+import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.module';
 import { InstrumentsController } from './instruments.controller';
 import { InstrumentsService } from './instruments.service';
 import { Instrument } from './entities/instrument.entity';
@@ -24,6 +25,7 @@ import { Instrument } from './entities/instrument.entity';
       // Spec 84 — getEditorStructure() cuenta respuestas por pregunta/opción.
       Response,
     ]),
+    MediaAttachmentsModule,
   ],
   controllers: [InstrumentsController],
   providers: [InstrumentsService],

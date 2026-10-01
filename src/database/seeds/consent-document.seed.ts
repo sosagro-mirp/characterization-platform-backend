@@ -43,25 +43,105 @@ const CONSENT_DOCUMENT_V1 = {
   contactEmail: 'datos.sosagro@itm.edu.co',
 };
 
+/**
+ * Spec 85 (Fase 1.3) — versión 1.1: declara qué datos son sensibles y que
+ * responderlos es facultativo (Ley 1581 de 2012 y Decreto 1377 de 2013,
+ * art. 12). Parte del texto realmente publicado de la v1.0 (que difiere del
+ * texto sembrado arriba: los seeds están desfasados) y solo AGREGA el párrafo
+ * de datos sensibles al cuerpo, sin cambios de esquema. Debe revisarlo el
+ * responsable jurídico del proyecto antes de publicarse. También queda en
+ * `draft`: publicarla es una acción explícita.
+ */
+const SENSITIVE_DATA_PARAGRAPH =
+  'Datos sensibles. En el Registro se le pregunta si el productor pertenece a alguno ' +
+  'de estos grupos o territorios: comunidades negras, afrocolombianas, raizales o ' +
+  'palenqueras; comunidad LGBTIQ+; municipio en zona PDET o ZOMAC. Algunos de ellos ' +
+  '—como el origen étnico o racial y la orientación sexual— son datos sensibles: ' +
+  'pueden afectar su intimidad o llevar a que alguien sea discriminado. Por eso ' +
+  'responder esa pregunta es completamente opcional: puede dejarla sin responder o ' +
+  'elegir «Prefiero no responder», sin ninguna consecuencia. Si la responde, solo se ' +
+  'usa para la investigación y nunca se publica de forma individual.';
+
+const CONSENT_DOCUMENT_V1_1 = {
+  version: '1.1',
+  title: CONSENT_DOCUMENT_V1.title,
+  body:
+    'Le estamos invitando a participar en una encuesta del proyecto SosAgro 4.C ' +
+    '(Sistema General de Regalías, SIGP 108927), que estudia las capacidades técnicas ' +
+    'y humanas de las unidades productivas de café, cacao, cannabis y cáñamo en ' +
+    'Colombia.\n\n' +
+    'Para ese estudio necesitamos registrar algunos datos suyos: su nombre, su número ' +
+    'de documento, sus datos de contacto (teléfono y correo, si los tiene), algunos ' +
+    'datos generales como su edad, género y nivel educativo, y las características y ' +
+    'la ubicación de su unidad productiva, incluida su ubicación geográfica.\n\n' +
+    'Esta información se usa únicamente con fines de investigación dentro de este ' +
+    'proyecto. No se usa para decidir sobre subsidios, créditos, programas de ' +
+    'gobierno, ni para ningún trámite que lo afecte a usted.\n\n' +
+    SENSITIVE_DATA_PARAGRAPH +
+    '\n\n' +
+    'Participar es voluntario. Puede negarse a responder cualquier pregunta, o ' +
+    'terminar la encuesta en el momento que quiera, sin tener que dar explicaciones y ' +
+    'sin que eso le traiga ninguna consecuencia.',
+  dataProcessingClause:
+    'Sus datos personales no se venden, no se comparten ni se entregan a ninguna otra ' +
+    'entidad, empresa o persona. No se usan con fines comerciales, publicitarios, ni ' +
+    'para evaluar su comportamiento crediticio.\n\n' +
+    'Solo el equipo de investigación del proyecto tiene acceso a la información que lo ' +
+    'identifica a usted.\n\n' +
+    'Los resultados que se publican —en el sitio web del proyecto, en informes o en ' +
+    'presentaciones— son siempre cifras agrupadas y anónimas. Nunca aparece su ' +
+    'nombre, su documento, su teléfono ni la ubicación de su finca. Además, cuando un ' +
+    'grupo tiene muy pocos participantes, esos resultados no se muestran, ' +
+    'precisamente para que nadie pueda deducir de quién se trata.\n\n' +
+    'Sus datos se conservan mientras dure el proyecto y el tiempo que la ley exija ' +
+    'para respaldar sus resultados. Después se eliminan o se anonimizan de forma ' +
+    'definitiva.',
+  multimediaClause:
+    'Durante la visita, el equipo puede tomar fotografías, grabar audio o grabar ' +
+    'video, para apoyar el registro y el análisis de la investigación.\n\n' +
+    'Usted decide por separado si autoriza cada uno de estos registros: puede aceptar ' +
+    'unos y negar otros.\n\n' +
+    'Negarse a cualquiera de ellos —o a todos— no afecta su participación en la ' +
+    'encuesta ni los beneficios del proyecto. Si en algún momento durante la visita ' +
+    'quiere que se detenga una grabación, basta con que lo diga.',
+  rightsClause:
+    'La Ley 1581 de 2012 le reconoce estos derechos sobre sus datos personales, y ' +
+    'usted puede ejercerlos en cualquier momento y sin costo:\n\n' +
+    '- Conocer qué datos suyos tenemos y cómo los hemos usado.\n' +
+    '- Actualizarlos o corregirlos si están equivocados o incompletos.\n' +
+    '- Pedir una copia de esta autorización.\n' +
+    '- Revocar esta autorización y pedir que sus datos se eliminen.\n' +
+    '- Presentar una queja ante la Superintendencia de Industria y Comercio si ' +
+    'considera que sus derechos no se están respetando.\n\n' +
+    'Para ejercer cualquiera de estos derechos, escriba al correo de contacto que ' +
+    'aparece en este documento, o dígaselo directamente al encuestador que lo ' +
+    'visitó.\n\n' +
+    'Tenga en cuenta que si revoca la autorización, retiramos sus datos del estudio, ' +
+    'pero los resultados agregados que ya se hayan publicado no se pueden deshacer ' +
+    '—en esos resultados usted nunca aparece identificado.',
+  responsibleEntity:
+    'Instituto Tecnológico Metropolitano (ITM) — Proyecto SosAgro 4.C',
+  contactEmail: 'maritzagil@itm.edu.co',
+};
+
 export async function seedConsentDocument(
   manager: EntityManager,
 ): Promise<void> {
   const repo = manager.getRepository(ConsentDocument);
 
-  const existing = await repo.findOne({
-    where: { version: CONSENT_DOCUMENT_V1.version },
-  });
+  for (const doc of [CONSENT_DOCUMENT_V1, CONSENT_DOCUMENT_V1_1]) {
+    const existing = await repo.findOne({ where: { version: doc.version } });
 
-  if (existing) {
+    if (existing) {
+      console.log(
+        `[seed] ConsentDocument versión "${doc.version}" ya existe. Se omite.`,
+      );
+      continue;
+    }
+
+    await repo.save(repo.create({ ...doc, status: 'draft' }));
     console.log(
-      `[seed] ConsentDocument versión "${CONSENT_DOCUMENT_V1.version}" ya existe. Se omite.`,
+      `[seed] ConsentDocument creado: versión ${doc.version} (draft — publicar manualmente).`,
     );
-    return;
   }
-
-  const document = repo.create({ ...CONSENT_DOCUMENT_V1, status: 'draft' });
-  await repo.save(document);
-  console.log(
-    `[seed] ConsentDocument creado: versión ${CONSENT_DOCUMENT_V1.version} (draft — publicar manualmente).`,
-  );
 }

@@ -36,4 +36,10 @@ export class FarmerDeletionPreviewDto {
    * de que se pierden en silencio.
    */
   preserved: { changeRequests: number };
+  /**
+   * Objetos de multimedia en R2 del agricultor (spec 85). Solo lo informa el
+   * borrado (`DELETE .../cascade`): `deleted` = eliminados del bucket,
+   * `queued` = fallaron y quedaron en `media_deletion_queue` para reintento.
+   */
+  mediaObjects?: { deleted: number; queued: number };
 }

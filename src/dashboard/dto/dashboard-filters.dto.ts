@@ -95,15 +95,6 @@ export class DashboardFiltersDto {
 
   @ApiPropertyOptional({
     description:
-      'Filtro global derivado de respuestas (spec 43, D3): grupo poblacional. Selección múltiple — lista de textos de opción separados por coma (OR entre ellos), sobre la pregunta fuente ("¿Pertenece el productor a...?", instrumento S1a — sin systemField, localizada por texto).',
-    example: 'Comunidad LGBTIQ+,Municipio en zona PDET',
-  })
-  @IsOptional()
-  @IsString()
-  populationGroup?: string;
-
-  @ApiPropertyOptional({
-    description:
       'Filtro global derivado de respuestas (spec 43, D3): perfil del productor. Coincide por el texto exacto de la opción de la pregunta fuente ("Perfil del productor", instrumento S1a — sin systemField, localizada por texto).',
     example: 'Encargado de cultivo',
   })

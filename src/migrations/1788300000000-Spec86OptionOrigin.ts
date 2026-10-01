@@ -11,8 +11,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 //
 // Aditiva: todas las filas existentes quedan en 'instrument'. El script
 // `run-migrate-other-options` es el que marca las legadas como 'field'.
-export class Spec86OptionOrigin1788200000000 implements MigrationInterface {
-  name = 'Spec86OptionOrigin1788200000000';
+export class Spec86OptionOrigin1788300000000 implements MigrationInterface {
+  name = 'Spec86OptionOrigin1788300000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

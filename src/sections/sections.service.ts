@@ -9,6 +9,7 @@ import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { StepCondition } from 'src/campaigns/entities/step-condition.entity';
+import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 import { CreateSectionDto } from './dto/create-section.dto';
 import { UpdateSectionDto } from './dto/update-section.dto';
 import { Section } from './entities/section.entity';
@@ -26,6 +27,7 @@ export class SectionsService {
     private readonly questionsRepository: Repository<Question>,
     @InjectRepository(StepCondition)
     private readonly stepConditionsRepository: Repository<StepCondition>,
+    private readonly mediaCleanup: MediaCleanupService,
   ) {}
 
   /**
@@ -175,6 +177,13 @@ export class SectionsService {
       });
     }
 
+    // Spec 85: la cascada Section → Question → MediaAttachment (ON DELETE
+    // CASCADE) deja objetos huérfanos en R2 si no se recolectan antes.
+    const mediaKeys = await this.mediaCleanup.collectBySection(
+      this.sectionsRepository.manager,
+      sectionId,
+    );
+
     const removedOrder = section.order;
     await this.sectionsRepository.remove(section);
 
@@ -189,5 +198,7 @@ export class SectionsService {
       }
     }
     await this.sectionsRepository.save(remaining);
+
+    await this.mediaCleanup.deleteAfterCommit(mediaKeys);
   }
 }
