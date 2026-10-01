@@ -24,6 +24,8 @@ import { ROLES } from '../auth/constants';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { CheckDuplicateQueryDto } from './dto/check-duplicate-query.dto';
 import { ExtractFarmerDto } from './dto/extract-farmer.dto';
+import { ListMySurveysQueryDto } from './dto/list-my-surveys-query.dto';
+import { MySurveysPageDto } from './dto/my-surveys-page.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
 import { ProcessPreviewResponseDto } from './dto/process-preview-response.dto';
 import {
@@ -401,23 +403,75 @@ export class SurveysController {
     return this.surveysService.deleteOrphanSurvey(id);
   }
 
+  @Get('mine')
+  @ApiBearerAuth()
+  @Roles(ROLES.POLLSTER, ROLES.RESEARCHER, ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Listar mis encuestas realizadas',
+    description:
+      'Encuestas de campo (origin="field") del usuario autenticado que ya tienen al menos una ' +
+      'respuesta, paginadas. Una API key queda acotada a su dueño. Spec 92.',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    schema: { type: 'integer', minimum: 1, default: 1 },
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Nombre o documento del productor (máximo 100 caracteres).',
+  })
+  @ApiResponse({ status: 200, type: MySurveysPageDto })
+  @ApiResponse({
+    status: 400,
+    description: 'page < 1, o limit fuera del rango 1..50.',
+  })
+  findMine(
+    @Query() query: ListMySurveysQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.findMine(user.userId, query);
+  }
+
   @Get(':id/responses')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({
     summary: 'Obtener respuestas de una encuesta',
     description:
-      'Devuelve todas las respuestas de la encuesta indicada, con el texto de cada pregunta, tipo, sección y valor formateado.',
+      'Devuelve todas las respuestas de la encuesta indicada, con el texto de cada pregunta, tipo, sección y valor formateado. ' +
+      'Un POLLSTER solo puede ver sus propias encuestas (404 si es ajena) y recibe una lista blanca de campos sin datos de descarga (spec 92, D2).',
   })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta' })
   @ApiResponse({
     status: 200,
     description:
       'Respuestas de la encuesta con detalle de preguntas y opciones.',
+    schema: {
+      type: 'object',
+      properties: {
+        surveyId: { type: 'string', format: 'uuid' },
+        instrumentName: { type: 'string', nullable: true },
+        syncedAt: { type: 'string', format: 'date-time' },
+        responses: { type: 'array', items: { type: 'object' } },
+      },
+    },
   })
-  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
-  getSurveyResponses(@Param('id', ParseUUIDPipe) id: string) {
-    return this.surveysService.findSurveyResponses(id);
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta no encontrada, o ajena si el requester es POLLSTER.',
+  })
+  getSurveyResponses(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.findSurveyResponses(id, user);
   }
 
   @Patch(':id/sync')
