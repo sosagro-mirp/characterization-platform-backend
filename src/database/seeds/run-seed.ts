@@ -35,6 +35,11 @@ import { TypeOfInstitution } from 'src/types-of-institutions/entities/type-of-in
 import { TypeOfQuestion } from 'src/types-of-questions/entities/type-of-question.entity';
 import { User } from 'src/users/entities/user.entity';
 import { MediaAttachment } from 'src/media-attachments/entities/media-attachment.entity';
+import { MediaDeletionQueue } from 'src/media-attachments/entities/media-deletion-queue.entity';
+import { ApiKey } from 'src/api-keys/entities/api-key.entity';
+import { ChangeRequest } from 'src/change-requests/entities/change-request.entity';
+import { FarmPlot } from 'src/farm-plots/entities/farm-plot.entity';
+import { FarmerDocumentCollision } from 'src/farmers/entities/farmer-document-collision.entity';
 import { ConsentDocument } from 'src/consents/entities/consent-document.entity';
 import { ConsentRecord } from 'src/consents/entities/consent-record.entity';
 import { seedActorTypes } from './actor-types.seed';
@@ -82,9 +87,16 @@ import { seedInstrumentoS8eServiciosEInfraestructuraGeneral } from './instrument
 import { seedInstrumentoS9AsociatividadYCanalesDeComercializacion } from './instrumento-s9-asociatividad-y-canales-de-comercializacion.seed';
 import { seedMunicipioOptions } from './municipio-options.seed';
 
+// Debe listar TODAS las entidades: TypeORM falla al inicializar si una
+// relación apunta a una entidad ausente (pasó con FarmPlot desde Farm#plots).
 const ALL_ENTITIES = [
   ActorType,
   MediaAttachment,
+  MediaDeletionQueue,
+  ApiKey,
+  ChangeRequest,
+  FarmPlot,
+  FarmerDocumentCollision,
   ConsentDocument,
   ConsentRecord,
   Campaign,

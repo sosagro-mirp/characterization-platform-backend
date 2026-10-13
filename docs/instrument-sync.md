@@ -27,7 +27,13 @@ base pide una o ambas de estas variables:
 | `SYNC_SOURCE_DATABASE_URL` | De dónde se exporta o con qué se compara |
 | `SYNC_TARGET_DATABASE_URL` | A dónde se aplica o se hace snapshot |
 
-Si el destino parece producción (URL con `neon.tech` o `railway`), `apply` y
+Qué cuenta como producción: **toda URL de Neon o Railway**, salvo que su host
+esté declarado como desarrollo en `SYNC_DEV_DATABASE_HOSTS` (hosts separados
+por comas, coincidencia exacta). Desde 2026-10-13 la base de desarrollo
+también vive en Neon (`sosagro-dev`), así que el dominio ya no las distingue;
+la regla falla cerrada: sin la variable, todo Neon se trata como producción.
+
+Si el destino parece producción, `apply` y
 `restore` exigen además `--production-target-confirm` — y ese flag solo se
 usa después de que el usuario lo haya confirmado explícitamente en la sesión.
 `snapshot` **rechaza de plano** un destino que parezca producción, sin flag
