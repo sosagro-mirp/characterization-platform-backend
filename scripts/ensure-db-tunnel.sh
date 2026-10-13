@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Con DATABASE_URL definida (Neon, desde 2026-10-13) no hace falta túnel.
+# Se lee del .env porque el script corre antes de que Nest lo cargue.
+if [ -n "${DATABASE_URL:-}" ] || grep -qE '^DATABASE_URL=.+' .env 2>/dev/null; then
+  echo "[db-tunnel] DATABASE_URL definida — se omite el túnel SSH"
+  exit 0
+fi
+
 LOCAL_PORT=5433
 REMOTE_HOST=asus
 REMOTE_PORT=5433
