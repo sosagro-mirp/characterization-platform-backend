@@ -682,6 +682,25 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
       expect(await persistedDocumentOf(survey)).toBe(DOC_CORRECTED_FREE);
     });
 
+    it('reenviar el mismo documento corregido tras extraer es idempotente (reintento de red)', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_SOURCE,
+      );
+      await extractFarmer(survey).expect(409);
+      const first = await extractFarmer(survey, {
+        correctedDocumentId: DOC_CORRECTED_FREE,
+      }).expect(201);
+      // El POST se confirmó pero la respuesta se perdió: el móvil reintenta.
+      const retry = await extractFarmer(survey, {
+        correctedDocumentId: DOC_CORRECTED_FREE,
+      }).expect(201);
+      const a = first.body as ExtractFarmerBody;
+      const b = retry.body as ExtractFarmerBody;
+      expect(b.existed).toBe(true);
+      expect(b.farmer.farmerId).toBe(a.farmer.farmerId);
+    });
+
     it('un encuestador no puede corregir el documento de la encuesta de otro usuario', async () => {
       const survey = await createIdentificationSurvey(
         NAME_P2,

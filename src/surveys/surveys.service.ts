@@ -361,8 +361,8 @@ export class SurveysService {
     correctedDocumentId: string,
     requester?: AuthenticatedUser,
   ): Promise<void> {
-    // El DTO ya recorta, pero esta función también la usan llamadores que no
-    // pasan por él: un valor en blanco no puede llegar a la respuesta.
+    // El DTO ya recorta; esto es una segunda barrera para que un valor en
+    // blanco o fuera de rango nunca llegue a la respuesta.
     const corrected = correctedDocumentId.trim();
     if (corrected.length < 3 || corrected.length > 50) {
       throw new BadRequestException(
@@ -390,7 +390,16 @@ export class SurveysService {
 
     // Con el agricultor ya extraído, reescribir la respuesta dejaría la
     // encuesta y el agricultor con documentos distintos.
+    // Salvo que sea un reintento idempotente: si el POST anterior se confirmó
+    // pero la respuesta se perdió, el móvil reenvía el mismo documento
+    // corregido (`withNetworkRetry`) y debe recibir al agricultor, no un 422.
     if (survey.farmer) {
+      if (
+        normalizeDocumentId(survey.farmer.documentId) ===
+        normalizeDocumentId(corrected)
+      ) {
+        return;
+      }
       throw new UnprocessableEntityException(
         'Survey already has a farmer; its document can no longer be corrected',
       );
