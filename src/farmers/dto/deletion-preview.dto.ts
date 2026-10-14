@@ -7,7 +7,7 @@
 export interface FarmDeletionInfo {
   farmId: string;
   name: string;
-  /** `true` si otro agricultor además de este referencia la misma finca. */
+  /** `true` si otro agricultor la tiene vinculada o hay encuestas ajenas ancladas a ella. */
   shared: boolean;
   /** `false` cuando la finca es compartida: sobrevive al borrado. */
   willBeDeleted: boolean;
@@ -29,7 +29,14 @@ export class FarmerDeletionPreviewDto {
   name: string;
   documentId: string | null;
   counts: DeletionCounts;
+  /** La finca principal (contrato histórico). */
   farm: FarmDeletionInfo | null;
+  /**
+   * Spec 94 — TODAS las fincas del productor (N:M) con su destino. "Compartida"
+   * = otro productor la tiene vinculada, o hay encuestas de otro productor
+   * ancladas a ella.
+   */
+  farms: FarmDeletionInfo[];
   /**
    * Registros que sobreviven al borrado porque su FK es `SET NULL`
    * (`change_requests.farmer_id`), para que el inventario no dé la impresión

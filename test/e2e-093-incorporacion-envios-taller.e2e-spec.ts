@@ -9,7 +9,9 @@
  * no normalizaba, el área no se convertía, etc. Las fases 1 y 2 del spec los
  * pusieron en verde (44/44, 2026-09-24). Algunos casos (C03 y la regresión de
  * `extract-crops` con sesión, parte de C17) protegen comportamiento que ya
- * existía y pasaban desde el principio: son guardas de regresión.
+ * existía y pasaban desde el principio: son guardas de regresión. (Spec 94:
+ * `extract-crops` pasó a ser aditivo, así que C03 ya no reemplaza los
+ * cultivos de la finca: conserva los previos y suma los nuevos.)
  *
  * Criterios cubiertos: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13 y 17 (un
  * `describe` por criterio, prefijo `Cnn`). El 14 (bandeja) lo cubren el
@@ -1180,8 +1182,8 @@ describe('spec-093 — incorporación de los envíos del taller (e2e)', () => {
     });
   });
 
-  describe('C03 (regresión) — extract-crops con sesión se comporta igual que antes', () => {
-    it('asigna a la sesión y REEMPLAZA los cultivos de la finca del productor de la sesión', async () => {
+  describe('C03 (regresión) — extract-crops con sesión asigna a la sesión igual que antes y, desde el spec 94, suma a la finca', () => {
+    it('asigna a la sesión y SUMA los cultivos a la finca del productor de la sesión (spec 94: aditivo, conserva los previos)', async () => {
       const farmId = await insertFarm({
         name: `Spec93 Finca Campo ${RUN}`,
         crops: ['Cacao'],
@@ -1244,10 +1246,11 @@ describe('spec-093 — incorporación de los envíos del taller (e2e)', () => {
       expect(sessionCrops.map((c) => c.crop_id).sort()).toEqual(
         sortedCropIds(['Café', 'Cáñamo']),
       );
-      // Semántica del flujo de campo: reemplaza (Cacao desaparece). Solo el
-      // canal público suma.
+      // Spec 94: `extract-crops` es aditivo. Los cultivos previos de la finca
+      // se conservan (Cacao sigue) y los nuevos se suman; los de la sesión se
+      // asignan como antes.
       expect(await farmCropIds(farmId)).toEqual(
-        sortedCropIds(['Café', 'Cáñamo']),
+        sortedCropIds(['Cacao', 'Café', 'Cáñamo']),
       );
     });
   });

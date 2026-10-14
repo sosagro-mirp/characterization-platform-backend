@@ -1,9 +1,10 @@
-import { canRevert, orderLogFiles } from './revert';
+import { assertRevertibleLog, canRevert, orderLogFiles } from './revert';
 import { SubmissionLog } from './types';
 
 function log(over: Partial<SubmissionLog> = {}): SubmissionLog {
   return {
     formatVersion: 1,
+    modelVersion: 94,
     surveyId: 's-1',
     action: 'process',
     appliedAt: '2026-09-24T00:00:00.000Z',
@@ -69,5 +70,25 @@ describe('canRevert', () => {
     expect(
       canRevert({ reviewStatus: 'processed', farmerId: 'otro' }, log()).ok,
     ).toBe(false);
+  });
+});
+
+describe('assertRevertibleLog (spec 94, D-H3-11)', () => {
+  it('acepta un log escrito con el modelo del spec 94', () => {
+    expect(() => assertRevertibleLog(log())).not.toThrow();
+  });
+
+  it('rechaza un log anterior al spec 94 (sin modelVersion) con un mensaje claro', () => {
+    const legacy = log();
+    delete legacy.modelVersion;
+    expect(() => assertRevertibleLog(legacy)).toThrow(
+      /antes del spec 94.*no se puede revertir/s,
+    );
+  });
+
+  it('rechaza una versión de modelo distinta', () => {
+    expect(() => assertRevertibleLog(log({ modelVersion: 93 }))).toThrow(
+      /spec 94/,
+    );
   });
 });

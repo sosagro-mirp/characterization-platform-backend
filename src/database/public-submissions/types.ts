@@ -92,8 +92,19 @@ export interface SubmissionPreviousState {
   respondent: RespondentSnapshot;
 }
 
+/**
+ * Spec 94 (D-H3-11) — versión del modelo de datos con el que `apply` escribió
+ * el log. Los logs anteriores (sin `modelVersion`) se escribieron cuando el
+ * productor tenía una sola finca (`farmers.farm_id`) y no existía el vínculo
+ * `farmer_farms` ni el anclaje de la encuesta: revertirlos con la lógica actual
+ * dejaría vínculos y anclajes huérfanos, así que `revert` los rechaza.
+ */
+export const SUBMISSION_LOG_MODEL_VERSION = 94;
+
 export interface SubmissionLog {
   formatVersion: 1;
+  /** Ausente en los logs anteriores al spec 94. */
+  modelVersion?: number;
   surveyId: string;
   action: 'process' | 'discard';
   appliedAt: string;

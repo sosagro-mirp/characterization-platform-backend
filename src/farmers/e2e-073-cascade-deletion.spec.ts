@@ -33,7 +33,6 @@ import { ConsentRecordsService } from '../consents/consent-records.service';
  */
 
 const FARMER_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
-const OTHER_FARMER_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const FARM_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const SESSION_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
 const SURVEY_DIRECT_ID = '11111111-1111-4111-8111-111111111111';
@@ -80,6 +79,16 @@ describe('FarmersService — borrado en cascada (spec 73)', () => {
       farmers: [{ id: FARMER_ID }],
     });
     farmersRepository.manager.query.mockImplementation((sql: string) => {
+      // Spec 94 — las fincas del productor (N:M) salen de `farmer_farms`.
+      if (/farmer_farms/i.test(sql))
+        return Promise.resolve([
+          {
+            farmId: FARM_ID,
+            name: 'La Esperanza TEST',
+            isPrimary: true,
+            shared: false,
+          },
+        ]);
       if (/responses/i.test(sql)) return Promise.resolve([{ count: 30 }]);
       if (/farmers_technologies|farmers_obstacles/i.test(sql))
         return Promise.resolve([{ count: 0 }]);
@@ -240,11 +249,22 @@ describe('FarmersService — borrado en cascada (spec 73)', () => {
 
   it('criterio 4: conserva la finca compartida con otro agricultor', async () => {
     setupDefaultCounts();
-    farmsRepository.findOne.mockResolvedValue({
-      farmId: FARM_ID,
-      name: 'La Esperanza TEST',
-      farmers: [{ id: FARMER_ID }, { id: OTHER_FARMER_ID }],
-    });
+    // Spec 94 — "compartida" = otro `farmer_farms` en la finca (u otras
+    // encuestas ancladas): la consulta de fincas del plan lo informa.
+    const defaultQuery =
+      farmersRepository.manager.query.getMockImplementation();
+    farmersRepository.manager.query.mockImplementation((sql: string) =>
+      /farmer_farms/i.test(sql)
+        ? Promise.resolve([
+            {
+              farmId: FARM_ID,
+              name: 'La Esperanza TEST',
+              isPrimary: true,
+              shared: true,
+            },
+          ])
+        : (defaultQuery as (s: string) => Promise<unknown>)(sql),
+    );
 
     const result = await service.removeCascade(FARMER_ID);
 
