@@ -44,9 +44,11 @@ export class FarmerDocumentCollision {
   existingFarmerName: string;
 
   // null mientras la colisión está pendiente de resolución (diferida al
-  // sincronizar, o el encuestador todavía no decidió).
+  // sincronizar, o el encuestador todavía no decidió). `corrected` (spec 68,
+  // Fase 8): el encuestador corrigió el documento mal digitado, así que la
+  // colisión registrada era un error de captura y ya no hay nada que revisar.
   @Column({ name: 'resolution', type: 'varchar', length: 20, nullable: true })
-  resolution: 'same_person' | 'separate_person' | null;
+  resolution: 'same_person' | 'separate_person' | 'corrected' | null;
 
   @CreateDateColumn({
     name: 'created_at',

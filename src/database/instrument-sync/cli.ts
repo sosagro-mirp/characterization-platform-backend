@@ -32,6 +32,7 @@ import {
   snapshot,
   verifyAgainstTarget,
 } from './index';
+import { looksLikeProduction } from './target-guard';
 
 function parseArgs(argv: string[]): {
   command: string;
@@ -105,9 +106,7 @@ function assertTargetAllowed(
     );
   }
 
-  const looksLikeProduction =
-    url.includes('neon.tech') || url.includes('railway');
-  if (looksLikeProduction && !flags['production-target-confirm']) {
+  if (looksLikeProduction(url) && !flags['production-target-confirm']) {
     throw new Error(
       'El destino parece producción. Revise el alcance de arriba y repita el comando con ' +
         '--production-target-confirm solo después de confirmarlo explícitamente con el usuario.',
@@ -135,7 +134,7 @@ async function main() {
     case 'snapshot': {
       const source = connect(requireEnv('SYNC_SOURCE_DATABASE_URL'));
       const targetUrl = requireEnv('SYNC_TARGET_DATABASE_URL');
-      if (targetUrl.includes('neon.tech') || targetUrl.includes('railway')) {
+      if (looksLikeProduction(targetUrl)) {
         throw new Error(
           'snapshot nunca corre contra un destino que parece producción.',
         );

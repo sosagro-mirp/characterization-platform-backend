@@ -521,7 +521,9 @@ export class SurveysController {
       'Lee las respuestas de la encuesta que tienen systemField asignado (prefijo farmer.* / farm.*), ' +
       'crea o reutiliza un Farmer y lo vincula a la CampaignSession. Si el documentId coincide con un ' +
       'Farmer existente cuyo nombre no corresponde (spec 68), responde 409 sin mutar nada — a menos ' +
-      "que el body incluya `resolution` ('same_person' | 'separate_person').",
+      "que el body incluya `resolution` ('same_person' | 'separate_person'). Si el body incluye " +
+      '`correctedDocumentId`, se actualiza primero la respuesta de documento de la encuesta con ese ' +
+      'valor y la extracción se re-evalúa con el documento nuevo (spec 68, Fase 8).',
   })
   @ApiParam({
     name: 'id',
@@ -538,12 +540,15 @@ export class SurveysController {
   })
   @ApiResponse({
     status: 422,
-    description: 'Falta farmer.name en las respuestas.',
+    description:
+      'Falta farmer.name en las respuestas, o se envió correctedDocumentId y la encuesta no tiene ' +
+      'ninguna respuesta de documento que corregir, o la encuesta ya tiene agricultor.',
   })
   extractFarmer(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ExtractFarmerDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.surveysService.extractFarmer(id, dto);
+    return this.surveysService.extractFarmer(id, dto, user);
   }
 }
