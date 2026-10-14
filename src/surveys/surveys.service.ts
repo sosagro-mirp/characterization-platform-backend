@@ -56,6 +56,18 @@ import {
   SystemFieldValue,
 } from './system-field-map';
 import { convertAreaToHectares } from './unit-conversion';
+import {
+  addFarmCrops,
+  anchorSurvey,
+  getPrimaryFarmId,
+  linkFarmerToFarm,
+  listActiveFarmCrops,
+} from 'src/farmer-farms/farm-links';
+import { pickFarmCrop } from 'src/farmer-farms/pick-farm-crop';
+import {
+  FARMER_VIEW_RELATIONS,
+  toFarmerView,
+} from 'src/farmer-farms/farm-views';
 import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 import { ConsentRecordsService } from '../consents/consent-records.service';
 
@@ -67,6 +79,10 @@ export interface SurveyFilters {
   cropId?: string;
   instrumentId?: string;
   farmerId?: string;
+  /** Spec 94 — encuestas ancladas a esta finca (`surveys.farm_id`). */
+  farmId?: string;
+  /** Spec 94 — encuestas ancladas a este cultivo de finca (`surveys.farm_crop_id`). */
+  farmCropId?: string;
 }
 
 // Spec 79 — fila de la bandeja de revisión de envíos públicos.
@@ -284,10 +300,17 @@ export class SurveysService {
   }
 
   async findAll(filters: SurveyFilters): Promise<Survey[]> {
+    // Spec 94 — cada fila trae `farm` y `crop` (solo id y nombre): la finca a
+    // la que está anclada la encuesta y su cultivo (derivado del cultivo de
+    // finca). `farmCropId` / `farmId` también salen como columnas.
     const qb = this.surveysRepository
       .createQueryBuilder('survey')
       .leftJoinAndSelect('survey.instruments', 'instrument')
-      .leftJoin('survey.campaignSession', 'campaignSession');
+      .leftJoin('survey.campaignSession', 'campaignSession')
+      .leftJoin('survey.farm', 'farm')
+      .addSelect(['farm.farmId', 'farm.name'])
+      .leftJoin('survey.crop', 'crop')
+      .addSelect(['crop.cropId', 'crop.name']);
 
     if (filters.actorTypeId) {
       qb.leftJoin('survey.actorType', 'actorType').andWhere(
@@ -316,9 +339,7 @@ export class SurveysService {
     }
 
     if (filters.cropId) {
-      qb.leftJoin('survey.crop', 'crop').andWhere('crop.cropId = :cropId', {
-        cropId: filters.cropId,
-      });
+      qb.andWhere('crop.cropId = :cropId', { cropId: filters.cropId });
     }
 
     if (filters.instrumentId) {
@@ -327,11 +348,22 @@ export class SurveysService {
       });
     }
 
+    // `farmerId` sigue resolviendo los DOS caminos (encuesta y sesión) hasta H8.
     if (filters.farmerId) {
       qb.andWhere(
         '(survey.farmer = :farmerId OR campaignSession.farmer = :farmerId)',
         { farmerId: filters.farmerId },
       );
+    }
+
+    if (filters.farmId) {
+      qb.andWhere('survey.farmId = :farmId', { farmId: filters.farmId });
+    }
+
+    if (filters.farmCropId) {
+      qb.andWhere('survey.farmCropId = :farmCropId', {
+        farmCropId: filters.farmCropId,
+      });
     }
 
     return qb.getMany();
@@ -490,15 +522,27 @@ export class SurveysService {
           );
         });
       }
-      return await this.surveysRepository.manager.transaction(
+      const result = await this.surveysRepository.manager.transaction(
         async (manager) => {
           await this.lockSurvey(manager, surveyId);
           return await this.extractFarmerLocked(surveyId, dto, manager);
         },
       );
+      // Spec 94 (C7) — el productor sale con `farm` (la principal, con
+      // `crops`) y `farms[]`, igual que `GET /farmers/:id`.
+      return { ...result, farmer: await this.loadFarmerView(result.farmer) };
     } catch (err) {
       throw await this.toCollisionConflict(err);
     }
+  }
+
+  /** Productor con la forma de `GET /farmers/:id` (spec 94); cae al original si no se halla. */
+  private async loadFarmerView(farmer: Farmer): Promise<Farmer> {
+    const full = await this.farmersRepository.findOne({
+      where: { id: farmer.id },
+      relations: [...FARMER_VIEW_RELATIONS],
+    });
+    return full ? toFarmerView(full) : farmer;
   }
 
   // Lock por encuesta: dos llamadas concurrentes sobre la misma encuesta se
@@ -574,6 +618,9 @@ export class SurveysService {
     // reejecutan aquí: son idempotentes (un UPDATE al mismo valor) y baratos.
     if (survey.farmer) {
       const farmer = survey.farmer;
+      // Spec 94 — un reintento también ancla la encuesta a la finca principal
+      // si aún no lo estaba (idempotente; no pisa un anclaje existente).
+      await this.anchorToPrimaryFarm(manager, surveyId, farmer.id, false);
       if (survey.campaignSession) {
         await manager.update(
           CampaignSession,
@@ -708,12 +755,25 @@ export class SurveysService {
           farm: farm ?? undefined,
         }),
       );
+      // Spec 94 — la finca nueva es el vínculo principal del productor
+      // (`farmer_farms`; `farmers.farm_id` queda como espejo).
+      if (farm) {
+        await linkFarmerToFarm(manager, {
+          farmerId: farmer.id,
+          farmId: farm.farmId,
+          role: 'producer',
+          isPrimary: true,
+          source: 'extraction',
+        });
+      }
     }
 
     // Spec 84 — deja constancia de qué productor salió de esta encuesta. Es
     // la clave de idempotencia que lee la guarda del principio: sin esto, un
     // segundo `extract-farmer` sobre la misma encuesta vuelve a crear.
     await manager.update(Survey, surveyId, { farmer });
+    // Spec 94 — ancla la encuesta a la finca principal (nueva o ya existente).
+    await this.anchorToPrimaryFarm(manager, surveyId, farmer.id, true);
 
     // Link farmer to the CampaignSession if the survey belongs to one
     if (survey.campaignSession) {
@@ -776,6 +836,29 @@ export class SurveysService {
     }
 
     return { farmer, existed };
+  }
+
+  /**
+   * Spec 94 — ancla la encuesta a la finca principal del productor. Con
+   * `overwrite=false` solo si la encuesta aún no tiene finca. Sin finca
+   * principal no hace nada.
+   */
+  private async anchorToPrimaryFarm(
+    manager: EntityManager,
+    surveyId: string,
+    farmerId: string,
+    overwrite: boolean,
+  ): Promise<void> {
+    const farmId = await getPrimaryFarmId(manager, farmerId);
+    if (!farmId) return;
+    if (!overwrite) {
+      const [row] = await manager.query<{ farm_id: string | null }[]>(
+        'SELECT farm_id FROM surveys WHERE survey_id = $1',
+        [surveyId],
+      );
+      if (row?.farm_id) return;
+    }
+    await anchorSurvey(manager, surveyId, { farmerId, farmId });
   }
 
   // Quién es el respondiente y con qué datos se identifica. Q9 = false (otros
@@ -1217,6 +1300,9 @@ export class SurveysService {
       .leftJoin('survey.campaignSession', 'campaignSession')
       .leftJoin('campaignSession.farmer', 'sessionFarmer')
       .leftJoin('campaignSession.campaign', 'campaign')
+      // Spec 94 — finca y cultivo a los que está anclada la encuesta.
+      .leftJoin('survey.farm', 'surveyFarm')
+      .leftJoin('survey.crop', 'surveyCrop')
       .where('survey.user = :userId', { userId })
       .andWhere('survey.origin = :origin', { origin: 'field' })
       .andWhere(
@@ -1249,6 +1335,10 @@ export class SurveysService {
       .addSelect('sessionFarmer.id', 'sessionFarmerId')
       .addSelect('sessionFarmer.name', 'sessionFarmerName')
       .addSelect('campaign.name', 'campaignName')
+      .addSelect('surveyFarm.farmId', 'farmId')
+      .addSelect('surveyFarm.name', 'farmName')
+      .addSelect('surveyCrop.cropId', 'cropId')
+      .addSelect('surveyCrop.name', 'cropName')
       .addSelect(
         '(SELECT i.name FROM surveys_instruments si ' +
           'JOIN instruments i ON i.instrument_id = si.instrument_id ' +
@@ -1277,6 +1367,10 @@ export class SurveysService {
         sessionFarmerId: string | null;
         sessionFarmerName: string | null;
         campaignName: string | null;
+        farmId: string | null;
+        farmName: string | null;
+        cropId: string | null;
+        cropName: string | null;
         instrumentName: string | null;
         responseCount: string;
       }>();
@@ -1291,6 +1385,8 @@ export class SurveysService {
         : row.sessionFarmerId
           ? { farmerId: row.sessionFarmerId, name: row.sessionFarmerName! }
           : null,
+      farm: row.farmId ? { farmId: row.farmId, name: row.farmName! } : null,
+      crop: row.cropId ? { cropId: row.cropId, name: row.cropName! } : null,
       responseCount: Number(row.responseCount),
       createdAt: new Date(row.createdAt).toISOString(),
       updatedAt: new Date(row.updatedAt).toISOString(),
@@ -1302,7 +1398,7 @@ export class SurveysService {
   async findSurveyResponses(surveyId: string, requester: AuthenticatedUser) {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
-      relations: { instruments: true, user: true },
+      relations: { instruments: true, user: true, farm: true, crop: true },
     });
 
     if (!survey) {
@@ -1364,6 +1460,14 @@ export class SurveysService {
     return {
       surveyId: survey.surveyId,
       instrumentName: survey.instruments?.[0]?.name ?? null,
+      // Spec 94 — finca y cultivo a los que está anclada la encuesta (para
+      // todos los roles, también el POLLSTER: no son datos de descarga).
+      farm: survey.farm
+        ? { farmId: survey.farm.farmId, name: survey.farm.name }
+        : null,
+      crop: survey.crop
+        ? { cropId: survey.crop.cropId, name: survey.crop.name }
+        : null,
       syncedAt: survey.updatedAt.toISOString(),
       // D2 — lista BLANCA: al POLLSTER solo le llegan estos 12 campos, elegidos
       // uno a uno. Un campo nuevo en `rows` (p. ej. attachmentId del spec 85)
@@ -1389,14 +1493,37 @@ export class SurveysService {
     };
   }
 
+  /**
+   * Spec 94 — mismo contrato de siempre (`{ crops }`, misma extracción), pero
+   * ADITIVO y anclando la encuesta:
+   *  - los cultivos se SUMAN a la finca (`ON CONFLICT … archived_at = NULL`);
+   *    ya no se reemplazan ni se borran los que no vienen en esta encuesta;
+   *  - la encuesta queda anclada a su finca y a su cultivo de finca
+   *    (`anchorSurvey`, que deriva `crop_id`);
+   *  - todo en UNA transacción bajo el lock `extract-farmer:<survey>`, el mismo
+   *    de `extract-farmer`, para que dos llamadas concurrentes no dupliquen la
+   *    finca. `campaign_sessions_crops` se sigue escribiendo como hoy (lo leen
+   *    las condiciones de paso hasta H8).
+   */
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
-    const survey = await this.surveysRepository.findOne({
+    return this.surveysRepository.manager.transaction(async (manager) => {
+      await this.lockSurvey(manager, surveyId);
+      return this.extractCropsLocked(manager, surveyId);
+    });
+  }
+
+  private async extractCropsLocked(
+    manager: EntityManager,
+    surveyId: string,
+  ): Promise<{ crops: TypeOfCrop[] }> {
+    const survey = await manager.findOne(Survey, {
       where: { surveyId },
       relations: [
         'responses',
         'responses.question',
         'responses.option',
         'campaignSession',
+        'farmer',
       ],
     });
 
@@ -1433,26 +1560,35 @@ export class SurveysService {
 
     const { crops } = resolveCropsFromResponses(
       survey.responses ?? [],
-      await this.typesOfCropsRepository.find(),
+      await manager.find(TypeOfCrop),
     );
+    const resolvedCropIds = crops.map((c) => c.cropId);
+
+    // Productor y finca a los que se ancla la encuesta; los cultivos "previos"
+    // de la sesión (antes de reemplazarlos) son el segundo criterio de elección.
+    let farmerId: string | null = survey.farmer?.id ?? null;
+    let farmId: string | null = null;
+    let previousSessionCropIds: string[] = [];
 
     // Assign crops to CampaignSession via direct relation update to avoid cascading nulls
     if (survey.campaignSession) {
-      const session = await this.campaignSessionsRepository.findOne({
+      const session = await manager.findOne(CampaignSession, {
         where: { sessionId: survey.campaignSession.sessionId },
-        relations: ['crops', 'farmer', 'farmer.farm'],
+        relations: ['crops', 'farmer'],
       });
       if (session) {
+        previousSessionCropIds = (session.crops ?? []).map((c) => c.cropId);
         session.crops = crops;
-        await this.campaignSessionsRepository.save(session);
+        await manager.save(CampaignSession, session);
+        farmerId = farmerId ?? session.farmer?.id ?? null;
 
         // Create or update Farm from farm.* fields present in this survey (e.g. S1b)
         const farmName = farmFieldMap['farm.name'] as string | undefined;
         if (farmName && session.farmer) {
           // Resolve farm.town from ANY survey in this session (may live in a different instrument)
           let resolvedTown: Town | null = null;
-          const townResponse = await this.responsesRepository
-            .createQueryBuilder('r')
+          const townResponse = await manager
+            .createQueryBuilder(Response, 'r')
             .innerJoin('r.survey', 's')
             .innerJoin('r.question', 'q')
             .leftJoinAndSelect('r.option', 'o')
@@ -1463,12 +1599,18 @@ export class SurveysService {
             .andWhere('o.metadataId IS NOT NULL')
             .getOne();
           if (townResponse?.option?.metadataId) {
-            resolvedTown = await this.townsRepository.findOne({
+            resolvedTown = await manager.findOne(Town, {
               where: { townId: townResponse.option.metadataId },
             });
           }
 
-          let farm: Farm | null = session.farmer.farm ?? null;
+          const primaryFarmId = await getPrimaryFarmId(
+            manager,
+            session.farmer.id,
+          );
+          let farm: Farm | null = primaryFarmId
+            ? await manager.findOne(Farm, { where: { farmId: primaryFarmId } })
+            : null;
           const farmFields = {
             name: farmName,
             town: resolvedTown ?? undefined,
@@ -1514,43 +1656,56 @@ export class SurveysService {
               undefined,
           };
           if (farm?.farmId) {
-            // Update existing farm (farmsRepository.update doesn't handle relations; use save)
+            // Update existing farm (save, no update: maneja la relación `town`)
             Object.assign(farm, farmFields);
-            await this.farmsRepository.save(farm);
-            farm = await this.farmsRepository.findOne({
-              where: { farmId: farm.farmId },
-              relations: ['crops'],
-            });
+            await manager.save(Farm, farm);
           } else {
-            // Create new farm and link to farmer
-            farm = await this.farmsRepository.save(
-              this.farmsRepository.create({ ...farmFields, location: null }),
+            // Create new farm and link to farmer (spec 94: vínculo principal
+            // en `farmer_farms`; el espejo `farmers.farm_id` lo escribe el helper)
+            farm = await manager.save(
+              Farm,
+              manager.create(Farm, { ...farmFields, location: null }),
             );
-            await this.farmersRepository.update(session.farmer.id, { farm });
-          }
-          // Propagate crops to farm
-          if (farm) {
-            const farmWithCrops = await this.farmsRepository.findOne({
-              where: { farmId: farm.farmId },
-              relations: ['crops'],
+            await linkFarmerToFarm(manager, {
+              farmerId: session.farmer.id,
+              farmId: farm.farmId,
+              role: 'producer',
+              isPrimary: true,
+              source: 'extraction',
             });
-            if (farmWithCrops) {
-              farmWithCrops.crops = crops;
-              await this.farmsRepository.save(farmWithCrops);
-            }
           }
-        } else if (session.farmer?.farm?.farmId) {
-          // No farm.* fields in this survey but farm already exists — just propagate crops
-          const farm = await this.farmsRepository.findOne({
-            where: { farmId: session.farmer.farm.farmId },
-            relations: ['crops'],
-          });
-          if (farm) {
-            farm.crops = crops;
-            await this.farmsRepository.save(farm);
+          farmId = farm.farmId;
+          // Propagate crops to farm — ADITIVO (spec 94): suma y reactiva, no quita.
+          await addFarmCrops(manager, farmId, resolvedCropIds);
+        } else if (session.farmer) {
+          const primaryFarmId = await getPrimaryFarmId(
+            manager,
+            session.farmer.id,
+          );
+          if (primaryFarmId) {
+            // No farm.* fields in this survey but farm already exists — just propagate crops
+            farmId = primaryFarmId;
+            await addFarmCrops(manager, farmId, resolvedCropIds);
           }
         }
       }
+    } else if (survey.farmer) {
+      // Encuesta de un productor sin sesión: se ancla a su finca principal sin
+      // escribir cultivos (hoy tampoco se escribían).
+      farmId = await getPrimaryFarmId(manager, survey.farmer.id);
+    }
+
+    if (farmId) {
+      const pick = pickFarmCrop(await listActiveFarmCrops(manager, farmId), [
+        resolvedCropIds,
+        previousSessionCropIds,
+      ]);
+      await anchorSurvey(manager, surveyId, {
+        // Solo se completa; nunca se cambia el productor de una encuesta.
+        ...(survey.farmer || !farmerId ? {} : { farmerId }),
+        farmId,
+        ...(pick.farmCropId ? { farmCropId: pick.farmCropId } : {}),
+      });
     }
 
     return { crops };
@@ -1988,20 +2143,17 @@ export class SurveysService {
     Object.assign(target, patch);
   }
 
-  // Suma cultivos a la finca sin quitar ninguno. No toca `campaign_sessions_crops`.
+  // Suma cultivos a la finca sin quitar ninguno (y reactiva los archivados,
+  // spec 94). No toca `campaign_sessions_crops`.
   private async addCropsToFarm(
     manager: EntityManager,
     farmId: string,
     crops: TypeOfCrop[],
   ): Promise<void> {
-    if (crops.length === 0) return;
-    await manager.query(
-      `INSERT INTO farms_crops (farm_id, crop_id)
-       SELECT $1::uuid, c.crop_id FROM unnest($2::uuid[]) AS c(crop_id)
-        WHERE NOT EXISTS (
-          SELECT 1 FROM farms_crops fc
-           WHERE fc.farm_id = $1::uuid AND fc.crop_id = c.crop_id)`,
-      [farmId, crops.map((c) => c.cropId)],
+    await addFarmCrops(
+      manager,
+      farmId,
+      crops.map((c) => c.cropId),
     );
   }
 
@@ -2181,7 +2333,18 @@ export class SurveysService {
       );
     }
 
-    if (farm) await this.addCropsToFarm(manager, farm.farmId, crops);
+    if (farm) {
+      // Spec 94 — vínculo productor–finca (idempotente: si ya existe no se
+      // toca; si el productor no tenía principal, este queda principal y se
+      // actualiza el espejo `farmers.farm_id`). Rol `producer`.
+      await linkFarmerToFarm(manager, {
+        farmerId: farmer.id,
+        farmId: farm.farmId,
+        role: 'producer',
+        source: 'public_process',
+      });
+      await this.addCropsToFarm(manager, farm.farmId, crops);
+    }
 
     await manager.update(Survey, surveyId, {
       farmer: { id: farmer.id } as Farmer,
@@ -2191,6 +2354,20 @@ export class SurveysService {
         : null,
       reviewedAt: new Date(),
     });
+
+    // Spec 94 — la encuesta pública queda anclada a la finca y, si las
+    // respuestas o la finca deciden uno, a su cultivo de finca.
+    if (farm) {
+      const pick = pickFarmCrop(
+        await listActiveFarmCrops(manager, farm.farmId),
+        [crops.map((c) => c.cropId)],
+      );
+      await anchorSurvey(manager, surveyId, {
+        farmerId: farmer.id,
+        farmId: farm.farmId,
+        ...(pick.farmCropId ? { farmCropId: pick.farmCropId } : {}),
+      });
+    }
 
     await this.consentRecordsService.linkOrphansToFarmerBySurvey(
       surveyId,

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Farmer } from './entities/farmer.entity';
 import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
+import { FarmerFarm } from 'src/farmer-farms/entities/farmer-farm.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
@@ -17,6 +18,7 @@ import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.
       Farmer,
       FarmerDocumentCollision,
       Farm,
+      FarmerFarm,
       Town,
       CampaignSession,
       Survey,

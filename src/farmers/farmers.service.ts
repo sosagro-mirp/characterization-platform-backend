@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   Logger,
@@ -6,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, In, Repository } from 'typeorm';
+import { EntityManager, ILike, In, Repository } from 'typeorm';
 import { Farmer } from './entities/farmer.entity';
 import { FarmerDocumentCollision } from './entities/farmer-document-collision.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
@@ -15,11 +16,43 @@ import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
-import { FarmerDeletionPreviewDto } from './dto/deletion-preview.dto';
+import {
+  FarmDeletionInfo,
+  FarmerDeletionPreviewDto,
+} from './dto/deletion-preview.dto';
 import { ConsentRecordsService } from '../consents/consent-records.service';
 import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
+import {
+  linkFarmerToFarm,
+  promoteToPrimary,
+} from 'src/farmer-farms/farm-links';
+import {
+  FARMER_VIEW_RELATIONS,
+  toFarmerView,
+} from 'src/farmer-farms/farm-views';
+import { LinkFarmerFarmDto } from './dto/link-farmer-farm.dto';
+import { UpdateFarmerFarmDto } from './dto/update-farmer-farm.dto';
 
-const FARMER_RELATIONS = ['farm', 'farm.town', 'farm.crops'];
+// Spec 94 — `farm` (la principal, con `crops` derivado de los cultivos activos)
+// y los vínculos para armar `farms[]`.
+const FARMER_RELATIONS: string[] = [...FARMER_VIEW_RELATIONS];
+
+/** Cultivos de finca que `search` necesita (activos y archivados, para filtrar). */
+const SEARCH_FARM_CROPS_SELECT = {
+  farmCropId: true,
+  cropId: true,
+  archivedAt: true,
+  crop: { cropId: true, name: true },
+} as const;
+
+/** Vínculo productor–finca tal como lo devuelven `POST/PATCH /farmers/:id/farms`. */
+export interface FarmerFarmLinkView {
+  farmerId: string;
+  farmId: string;
+  role: string;
+  isPrimary: boolean;
+  source: string;
+}
 
 /** Código Postgres de `foreign_key_violation`. */
 const POSTGRES_FK_VIOLATION = '23503';
@@ -107,41 +140,59 @@ export class FarmersService {
       town = found;
     }
 
-    let farm: Farm | undefined;
-    if (dto.farmName) {
-      farm = await this.farmsRepository.save(
-        this.farmsRepository.create({
-          name: dto.farmName,
-          town,
-          latitude: dto.latitude ?? null,
-          longitude: dto.longitude ?? null,
-          altitude: dto.altitude ?? null,
-        }),
-      );
-    }
+    // Spec 94 — finca, productor y vínculo principal (con espejo) en una
+    // transacción: no puede quedar un productor con finca y sin vínculo.
+    const farmerId = await this.farmersRepository.manager.transaction(
+      async (manager) => {
+        let farm: Farm | undefined;
+        if (dto.farmName) {
+          farm = await manager.save(
+            Farm,
+            manager.create(Farm, {
+              name: dto.farmName,
+              town,
+              latitude: dto.latitude ?? null,
+              longitude: dto.longitude ?? null,
+              altitude: dto.altitude ?? null,
+            }),
+          );
+        }
 
-    const farmer = await this.farmersRepository.save(
-      this.farmersRepository.create({
-        name: dto.name,
-        documentId: dto.documentId,
-        phone: dto.phone ?? null,
-        email: dto.email ?? null,
-        age: dto.age ?? null,
-        gender: dto.gender ?? null,
-        educationLevel: dto.educationLevel ?? null,
-        experienceYears: dto.experienceYears ?? null,
-        familySize: dto.familySize ?? null,
-        isMainIncome: dto.isMainIncome ?? null,
-        participationInTraining: dto.participationInTraining ?? null,
-        farm,
-      }),
+        const created = await manager.save(
+          Farmer,
+          manager.create(Farmer, {
+            name: dto.name,
+            documentId: dto.documentId,
+            phone: dto.phone ?? null,
+            email: dto.email ?? null,
+            age: dto.age ?? null,
+            gender: dto.gender ?? null,
+            educationLevel: dto.educationLevel ?? null,
+            experienceYears: dto.experienceYears ?? null,
+            familySize: dto.familySize ?? null,
+            isMainIncome: dto.isMainIncome ?? null,
+            participationInTraining: dto.participationInTraining ?? null,
+            farm,
+          }),
+        );
+        if (farm) {
+          await linkFarmerToFarm(manager, {
+            farmerId: created.id,
+            farmId: farm.farmId,
+            role: 'producer',
+            isPrimary: true,
+            source: 'admin',
+          });
+        }
+        return created.id;
+      },
     );
 
-    return this.findOne(farmer.id);
+    return this.findOne(farmerId);
   }
 
   async search(query: string) {
-    return this.farmersRepository.find({
+    const farmers = await this.farmersRepository.find({
       select: {
         id: true,
         name: true,
@@ -151,15 +202,135 @@ export class FarmersService {
           farmId: true,
           name: true,
           town: { townId: true, name: true },
-          crops: { cropId: true, name: true },
+          farmCrops: SEARCH_FARM_CROPS_SELECT,
+        },
+        farmLinks: {
+          farmerFarmId: true,
+          role: true,
+          isPrimary: true,
+          createdAt: true,
+          farm: {
+            farmId: true,
+            name: true,
+            town: { townId: true, name: true },
+            farmCrops: SEARCH_FARM_CROPS_SELECT,
+          },
         },
       },
-      relations: ['farm', 'farm.town', 'farm.crops'],
+      relations: FARMER_RELATIONS,
       where: [
         { name: ILike(`%${query}%`) },
         { documentId: ILike(`%${query}%`) },
       ],
       take: 10,
+    });
+    // Endpoint @Public(): `farms[]` sin `vereda` (decisión del usuario 2026-10-14).
+    return farmers.map((farmer) =>
+      toFarmerView(farmer, { includeVereda: false }),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Spec 94 — vínculo productor ↔ finca (N:M con rol). Sin desvincular
+  // (D-H3-7: queda fuera de H3).
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private async readLink(
+    manager: EntityManager,
+    farmerId: string,
+    farmId: string,
+  ): Promise<FarmerFarmLinkView | null> {
+    const rows = await manager.query<
+      {
+        farmer_id: string;
+        farm_id: string;
+        role: string;
+        is_primary: boolean;
+        source: string;
+      }[]
+    >(
+      `SELECT farmer_id, farm_id, role, is_primary, source
+         FROM farmer_farms WHERE farmer_id = $1 AND farm_id = $2`,
+      [farmerId, farmId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      farmerId: row.farmer_id,
+      farmId: row.farm_id,
+      role: row.role,
+      isPrimary: row.is_primary,
+      source: row.source,
+    };
+  }
+
+  /** `POST /farmers/:id/farms` — 409 si el vínculo ya existe. */
+  async linkFarm(
+    farmerId: string,
+    dto: LinkFarmerFarmDto,
+  ): Promise<FarmerFarmLinkView> {
+    const farmer = await this.farmersRepository.findOne({
+      where: { id: farmerId },
+    });
+    if (!farmer) throw new NotFoundException('Farmer not found');
+    const farm = await this.farmsRepository.findOne({
+      where: { farmId: dto.farmId },
+    });
+    if (!farm) throw new NotFoundException('Farm not found');
+
+    return this.farmersRepository.manager.transaction(async (manager) => {
+      const result = await linkFarmerToFarm(manager, {
+        farmerId,
+        farmId: dto.farmId,
+        role: dto.role ?? 'producer',
+        isPrimary: dto.isPrimary,
+        source: 'admin',
+      });
+      if (!result.created) {
+        throw new ConflictException(
+          'El productor ya está vinculado a esta finca',
+        );
+      }
+      const link = await this.readLink(manager, farmerId, dto.farmId);
+      return link as FarmerFarmLinkView;
+    });
+  }
+
+  /** `PATCH /farmers/:id/farms/:farmId` — rol y/o finca principal. */
+  async updateFarmLink(
+    farmerId: string,
+    farmId: string,
+    dto: UpdateFarmerFarmDto,
+  ): Promise<FarmerFarmLinkView> {
+    return this.farmersRepository.manager.transaction(async (manager) => {
+      // Mismo lock por productor que usa `linkFarmerToFarm`.
+      await manager.query(`SELECT id FROM farmers WHERE id = $1 FOR UPDATE`, [
+        farmerId,
+      ]);
+      const current = await this.readLink(manager, farmerId, farmId);
+      if (!current) {
+        throw new NotFoundException(
+          'El productor no está vinculado a la finca',
+        );
+      }
+
+      if (dto.isPrimary === false && current.isPrimary) {
+        throw new BadRequestException(
+          'No se puede quitar la finca principal sin designar otra: marque otra finca como principal',
+        );
+      }
+      if (dto.role !== undefined && dto.role !== current.role) {
+        await manager.query(
+          `UPDATE farmer_farms SET role = $3, updated_at = now()
+            WHERE farmer_id = $1 AND farm_id = $2`,
+          [farmerId, farmId, dto.role],
+        );
+      }
+      if (dto.isPrimary === true && !current.isPrimary) {
+        await promoteToPrimary(manager, farmerId, farmId);
+      }
+      const updated = await this.readLink(manager, farmerId, farmId);
+      return updated as FarmerFarmLinkView;
     });
   }
 
@@ -179,7 +350,7 @@ export class FarmersService {
     );
 
     return farmers.map((farmer) =>
-      Object.assign(farmer, {
+      Object.assign(toFarmerView(farmer), {
         hasPendingConsent: pendingMap.get(farmer.id) ?? true,
       }),
     );
@@ -191,7 +362,7 @@ export class FarmersService {
       relations: [...FARMER_RELATIONS, 'cooperative'],
     });
     if (!farmer) throw new NotFoundException('Farmer not found');
-    return farmer;
+    return toFarmerView(farmer);
   }
 
   async update(id: string, dto: UpdateFarmerDto): Promise<Farmer> {
@@ -255,7 +426,8 @@ export class FarmersService {
   // borrado en una transacción, en el orden verificado en producción
   // (`docs/testing/limpieza-produccion-2026-08-24.sql`):
   //   colisiones → encuestas (arrastra respuestas por CASCADE de DB) →
-  //   sesiones → relaciones M:M/conexiones → agricultor → finca (si exclusiva)
+  //   sesiones → relaciones M:M/conexiones → vínculos de finca → agricultor →
+  //   fincas exclusivas (spec 94: N:M, después de las encuestas por los RESTRICT)
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -292,22 +464,58 @@ export class FarmersService {
         where: { existingFarmer: { id } },
       });
 
-    let farmInfo: FarmerDeletionPreviewDto['farm'] = null;
-    if (farmer.farm) {
-      const farm = await this.farmsRepository.findOne({
-        where: { farmId: farmer.farm.farmId },
-        relations: ['farmers'],
-      });
-      const otherFarmers = (farm?.farmers ?? []).filter((f) => f.id !== id);
-      farmInfo = {
-        farmId: farmer.farm.farmId,
-        name: farm?.name ?? farmer.farm.name,
-        shared: otherFarmers.length > 0,
-        willBeDeleted: otherFarmers.length === 0,
-      };
-    }
+    // Spec 94 — N:M. Una finca es "compartida" si otro productor tiene un
+    // vínculo con ella (`farmer_farms`, o el espejo `farmers.farm_id`) o si
+    // hay encuestas de OTRO productor ancladas a ella. Las encuestas de este
+    // productor no cuentan: se borran antes que la finca.
+    const surveyIds = surveys.map((s) => s.surveyId);
+    const farmRows = await this.farmersRepository.manager.query<
+      {
+        farmId: string;
+        name: string;
+        isPrimary: boolean;
+        shared: boolean;
+      }[]
+    >(
+      `SELECT mine.farm_id AS "farmId", f.name AS name, mine.is_primary AS "isPrimary",
+              (EXISTS (SELECT 1 FROM farmer_farms o
+                        WHERE o.farm_id = mine.farm_id AND o.farmer_id <> $1)
+               OR EXISTS (SELECT 1 FROM farmers m
+                           WHERE m.farm_id = mine.farm_id AND m.id <> $1)
+               OR EXISTS (SELECT 1 FROM surveys s
+                           WHERE s.farm_id = mine.farm_id
+                             AND NOT (s.survey_id = ANY($2::uuid[])))) AS shared
+         FROM (SELECT ff.farm_id, ff.is_primary, ff.created_at
+                 FROM farmer_farms ff WHERE ff.farmer_id = $1
+               UNION ALL
+               SELECT fr.farm_id, false, fr.created_at
+                 FROM farmers fr
+                WHERE fr.id = $1 AND fr.farm_id IS NOT NULL
+                  AND NOT EXISTS (SELECT 1 FROM farmer_farms x
+                                   WHERE x.farmer_id = $1 AND x.farm_id = fr.farm_id)
+              ) mine
+         JOIN farms f ON f.farm_id = mine.farm_id
+        ORDER BY mine.is_primary DESC, mine.created_at ASC`,
+      [id, surveyIds],
+    );
+    const farms: FarmDeletionInfo[] = farmRows.map((row) => ({
+      farmId: row.farmId,
+      name: row.name,
+      shared: row.shared,
+      willBeDeleted: !row.shared,
+    }));
+    // `farm` (contrato histórico) = la principal.
+    const farmInfo: FarmerDeletionPreviewDto['farm'] =
+      farms.find((f) => f.farmId === farmer.farm?.farmId) ?? farms[0] ?? null;
 
-    return { farmer, sessionIds, surveys, documentCollisionsCount, farmInfo };
+    return {
+      farmer,
+      sessionIds,
+      surveys,
+      documentCollisionsCount,
+      farmInfo,
+      farms,
+    };
   }
 
   /** Ejecuta un `SELECT count(*) AS count ...` y devuelve el número, tipado. */
@@ -319,8 +527,14 @@ export class FarmersService {
   }
 
   async getDeletionPreview(id: string): Promise<FarmerDeletionPreviewDto> {
-    const { farmer, sessionIds, surveys, documentCollisionsCount, farmInfo } =
-      await this.computeDeletionPlan(id);
+    const {
+      farmer,
+      sessionIds,
+      surveys,
+      documentCollisionsCount,
+      farmInfo,
+      farms,
+    } = await this.computeDeletionPlan(id);
 
     const surveyIds = surveys.map((s) => s.surveyId);
     const responsesCount = surveyIds.length
@@ -357,7 +571,7 @@ export class FarmersService {
       name: farmer.name,
       documentId: farmer.documentId,
       counts: {
-        farms: farmInfo?.willBeDeleted ? 1 : 0,
+        farms: farms.filter((f) => f.willBeDeleted).length,
         campaignSessions: sessionIds.length,
         surveys: surveyIds.length,
         responses: responsesCount,
@@ -366,6 +580,7 @@ export class FarmersService {
         consentRecords: consentRecordsCount,
       },
       farm: farmInfo,
+      farms,
       preserved: { changeRequests: changeRequestsCount },
     };
   }
@@ -374,9 +589,16 @@ export class FarmersService {
     id: string,
     actor?: string,
   ): Promise<FarmerDeletionPreviewDto> {
-    const { farmer, sessionIds, surveys, documentCollisionsCount, farmInfo } =
-      await this.computeDeletionPlan(id);
+    const {
+      farmer,
+      sessionIds,
+      surveys,
+      documentCollisionsCount,
+      farmInfo,
+      farms,
+    } = await this.computeDeletionPlan(id);
     const surveyIds = surveys.map((s) => s.surveyId);
+    const farmsToDelete = farms.filter((f) => f.willBeDeleted);
     let mediaKeys: string[] = [];
 
     await this.farmersRepository.manager.transaction(async (manager) => {
@@ -429,12 +651,22 @@ export class FarmersService {
         id,
       ]);
 
-      // 6. El agricultor.
+      // 6. Vínculos productor–finca (spec 94). El schema los borra por CASCADE
+      // con el agricultor; se borran aquí de forma explícita, con el mismo
+      // criterio defensivo del paso 5.
+      await manager.query('DELETE FROM farmer_farms WHERE farmer_id = $1', [
+        id,
+      ]);
+
+      // 7. El agricultor.
       await manager.delete(Farmer, { id });
 
-      // 7. La finca, solo si quedó sin otro agricultor que la referencie.
-      if (farmInfo?.willBeDeleted) {
-        await manager.delete(Farm, { farmId: farmInfo.farmId });
+      // 8. Las fincas que quedaron sin otro productor ni encuestas ajenas. Va
+      // DESPUÉS de las encuestas (paso 2): `surveys.farm_id` y
+      // `surveys.farm_crop_id` son RESTRICT (spec 94). Los cultivos de finca
+      // y los lotes caen por CASCADE con la finca.
+      for (const farm of farmsToDelete) {
+        await manager.delete(Farm, { farmId: farm.farmId });
       }
     });
 
@@ -447,7 +679,8 @@ export class FarmersService {
         `sesiones=${sessionIds.length} encuestas=${surveyIds.length} ` +
         `colisiones=${documentCollisionsCount} ` +
         `multimedia=${mediaObjects.deleted} borrados/${mediaObjects.queued} en cola ` +
-        `finca=${farmInfo?.willBeDeleted ? farmInfo.farmId : 'conservada'}`,
+        `fincas borradas=${farmsToDelete.map((f) => f.farmId).join(',') || 'ninguna'} ` +
+        `fincas conservadas=${farms.filter((f) => f.shared).length}`,
     );
 
     return {
@@ -455,7 +688,7 @@ export class FarmersService {
       name: farmer.name,
       documentId: farmer.documentId,
       counts: {
-        farms: farmInfo?.willBeDeleted ? 1 : 0,
+        farms: farmsToDelete.length,
         campaignSessions: sessionIds.length,
         surveys: surveyIds.length,
         responses: 0, // se calcula solo en el preview; el borrado no lo recuenta
@@ -464,6 +697,7 @@ export class FarmersService {
         consentRecords: 0, // idem: solo el preview lo recuenta
       },
       farm: farmInfo,
+      farms,
       preserved: { changeRequests: 0 },
       mediaObjects,
     };

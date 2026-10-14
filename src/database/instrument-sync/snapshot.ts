@@ -40,7 +40,15 @@ const TABLES_TO_CLEAR = [
 ] as const;
 
 /** Nunca se tocan: agricultores y fincas de prueba se conservan (decisión del usuario, spec 84). */
-const PRESERVED_TABLES = ['farmers', 'farms', 'farms_crops', 'farm_plots'];
+const PRESERVED_TABLES = [
+  'farmers',
+  'farms',
+  'farms_crops',
+  'farm_plots',
+  // Spec 94 — vínculos productor ↔ finca: dependen de farmers/farms, no de
+  // las tablas que se vacían, y se conservan junto con ellos.
+  'farmer_farms',
+];
 
 export interface SnapshotGuard {
   /** El propio llamador certifica explícitamente que el destino NO es producción. */
@@ -112,8 +120,10 @@ export async function snapshot(
  * Antes de borrar, confirma que no hay ninguna tabla con una FK hacia
  * `surveys`, `instruments`, `sections`, `questions`, `options_question` o
  * `campaigns` que no esté en `TABLES_TO_CLEAR` o `PRESERVED_TABLES`.
+ *
+ * Exportada (spec 94, C12) para poder probar la guarda sin vaciar desarrollo.
  */
-async function assertNoUnknownDependents(ds: DataSource): Promise<void> {
+export async function assertNoUnknownDependents(ds: DataSource): Promise<void> {
   const rows = await ds.query<{ dependent_table: string }[]>(
     `SELECT DISTINCT tc.table_name AS dependent_table
      FROM information_schema.table_constraints tc

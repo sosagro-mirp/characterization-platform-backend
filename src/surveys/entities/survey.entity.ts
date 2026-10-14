@@ -2,15 +2,19 @@ import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session.entity';
 import { Department } from 'src/departments/entities/department.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
+import { Farm } from 'src/farms/entities/farm.entity';
+import { FarmCrop } from 'src/farms/entities/farm-crop.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   JoinTable,
   ManyToMany,
@@ -21,6 +25,13 @@ import {
 } from 'typeorm';
 
 @Entity({ name: 'surveys' })
+@Index('IDX_surveys_farmer', ['farmer'])
+@Index('IDX_surveys_farm', ['farmId'])
+@Index('IDX_surveys_farm_crop', ['farmCropId'])
+@Check(
+  'CHK_surveys_farm_crop_requires_farm',
+  '"farm_crop_id" IS NULL OR "farm_id" IS NOT NULL',
+)
 export class Survey {
   @PrimaryGeneratedColumn('uuid', {
     name: 'survey_id',
@@ -36,6 +47,43 @@ export class Survey {
     referencedColumnName: 'id',
   })
   farmer?: Farmer;
+
+  // Spec 94 — finca y cultivo de finca a los que apunta la encuesta. Se
+  // escriben SOLO con `anchorSurvey` (SQL directo): `farm_id` es columna
+  // compartida por la FK simple a `farms` y por la FK compuesta
+  // `(farm_crop_id, farm_id) → farms_crops`, que obliga a que el cultivo
+  // pertenezca a la finca de la encuesta. No persistir estas relaciones con
+  // `save()`.
+  @Column({ name: 'farm_id', type: 'uuid', nullable: true })
+  farmId?: string | null;
+
+  @Column({ name: 'farm_crop_id', type: 'uuid', nullable: true })
+  farmCropId?: string | null;
+
+  @ManyToOne(() => Farm, {
+    nullable: true,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({
+    name: 'farm_id',
+    referencedColumnName: 'farmId',
+    foreignKeyConstraintName: 'FK_surveys_farm',
+  })
+  farm?: Farm | null;
+
+  @ManyToOne(() => FarmCrop, {
+    nullable: true,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn([
+    {
+      name: 'farm_crop_id',
+      referencedColumnName: 'farmCropId',
+      foreignKeyConstraintName: 'FK_surveys_farm_crop',
+    },
+    { name: 'farm_id', referencedColumnName: 'farmId' },
+  ])
+  farmCrop?: FarmCrop | null;
 
   @ManyToOne(() => User, {
     nullable: true,

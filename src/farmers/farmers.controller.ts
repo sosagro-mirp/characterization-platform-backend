@@ -17,6 +17,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { JwtOnly } from '../auth/decorators/jwt-only.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -25,6 +26,9 @@ import { ROLES } from '../auth/constants';
 import { FarmersService } from './farmers.service';
 import { CreateFarmerDto } from './dto/create-farmer.dto';
 import { UpdateFarmerDto } from './dto/update-farmer.dto';
+import { LinkFarmerFarmDto } from './dto/link-farmer-farm.dto';
+import { FarmerFarmLinkDto } from 'src/farmer-farms/dto/farmer-farm-view.dto';
+import { UpdateFarmerFarmDto } from './dto/update-farmer-farm.dto';
 import { ConsentRecordsService } from '../consents/consent-records.service';
 
 @ApiTags('Farmers')
@@ -94,7 +98,13 @@ export class FarmersController {
 
   @Get(':id')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
-  @ApiOperation({ summary: 'Get farmer by ID' })
+  @ApiOperation({
+    summary: 'Get farmer by ID',
+    description:
+      'Spec 94. `farm` se mantiene (la finca principal, con `crops`); se agrega `farms[]` ' +
+      '(todas sus fincas: `farmId`, `name`, `vereda`, `town`, `role`, `isPrimary` y ' +
+      '`crops[{farmCropId, cropId, name}]`).',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, description: 'Farmer found.' })
   @ApiResponse({ status: 404, description: 'Farmer not found.' })
@@ -116,6 +126,64 @@ export class FarmersController {
   @ApiResponse({ status: 200, description: 'Estado de consentimiento.' })
   getConsentStatus(@Param('id', ParseUUIDPipe) id: string) {
     return this.consentRecordsService.getFarmerStatus(id);
+  }
+
+  // Spec 94 — vínculo productor ↔ finca (N:M con rol).
+  @Post(':id/farms')
+  @JwtOnly()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Vincular un productor a una finca existente (spec 94)',
+    description:
+      'Crea el vínculo con un `role` (por defecto `producer`). Con `isPrimary: true` la finca ' +
+      'queda como principal y desplaza a la actual; se actualiza el espejo `farmers.farm_id`. ' +
+      'Si el productor no tenía finca, el primer vínculo queda principal aunque no se indique.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({
+    status: 201,
+    type: FarmerFarmLinkDto,
+    description: 'Vínculo: { farmerId, farmId, role, isPrimary, source }.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Productor o finca no encontrados.',
+  })
+  @ApiResponse({ status: 409, description: 'El vínculo ya existe.' })
+  linkFarm(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: LinkFarmerFarmDto,
+  ) {
+    return this.farmersService.linkFarm(id, dto);
+  }
+
+  @Patch(':id/farms/:farmId')
+  @JwtOnly()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Cambiar el rol o la finca principal de un vínculo (spec 94)',
+    description:
+      '`isPrimary: true` desplaza a la principal actual y actualiza el espejo ' +
+      '`farmers.farm_id`. No hay desvincular (queda fuera del spec 94).',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'farmId', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    type: FarmerFarmLinkDto,
+    description: 'Vínculo: { farmerId, farmId, role, isPrimary, source }.',
+  })
+  @ApiResponse({
+    status: 400,
+    description: '`isPrimary: false` sobre la finca principal.',
+  })
+  @ApiResponse({ status: 404, description: 'El vínculo no existe.' })
+  updateFarmLink(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('farmId', ParseUUIDPipe) farmId: string,
+    @Body() dto: UpdateFarmerFarmDto,
+  ) {
+    return this.farmersService.updateFarmLink(id, farmId, dto);
   }
 
   @Patch(':id')

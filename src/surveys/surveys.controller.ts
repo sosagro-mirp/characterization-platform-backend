@@ -117,9 +117,26 @@ export class SurveysController {
       'Filtrar por agricultor (incluye surveys vinculados a través de campaign_sessions)',
     schema: { type: 'string', format: 'uuid' },
   })
+  @ApiQuery({
+    name: 'farmId',
+    required: false,
+    description:
+      'Spec 94 — encuestas ancladas a esta finca (`surveys.farm_id`).',
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiQuery({
+    name: 'farmCropId',
+    required: false,
+    description:
+      'Spec 94 — encuestas ancladas a este cultivo de finca (`surveys.farm_crop_id`, el id de `farmCrops[]`).',
+    schema: { type: 'string', format: 'uuid' },
+  })
   @ApiResponse({
     status: 200,
-    description: 'Lista de encuestas con sus instrumentos asociados.',
+    description:
+      'Lista de encuestas con sus instrumentos asociados. Spec 94: cada fila trae ' +
+      '`farm` ({ farmId, name } | null) y `crop` ({ cropId, name } | null), además de ' +
+      '`farmId` y `farmCropId`.',
   })
   findAll(
     @Query('actorTypeId') actorTypeId?: string,
@@ -129,6 +146,9 @@ export class SurveysController {
     @Query('cropId') cropId?: string,
     @Query('instrumentId') instrumentId?: string,
     @Query('farmerId') farmerId?: string,
+    @Query('farmId', new ParseUUIDPipe({ optional: true })) farmId?: string,
+    @Query('farmCropId', new ParseUUIDPipe({ optional: true }))
+    farmCropId?: string,
   ) {
     const filters: SurveyFilters = {
       actorTypeId,
@@ -138,6 +158,8 @@ export class SurveysController {
       cropId,
       instrumentId,
       farmerId,
+      farmId,
+      farmCropId,
     };
     return this.surveysService.findAll(filters);
   }
@@ -458,6 +480,25 @@ export class SurveysController {
       properties: {
         surveyId: { type: 'string', format: 'uuid' },
         instrumentName: { type: 'string', nullable: true },
+        farm: {
+          type: 'object',
+          nullable: true,
+          description: 'Spec 94 — finca a la que está anclada la encuesta.',
+          properties: {
+            farmId: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+          },
+        },
+        crop: {
+          type: 'object',
+          nullable: true,
+          description:
+            'Spec 94 — cultivo de la encuesta (derivado del cultivo de finca).',
+          properties: {
+            cropId: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+          },
+        },
         syncedAt: { type: 'string', format: 'date-time' },
         responses: { type: 'array', items: { type: 'object' } },
       },
@@ -499,7 +540,9 @@ export class SurveysController {
     summary: 'Extraer cultivos desde respuestas S2',
     description:
       'Lee las respuestas con systemField crop.* y valor true, identifica los TypeOfCrop ' +
-      'correspondientes y los asigna a la CampaignSession.',
+      'correspondientes y los asigna a la CampaignSession. Spec 94: además SUMA los cultivos a la ' +
+      'finca del productor (nunca quita ninguno; reactiva los archivados) y ancla la encuesta a su ' +
+      'finca y cultivo de finca (`farm_id`, `farm_crop_id`, `crop_id` derivado).',
   })
   @ApiParam({
     name: 'id',
@@ -519,7 +562,9 @@ export class SurveysController {
     summary: 'Extraer agricultor desde respuestas S1',
     description:
       'Lee las respuestas de la encuesta que tienen systemField asignado (prefijo farmer.* / farm.*), ' +
-      'crea o reutiliza un Farmer y lo vincula a la CampaignSession. Si el documentId coincide con un ' +
+      'crea o reutiliza un Farmer y lo vincula a la CampaignSession. Spec 94: la finca nueva queda como ' +
+      'vínculo principal del productor (`farmer_farms`) y la encuesta se ancla a su finca principal; el ' +
+      '`farmer` de la respuesta trae `farm` (la principal) y `farms[]`. Si el documentId coincide con un ' +
       'Farmer existente cuyo nombre no corresponde (spec 68), responde 409 sin mutar nada — a menos ' +
       "que el body incluya `resolution` ('same_person' | 'separate_person'). Si el body incluye " +
       '`correctedDocumentId`, se actualiza primero la respuesta de documento de la encuesta con ese ' +

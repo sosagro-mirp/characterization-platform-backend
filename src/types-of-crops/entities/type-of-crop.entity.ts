@@ -1,9 +1,7 @@
-import { Farm } from 'src/farms/entities/farm.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
-  ManyToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -21,9 +19,6 @@ export class TypeOfCrop {
     nullable: false,
   })
   name: string;
-
-  @ManyToMany(() => Farm, (farm) => farm.crops)
-  farms: Farm[];
 
   @CreateDateColumn({
     name: 'created_at',

@@ -1,8 +1,9 @@
 import { Farmer } from 'src/farmers/entities/farmer.entity';
 import { Device } from 'src/devices/entities/device.entity';
 import { Town } from 'src/towns/entities/town.entity';
-import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { FarmPlot } from 'src/farm-plots/entities/farm-plot.entity';
+import { FarmCrop } from 'src/farms/entities/farm-crop.entity';
+import { FarmerFarm } from 'src/farmer-farms/entities/farmer-farm.entity';
 import {
   Column,
   CreateDateColumn,
@@ -23,9 +24,10 @@ export class Farm {
   })
   farmId: string;
 
+  // Spec 94 (D-H3-10) — pasa de varchar(50) a varchar(255).
   @Column({
     type: 'varchar',
-    length: 50,
+    length: 255,
     nullable: false,
   })
   name: string;
@@ -142,19 +144,20 @@ export class Farm {
   @OneToMany(() => FarmPlot, (plot) => plot.farm)
   plots: FarmPlot[];
 
-  @ManyToMany(() => TypeOfCrop, (crop: TypeOfCrop) => crop.farms)
-  @JoinTable({
-    name: 'farms_crops',
-    joinColumn: {
-      name: 'farm_id',
-      referencedColumnName: 'farmId',
-    },
-    inverseJoinColumn: {
-      name: 'crop_id',
-      referencedColumnName: 'cropId',
-    },
-  })
-  crops: TypeOfCrop[];
+  /** Spec 94 — cultivos de la finca como entidad (activos y archivados). */
+  @OneToMany(() => FarmCrop, (farmCrop) => farmCrop.farm)
+  farmCrops: FarmCrop[];
+
+  /** Spec 94 — vínculos productor ↔ finca con rol (N:M). */
+  @OneToMany(() => FarmerFarm, (link) => link.farm)
+  farmerLinks: FarmerFarm[];
+
+  /**
+   * Spec 94 — NO es una columna ni una relación: `{cropId, name}[]` de los
+   * cultivos ACTIVOS, derivado de `farmCrops` al serializar (ver
+   * `farmer-farms/farm-views.ts`). Mantiene el contrato histórico `farm.crops`.
+   */
+  crops?: { cropId: string; name: string }[];
 
   @ManyToMany(() => Device)
   @JoinTable({
