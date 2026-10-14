@@ -1901,5 +1901,26 @@ describe('spec-094 — modelo de datos centrado en el productor (e2e)', () => {
       );
       expect(await farmerLinks(farmerId)).toHaveLength(1);
     });
+
+    it('el cropId de POST /surveys se conserva tras extract-farmer cuando no hay cultivo de finca anclado', async () => {
+      const { sessionId } = await seedCampaignSession(null);
+      const registration = await createSurvey('reg', {
+        campaignSessionId: sessionId,
+        stepOrder: 1,
+        cropId: cropId['Cacao'],
+      });
+      await batchOk('reg', registration, {
+        name: 'Spec94 C13c Lucia Pardo Rios',
+        document: newDoc(),
+        farmName: `Spec94 Finca C13c ${RUN}`,
+        mainCrop: 'Café',
+      });
+      await extractFarmer(registration).expect(201);
+
+      const anchors = await surveyAnchors(registration);
+      expect(anchors.farm_id).not.toBeNull();
+      expect(anchors.farm_crop_id).toBeNull();
+      expect(anchors.crop_id).toBe(cropId['Cacao']);
+    });
   });
 });

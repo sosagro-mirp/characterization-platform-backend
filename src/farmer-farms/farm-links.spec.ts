@@ -68,7 +68,7 @@ describe('anchorSurvey (spec 94, D-H3-9)', () => {
       'farm_crop_id = CASE WHEN EXISTS (SELECT 1 FROM farms_crops fc WHERE fc.farm_crop_id = surveys.farm_crop_id AND fc.farm_id = $2::uuid) THEN farm_crop_id ELSE NULL END',
     );
     expect(calls[0].sql).toContain(
-      'crop_id = CASE WHEN EXISTS (SELECT 1 FROM farms_crops fc WHERE fc.farm_crop_id = surveys.farm_crop_id AND fc.farm_id = $2::uuid) THEN crop_id ELSE NULL END',
+      'crop_id = CASE WHEN surveys.farm_crop_id IS NULL OR EXISTS (SELECT 1 FROM farms_crops fc WHERE fc.farm_crop_id = surveys.farm_crop_id AND fc.farm_id = $2::uuid) THEN crop_id ELSE NULL END',
     );
   });
 

@@ -44,6 +44,8 @@ export async function resolveFarmerFarmId(
 ): Promise<string | null> {
   const primary = await getPrimaryFarmId(manager, farmerId);
   if (primary) return primary;
+  // DEBT: el vínculo no se sana cuando la finca solo existe en el espejo
+  // (sin fila en `farmer_farms`); solo ocurre con SQL directo, tras el backfill.
   const mirror = await manager.query<{ farm_id: string | null }[]>(
     `SELECT farm_id FROM farmers WHERE id = $1`,
     [farmerId],
@@ -219,7 +221,8 @@ export async function anchorSurvey(
       sets.push(
         `farm_crop_id = CASE WHEN EXISTS (SELECT 1 FROM farms_crops fc WHERE fc.farm_crop_id = surveys.farm_crop_id AND fc.farm_id = ${ref}) THEN farm_crop_id ELSE NULL END`,
         // `crop_id` se deriva de `farm_crop_id`: si el cultivo se suelta, también.
-        `crop_id = CASE WHEN EXISTS (SELECT 1 FROM farms_crops fc WHERE fc.farm_crop_id = surveys.farm_crop_id AND fc.farm_id = ${ref}) THEN crop_id ELSE NULL END`,
+        // Sin cultivo de finca anclado, `crop_id` (p. ej. el `cropId` de POST /surveys) se conserva.
+        `crop_id = CASE WHEN surveys.farm_crop_id IS NULL OR EXISTS (SELECT 1 FROM farms_crops fc WHERE fc.farm_crop_id = surveys.farm_crop_id AND fc.farm_id = ${ref}) THEN crop_id ELSE NULL END`,
       );
     }
   }
