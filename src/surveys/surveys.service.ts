@@ -24,7 +24,7 @@ import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
-import { DeepPartial, EntityManager, In, Repository } from 'typeorm';
+import { DeepPartial, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { ROLES } from '../auth/constants';
@@ -350,6 +350,103 @@ export class SurveysService {
     return this.surveysRepository.save(survey);
   }
 
+  // Spec 68, Fase 8 — aplica el documento corregido sobre la respuesta ya
+  // persistida de la encuesta. Elige la misma respuesta que la extracción
+  // usaría como documento del agricultor: la del productor cuando el
+  // encuestado no lo es (Q9 = false) y esa respuesta existe, la del
+  // encuestado en cualquier otro caso.
+  private async applyCorrectedDocumentId(
+    manager: EntityManager,
+    surveyId: string,
+    correctedDocumentId: string,
+    requester?: AuthenticatedUser,
+  ): Promise<void> {
+    // El DTO ya recorta; esto es una segunda barrera para que un valor en
+    // blanco o fuera de rango nunca llegue a la respuesta.
+    const corrected = correctedDocumentId.trim();
+    if (corrected.length < 3 || corrected.length > 50) {
+      throw new BadRequestException(
+        'correctedDocumentId must be between 3 and 50 characters',
+      );
+    }
+
+    const survey = await manager.findOne(Survey, {
+      where: { surveyId },
+      relations: ['responses', 'responses.question', 'user', 'farmer'],
+    });
+    if (!survey) throw new NotFoundException('Survey not found');
+
+    // Un POLLSTER solo corrige sus propias encuestas (mismo criterio que
+    // `findSurveyResponses`, spec 92): 404, sin revelar que la ajena existe.
+    // Una encuesta sin dueño (anterior a spec 86) se trata como propia, igual
+    // que en el móvil.
+    if (
+      requester?.role === ROLES.POLLSTER &&
+      survey.user &&
+      survey.user.userId !== requester.userId
+    ) {
+      throw new NotFoundException('Survey not found');
+    }
+
+    // Con el agricultor ya extraído, reescribir la respuesta dejaría la
+    // encuesta y el agricultor con documentos distintos.
+    // Salvo que sea un reintento idempotente: si el POST anterior se confirmó
+    // pero la respuesta se perdió, el móvil reenvía el mismo documento
+    // corregido (`withNetworkRetry`) y debe recibir al agricultor, no un 422.
+    if (survey.farmer) {
+      if (
+        normalizeDocumentId(survey.farmer.documentId) ===
+        normalizeDocumentId(corrected)
+      ) {
+        return;
+      }
+      throw new UnprocessableEntityException(
+        'Survey already has a farmer; its document can no longer be corrected',
+      );
+    }
+
+    const responses = survey.responses ?? [];
+    const isRespondent = responses.find(
+      (r) => r.question?.systemField === 'farmer.isRespondent',
+    )?.booleanValue;
+
+    const producerResponse = responses.find(
+      (r) => r.question?.systemField === 'farmer.producerDocumentId',
+    );
+    const respondentResponse = responses.find(
+      (r) => r.question?.systemField === 'farmer.documentId',
+    );
+
+    const target =
+      isRespondent === false && producerResponse
+        ? producerResponse
+        : respondentResponse;
+
+    if (!target) {
+      throw new UnprocessableEntityException(
+        'Survey has no document response to correct',
+      );
+    }
+
+    await manager.update(Response, target.responseId, {
+      textValue: corrected,
+    });
+
+    // La colisión que registró el documento mal digitado era un error de
+    // captura: se cierra como `corrected` para que no quede pendiente para
+    // siempre en el registro ni en `list_document_collisions`. Si el
+    // documento nuevo también choca, esa colisión se registra aparte.
+    await manager.update(
+      FarmerDocumentCollision,
+      { survey: { surveyId }, resolution: IsNull() },
+      { resolution: 'corrected', resolvedAt: new Date() },
+    );
+
+    this.logger.log(
+      `[extractFarmer] corrected documentId on response ${target.responseId} of survey ${surveyId}`,
+    );
+  }
+
   /**
    * Spec 84 (hallazgo de la ronda de pruebas, 2026-09-13) — serializa las
    * extracciones concurrentes de la MISMA encuesta y las hace idempotentes.
@@ -371,8 +468,28 @@ export class SurveysService {
   async extractFarmer(
     surveyId: string,
     dto: ExtractFarmerDto = {},
+    requester?: AuthenticatedUser,
   ): Promise<{ farmer: Farmer; existed: boolean }> {
     try {
+      // Spec 68, Fase 8 — "Corregir el documento". Para cuando el encuestador
+      // ve el aviso, la encuesta ya está sincronizada y `createMany()` ignora
+      // un batch cuya encuesta ya tiene respuestas, así que la corrección solo
+      // llega por aquí. Va en su propia transacción, antes de la extracción:
+      // si el documento nuevo también colisiona, la transacción principal se
+      // revierte, y la corrección debe sobrevivir a ese 409 — el móvil ya la
+      // descartó y el reintento leerá el documento persistido.
+      const { correctedDocumentId } = dto;
+      if (correctedDocumentId) {
+        await this.surveysRepository.manager.transaction(async (manager) => {
+          await this.lockSurvey(manager, surveyId);
+          await this.applyCorrectedDocumentId(
+            manager,
+            surveyId,
+            correctedDocumentId,
+            requester,
+          );
+        });
+      }
       return await this.surveysRepository.manager.transaction(
         async (manager) => {
           await this.lockSurvey(manager, surveyId);
@@ -815,7 +932,12 @@ export class SurveysService {
     });
 
     if (existingRow) {
-      if (existingRow.resolution) return; // already resolved — leave as-is
+      // Ya resuelta — se deja como está. Salvo `corrected`: esa fila cerró un
+      // error de captura, no una decisión sobre dos personas, así que un
+      // nuevo choque idéntico debe volver a quedar pendiente.
+      if (existingRow.resolution && existingRow.resolution !== 'corrected') {
+        return;
+      }
       // `.update()`, not load-then-`.save()`: `existingRow` above doesn't
       // fetch the `survey`/`existingFarmer` relations, and saving that
       // partial entity back could null out `survey_id` on a repeated
