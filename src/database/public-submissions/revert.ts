@@ -9,7 +9,7 @@ import {
   FARMER_COMPLETABLE_FIELDS,
 } from 'src/surveys/public-submission-plan';
 import { parseSubmissionLog, planFieldReverts } from './log';
-import { SubmissionLog } from './types';
+import { SUBMISSION_LOG_MODEL_VERSION, SubmissionLog } from './types';
 
 /**
  * Spec 93, Fase 3 — `public-submissions:revert`. Deshace envío por envío, a
@@ -48,6 +48,21 @@ export function canRevert(
     };
   }
   return { ok: true };
+}
+
+/**
+ * Spec 94 (D-H3-11) — rechaza los logs escritos antes del modelo N:M
+ * productor–finca. Se evalúan TODOS antes de tocar la base: una corrida con un
+ * solo log previo no revierte nada.
+ */
+export function assertRevertibleLog(entry: SubmissionLog): void {
+  if (entry.modelVersion === SUBMISSION_LOG_MODEL_VERSION) return;
+  throw new Error(
+    `El log del envío ${entry.surveyId} se escribió antes del spec 94 (modelo productor–finca N:M) y ` +
+      'no se puede revertir con esta versión: no registra el vínculo productor–finca ni el anclaje de la ' +
+      'encuesta, y revertirlo dejaría datos huérfanos. Revierta ese envío a mano (SQL revisado) o ' +
+      'vuelva a aplicar y revertir con un log nuevo.',
+  );
 }
 
 export interface RevertOutcome {
@@ -133,6 +148,15 @@ async function revertOne(
   if (entry.action === 'process' && entry.farmer) {
     const farmerId = entry.farmer.farmerId;
 
+    // Spec 94 — primero se suelta el anclaje de la encuesta (`farm_id`,
+    // `farm_crop_id`, `crop_id`): las FK a la finca y a sus cultivos son
+    // RESTRICT y bloquearían el borrado de lo que `apply` agregó.
+    await manager.query(
+      `UPDATE surveys SET farm_crop_id = NULL, crop_id = NULL, farm_id = NULL
+        WHERE survey_id = $1`,
+      [entry.surveyId],
+    );
+
     if (entry.consentRecordsRelinked.length > 0) {
       await manager.query(
         `UPDATE consent_records SET farmer_id = NULL
@@ -145,11 +169,20 @@ async function revertOne(
     }
 
     if (entry.farm && entry.cropsAdded.length > 0) {
-      await manager.query(
-        'DELETE FROM farms_crops WHERE farm_id = $1 AND crop_id = ANY($2::uuid[])',
+      // Spec 94 — un cultivo al que otra encuesta sigue anclada no se borra.
+      const removed = await manager.query<{ crop_id: string }[]>(
+        `DELETE FROM farms_crops fc
+          WHERE fc.farm_id = $1 AND fc.crop_id = ANY($2::uuid[])
+            AND NOT EXISTS (SELECT 1 FROM surveys s WHERE s.farm_crop_id = fc.farm_crop_id)
+          RETURNING fc.crop_id`,
         [entry.farm.farmId, entry.cropsAdded.map((c) => c.cropId)],
       );
-      outcome.actions.push(`${entry.cropsAdded.length} cultivo(s) quitado(s)`);
+      outcome.actions.push(`${removed.length} cultivo(s) quitado(s)`);
+      if (removed.length < entry.cropsAdded.length) {
+        outcome.notes.push(
+          `${entry.cropsAdded.length - removed.length} cultivo(s) conservado(s): otras encuestas están ancladas a ellos`,
+        );
+      }
     }
 
     if (entry.fieldsCompleted.length > 0 && !entry.farmer.created) {
@@ -242,6 +275,13 @@ async function revertOne(
     const farmerId = entry.farmer.farmerId;
 
     if (entry.farm?.assignedToFarmer && !entry.farmer.created) {
+      // Spec 94 — se quita el vínculo `farmer_farms` que creó el procesado y
+      // el espejo `farmers.farm_id`.
+      await manager.query(
+        `DELETE FROM farmer_farms
+          WHERE farmer_id = $1 AND farm_id = $2 AND source = 'public_process'`,
+        [farmerId, entry.farm.farmId],
+      );
       await manager.query(
         'UPDATE farmers SET farm_id = NULL WHERE id = $1 AND farm_id = $2',
         [farmerId, entry.farm.farmId],
@@ -289,9 +329,15 @@ async function revertOne(
 
     if (entry.farm?.mode === 'created') {
       const farmId = entry.farm.farmId;
+      // Spec 94 — usan la finca los productores vinculados (`farmer_farms`),
+      // los del espejo `farmers.farm_id` y las encuestas ancladas a ella.
       const users = await count(
         manager,
-        'SELECT count(*) AS n FROM farmers WHERE farm_id = $1',
+        `SELECT (SELECT count(*) FROM farmer_farms WHERE farm_id = $1)
+              + (SELECT count(*) FROM farmers WHERE farm_id = $1
+                    AND NOT EXISTS (SELECT 1 FROM farmer_farms ff
+                                     WHERE ff.farmer_id = farmers.id AND ff.farm_id = $1))
+              + (SELECT count(*) FROM surveys WHERE farm_id = $1) AS n`,
         [farmId],
       );
       if (users > 0) {
@@ -320,6 +366,8 @@ export async function runRevert(
   const logs = readLogs(params.logPath, params.onlySurveyId);
   if (logs.length === 0)
     throw new Error('No hay logs para revertir en esa ruta.');
+  // Spec 94 (D-H3-11): antes de confirmar y de tocar nada.
+  for (const entry of logs) assertRevertibleLog(entry);
 
   await params.confirmBeforeWrite(logs.length);
 

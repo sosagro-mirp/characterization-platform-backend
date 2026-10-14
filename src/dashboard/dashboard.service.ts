@@ -1514,9 +1514,11 @@ export class DashboardService {
       undefined,
       responseFilters,
     )
-      .innerJoin('survey.farmer', 'farmerForFarmCount')
-      .andWhere('farmerForFarmCount.farm IS NOT NULL')
-      .select('COUNT(DISTINCT farmerForFarmCount.farm)', 'count')
+      // Spec 94 — fincas distintas de las ENCUESTAS (`surveys.farm_id`), no la
+      // finca actual de cada productor: cambiar la principal de un productor
+      // ya no reescribe el pasado.
+      .andWhere('survey.farm IS NOT NULL')
+      .select('COUNT(DISTINCT survey.farm)', 'count')
       .getRawOne<{ count: string }>();
     return Number(raw?.count ?? 0);
   }

@@ -20,6 +20,7 @@ import {
 import { diffSnapshots, StateSnapshot } from './log';
 import {
   CollisionRowSnapshot,
+  SUBMISSION_LOG_MODEL_VERSION,
   SubmissionDecision,
   SubmissionLog,
 } from './types';
@@ -113,7 +114,7 @@ export async function captureState(
     : null;
   const cropRows = farmEntity
     ? await ds.query<{ crop_id: string }[]>(
-        'SELECT crop_id FROM farms_crops WHERE farm_id = $1',
+        'SELECT crop_id FROM farms_crops WHERE farm_id = $1 AND archived_at IS NULL',
         [farmEntity.farmId],
       )
     : [];
@@ -289,6 +290,9 @@ async function processOne(
 
   return {
     formatVersion: 1,
+    // Spec 94 — marca que el log se escribió con el modelo N:M productor–finca
+    // (vínculo `farmer_farms`, anclaje de la encuesta); `revert` solo acepta estos.
+    modelVersion: SUBMISSION_LOG_MODEL_VERSION,
     surveyId: decision.surveyId,
     action: 'process',
     appliedAt: new Date().toISOString(),
@@ -314,6 +318,7 @@ async function discardOne(
   );
   return {
     formatVersion: 1,
+    modelVersion: SUBMISSION_LOG_MODEL_VERSION,
     surveyId: decision.surveyId,
     action: 'discard',
     appliedAt: new Date().toISOString(),
