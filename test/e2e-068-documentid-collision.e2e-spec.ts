@@ -631,6 +631,71 @@ describe('Spec 68 — Colisión de documentId entre agricultores (e2e)', () => {
       );
       await extractFarmer(survey, { correctedDocumentId: '1' }).expect(400);
     });
+
+    it('rechaza un documento en blanco o que queda corto tras recortarlo', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_SOURCE,
+      );
+      await extractFarmer(survey, { correctedDocumentId: '     ' }).expect(400);
+      await extractFarmer(survey, { correctedDocumentId: '  12  ' }).expect(
+        400,
+      );
+      // La respuesta original no se tocó.
+      expect(await persistedDocumentOf(survey)).toBe(DOC_CORRECTED_SOURCE);
+    });
+
+    it('cierra como `corrected` la colisión que registró el documento mal digitado', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_SOURCE,
+      );
+      await extractFarmer(survey).expect(409);
+
+      const pending = await ds.query<{ resolution: string | null }[]>(
+        `SELECT resolution FROM farmer_document_collisions WHERE survey_id = $1`,
+        [survey],
+      );
+      expect(pending.map((r) => r.resolution)).toContain(null);
+
+      await extractFarmer(survey, {
+        correctedDocumentId: DOC_CORRECTED_FREE,
+      }).expect(201);
+
+      const after = await ds.query<{ resolution: string | null }[]>(
+        `SELECT resolution FROM farmer_document_collisions WHERE survey_id = $1`,
+        [survey],
+      );
+      expect(after.length).toBeGreaterThan(0);
+      expect(after.every((r) => r.resolution === 'corrected')).toBe(true);
+    });
+
+    it('responde 422 si la encuesta ya tiene agricultor extraído', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_FREE,
+      );
+      await extractFarmer(survey).expect(201);
+      await extractFarmer(survey, {
+        correctedDocumentId: DOC_CORRECTED_TAKEN,
+      }).expect(422);
+      expect(await persistedDocumentOf(survey)).toBe(DOC_CORRECTED_FREE);
+    });
+
+    it('un encuestador no puede corregir el documento de la encuesta de otro usuario', async () => {
+      const survey = await createIdentificationSurvey(
+        NAME_P2,
+        DOC_CORRECTED_SOURCE,
+      );
+      await ds.query(
+        `UPDATE surveys SET user_id = (SELECT user_id FROM users WHERE email = $1) WHERE survey_id = $2`,
+        [testEmail('admin'), survey],
+      );
+      await extractFarmer(survey, {
+        correctedDocumentId: DOC_CORRECTED_FREE,
+      }).expect(404);
+      expect(await persistedDocumentOf(survey)).toBe(DOC_CORRECTED_SOURCE);
+    });
   });
 
   describe('Registro auditable de colisiones', () => {

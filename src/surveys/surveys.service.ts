@@ -24,7 +24,7 @@ import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
-import { DeepPartial, EntityManager, In, Repository } from 'typeorm';
+import { DeepPartial, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { ROLES } from '../auth/constants';
@@ -359,12 +359,42 @@ export class SurveysService {
     manager: EntityManager,
     surveyId: string,
     correctedDocumentId: string,
+    requester?: AuthenticatedUser,
   ): Promise<void> {
+    // El DTO ya recorta, pero esta función también la usan llamadores que no
+    // pasan por él: un valor en blanco no puede llegar a la respuesta.
+    const corrected = correctedDocumentId.trim();
+    if (corrected.length < 3 || corrected.length > 50) {
+      throw new BadRequestException(
+        'correctedDocumentId must be between 3 and 50 characters',
+      );
+    }
+
     const survey = await manager.findOne(Survey, {
       where: { surveyId },
-      relations: ['responses', 'responses.question'],
+      relations: ['responses', 'responses.question', 'user', 'farmer'],
     });
     if (!survey) throw new NotFoundException('Survey not found');
+
+    // Un POLLSTER solo corrige sus propias encuestas (mismo criterio que
+    // `findSurveyResponses`, spec 92): 404, sin revelar que la ajena existe.
+    // Una encuesta sin dueño (anterior a spec 86) se trata como propia, igual
+    // que en el móvil.
+    if (
+      requester?.role === ROLES.POLLSTER &&
+      survey.user &&
+      survey.user.userId !== requester.userId
+    ) {
+      throw new NotFoundException('Survey not found');
+    }
+
+    // Con el agricultor ya extraído, reescribir la respuesta dejaría la
+    // encuesta y el agricultor con documentos distintos.
+    if (survey.farmer) {
+      throw new UnprocessableEntityException(
+        'Survey already has a farmer; its document can no longer be corrected',
+      );
+    }
 
     const responses = survey.responses ?? [];
     const isRespondent = responses.find(
@@ -390,8 +420,18 @@ export class SurveysService {
     }
 
     await manager.update(Response, target.responseId, {
-      textValue: correctedDocumentId.trim(),
+      textValue: corrected,
     });
+
+    // La colisión que registró el documento mal digitado era un error de
+    // captura: se cierra como `corrected` para que no quede pendiente para
+    // siempre en el registro ni en `list_document_collisions`. Si el
+    // documento nuevo también choca, esa colisión se registra aparte.
+    await manager.update(
+      FarmerDocumentCollision,
+      { survey: { surveyId }, resolution: IsNull() },
+      { resolution: 'corrected', resolvedAt: new Date() },
+    );
 
     this.logger.log(
       `[extractFarmer] corrected documentId on response ${target.responseId} of survey ${surveyId}`,
@@ -419,6 +459,7 @@ export class SurveysService {
   async extractFarmer(
     surveyId: string,
     dto: ExtractFarmerDto = {},
+    requester?: AuthenticatedUser,
   ): Promise<{ farmer: Farmer; existed: boolean }> {
     try {
       // Spec 68, Fase 8 — "Corregir el documento". Para cuando el encuestador
@@ -436,6 +477,7 @@ export class SurveysService {
             manager,
             surveyId,
             correctedDocumentId,
+            requester,
           );
         });
       }
@@ -881,7 +923,12 @@ export class SurveysService {
     });
 
     if (existingRow) {
-      if (existingRow.resolution) return; // already resolved — leave as-is
+      // Ya resuelta — se deja como está. Salvo `corrected`: esa fila cerró un
+      // error de captura, no una decisión sobre dos personas, así que un
+      // nuevo choque idéntico debe volver a quedar pendiente.
+      if (existingRow.resolution && existingRow.resolution !== 'corrected') {
+        return;
+      }
       // `.update()`, not load-then-`.save()`: `existingRow` above doesn't
       // fetch the `survey`/`existingFarmer` relations, and saving that
       // partial entity back could null out `survey_id` on a repeated

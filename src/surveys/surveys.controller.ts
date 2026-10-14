@@ -542,12 +542,13 @@ export class SurveysController {
     status: 422,
     description:
       'Falta farmer.name en las respuestas, o se envió correctedDocumentId y la encuesta no tiene ' +
-      'ninguna respuesta de documento que corregir.',
+      'ninguna respuesta de documento que corregir, o la encuesta ya tiene agricultor.',
   })
   extractFarmer(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ExtractFarmerDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.surveysService.extractFarmer(id, dto);
+    return this.surveysService.extractFarmer(id, dto, user);
   }
 }

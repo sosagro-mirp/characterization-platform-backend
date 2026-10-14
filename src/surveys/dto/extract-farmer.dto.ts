@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, Length } from 'class-validator';
 
 // Spec 68 — resolución explícita de una colisión de documentId. Sin
@@ -29,6 +30,11 @@ export class ExtractFarmerDto {
     maxLength: 50,
   })
   @IsOptional()
+  // `@Length` se evalúa sobre el valor ya recortado: sin esto, "   " o "  12  "
+  // pasaban la validación y se guardaban recortados por debajo del mínimo.
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @Length(3, 50)
   correctedDocumentId?: string;
