@@ -59,7 +59,7 @@ import { convertAreaToHectares } from './unit-conversion';
 import {
   addFarmCrops,
   anchorSurvey,
-  getPrimaryFarmId,
+  resolveFarmerFarmId,
   linkFarmerToFarm,
   listActiveFarmCrops,
 } from 'src/farmer-farms/farm-links';
@@ -849,7 +849,7 @@ export class SurveysService {
     farmerId: string,
     overwrite: boolean,
   ): Promise<void> {
-    const farmId = await getPrimaryFarmId(manager, farmerId);
+    const farmId = await resolveFarmerFarmId(manager, farmerId);
     if (!farmId) return;
     if (!overwrite) {
       const [row] = await manager.query<{ farm_id: string | null }[]>(
@@ -1604,7 +1604,7 @@ export class SurveysService {
             });
           }
 
-          const primaryFarmId = await getPrimaryFarmId(
+          const primaryFarmId = await resolveFarmerFarmId(
             manager,
             session.farmer.id,
           );
@@ -1678,7 +1678,7 @@ export class SurveysService {
           // Propagate crops to farm — ADITIVO (spec 94): suma y reactiva, no quita.
           await addFarmCrops(manager, farmId, resolvedCropIds);
         } else if (session.farmer) {
-          const primaryFarmId = await getPrimaryFarmId(
+          const primaryFarmId = await resolveFarmerFarmId(
             manager,
             session.farmer.id,
           );
@@ -1692,7 +1692,7 @@ export class SurveysService {
     } else if (survey.farmer) {
       // Encuesta de un productor sin sesión: se ancla a su finca principal sin
       // escribir cultivos (hoy tampoco se escribían).
-      farmId = await getPrimaryFarmId(manager, survey.farmer.id);
+      farmId = await resolveFarmerFarmId(manager, survey.farmer.id);
     }
 
     if (farmId) {

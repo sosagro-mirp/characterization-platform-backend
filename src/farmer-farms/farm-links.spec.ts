@@ -4,6 +4,7 @@ import {
   anchorSurvey,
   getPrimaryFarmId,
   linkFarmerToFarm,
+  resolveFarmerFarmId,
   promoteToPrimary,
 } from './farm-links';
 
@@ -200,10 +201,27 @@ describe('promoteToPrimary / addFarmCrops', () => {
 
 describe('getPrimaryFarmId (spec 94)', () => {
   it('devuelve la finca principal de farmer_farms', async () => {
-    const { manager, calls } = fakeManager((sql) =>
+    const { manager } = fakeManager((sql) =>
       sql.includes('FROM farmer_farms') ? [{ farm_id: 'farm-1' }] : [],
     );
     await expect(getPrimaryFarmId(manager, 'f-1')).resolves.toBe('farm-1');
+  });
+
+  it('es estricta: sin vínculo principal NO usa el espejo farmers.farm_id', async () => {
+    const { manager, calls } = fakeManager((sql) =>
+      sql.includes('FROM farmers') ? [{ farm_id: 'farm-legacy' }] : [],
+    );
+    await expect(getPrimaryFarmId(manager, 'f-1')).resolves.toBeNull();
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe('resolveFarmerFarmId (spec 94)', () => {
+  it('prefiere la principal de farmer_farms', async () => {
+    const { manager, calls } = fakeManager((sql) =>
+      sql.includes('FROM farmer_farms') ? [{ farm_id: 'farm-1' }] : [],
+    );
+    await expect(resolveFarmerFarmId(manager, 'f-1')).resolves.toBe('farm-1');
     expect(calls).toHaveLength(1);
   });
 
@@ -211,12 +229,14 @@ describe('getPrimaryFarmId (spec 94)', () => {
     const { manager, calls } = fakeManager((sql) =>
       sql.includes('FROM farmers') ? [{ farm_id: 'farm-legacy' }] : [],
     );
-    await expect(getPrimaryFarmId(manager, 'f-1')).resolves.toBe('farm-legacy');
+    await expect(resolveFarmerFarmId(manager, 'f-1')).resolves.toBe(
+      'farm-legacy',
+    );
     expect(calls).toHaveLength(2);
   });
 
   it('sin vínculo ni espejo, devuelve null', async () => {
     const { manager } = fakeManager(() => []);
-    await expect(getPrimaryFarmId(manager, 'f-1')).resolves.toBeNull();
+    await expect(resolveFarmerFarmId(manager, 'f-1')).resolves.toBeNull();
   });
 });

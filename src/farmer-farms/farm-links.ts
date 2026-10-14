@@ -17,10 +17,9 @@ import type { FarmCropOption } from './pick-farm-crop';
  */
 
 /**
- * Finca principal del productor según `farmer_farms`, o `null` si no tiene.
- * Respaldo: si no hay vínculo principal, se usa el espejo `farmers.farm_id`
- * (productores creados antes del spec 94 o por SQL directo, sin fila en
- * `farmer_farms`); así la extracción no los trata como "sin finca".
+ * Finca principal del productor según `farmer_farms`, o `null` si no tiene
+ * vínculo principal. Es la lectura **estricta** que usa `linkFarmerToFarm`
+ * para decidir si un vínculo nuevo queda como principal.
  */
 export async function getPrimaryFarmId(
   manager: EntityManager,
@@ -30,7 +29,21 @@ export async function getPrimaryFarmId(
     `SELECT farm_id FROM farmer_farms WHERE farmer_id = $1 AND is_primary = true`,
     [farmerId],
   );
-  if (rows[0]?.farm_id) return rows[0].farm_id;
+  return rows[0]?.farm_id ?? null;
+}
+
+/**
+ * Finca del productor para la extracción: la principal de `farmer_farms` y, si
+ * no hay vínculo (productores creados antes del spec 94 o por SQL directo), el
+ * espejo `farmers.farm_id`. No se usa para decidir principal: ver
+ * `getPrimaryFarmId`.
+ */
+export async function resolveFarmerFarmId(
+  manager: EntityManager,
+  farmerId: string,
+): Promise<string | null> {
+  const primary = await getPrimaryFarmId(manager, farmerId);
+  if (primary) return primary;
   const mirror = await manager.query<{ farm_id: string | null }[]>(
     `SELECT farm_id FROM farmers WHERE id = $1`,
     [farmerId],
