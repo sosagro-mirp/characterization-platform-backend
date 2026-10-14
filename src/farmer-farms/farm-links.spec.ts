@@ -2,6 +2,7 @@ import type { EntityManager } from 'typeorm';
 import {
   addFarmCrops,
   anchorSurvey,
+  getPrimaryFarmId,
   linkFarmerToFarm,
   promoteToPrimary,
 } from './farm-links';
@@ -194,5 +195,28 @@ describe('promoteToPrimary / addFarmCrops', () => {
     const { manager, calls } = fakeManager();
     expect(await addFarmCrops(manager, 'f-1', [])).toEqual([]);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('getPrimaryFarmId (spec 94)', () => {
+  it('devuelve la finca principal de farmer_farms', async () => {
+    const { manager, calls } = fakeManager((sql) =>
+      sql.includes('FROM farmer_farms') ? [{ farm_id: 'farm-1' }] : [],
+    );
+    await expect(getPrimaryFarmId(manager, 'f-1')).resolves.toBe('farm-1');
+    expect(calls).toHaveLength(1);
+  });
+
+  it('sin vínculo principal, usa el espejo farmers.farm_id', async () => {
+    const { manager, calls } = fakeManager((sql) =>
+      sql.includes('FROM farmers') ? [{ farm_id: 'farm-legacy' }] : [],
+    );
+    await expect(getPrimaryFarmId(manager, 'f-1')).resolves.toBe('farm-legacy');
+    expect(calls).toHaveLength(2);
+  });
+
+  it('sin vínculo ni espejo, devuelve null', async () => {
+    const { manager } = fakeManager(() => []);
+    await expect(getPrimaryFarmId(manager, 'f-1')).resolves.toBeNull();
   });
 });

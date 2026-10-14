@@ -16,7 +16,12 @@ import type { FarmCropOption } from './pick-farm-crop';
  * que TypeORM no persiste bien desde la entidad.
  */
 
-/** Finca principal del productor según `farmer_farms`, o `null` si no tiene. */
+/**
+ * Finca principal del productor según `farmer_farms`, o `null` si no tiene.
+ * Respaldo: si no hay vínculo principal, se usa el espejo `farmers.farm_id`
+ * (productores creados antes del spec 94 o por SQL directo, sin fila en
+ * `farmer_farms`); así la extracción no los trata como "sin finca".
+ */
 export async function getPrimaryFarmId(
   manager: EntityManager,
   farmerId: string,
@@ -25,7 +30,12 @@ export async function getPrimaryFarmId(
     `SELECT farm_id FROM farmer_farms WHERE farmer_id = $1 AND is_primary = true`,
     [farmerId],
   );
-  return rows[0]?.farm_id ?? null;
+  if (rows[0]?.farm_id) return rows[0].farm_id;
+  const mirror = await manager.query<{ farm_id: string | null }[]>(
+    `SELECT farm_id FROM farmers WHERE id = $1`,
+    [farmerId],
+  );
+  return mirror[0]?.farm_id ?? null;
 }
 
 export interface LinkFarmerToFarmParams {
