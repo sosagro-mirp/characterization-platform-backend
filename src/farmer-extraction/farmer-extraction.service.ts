@@ -597,11 +597,20 @@ export class FarmerExtractionService {
         name: nameOf.get(c.cropId) ?? '',
       }));
       if (!farmCropId) {
-        farmCropId =
-          pickFarmCrop(await listActiveFarmCrops(manager, farm.farmId), [
-            crops.map((c) => c.cropId),
-            previousSessionCropIds,
-          ]).farmCropId ?? null;
+        const active = await listActiveFarmCrops(manager, farm.farmId);
+        // Un `cropId` explícito de POST /surveys manda: se ancla al cultivo de
+        // finca de ese cultivo y, si la finca no lo tiene, no se ancla ninguno
+        // (el `crop_id` del cliente se conserva).
+        const [{ crop_id: explicitCropId }] = await manager.query<
+          { crop_id: string | null }[]
+        >('SELECT crop_id FROM surveys WHERE survey_id = $1', [surveyId]);
+        farmCropId = explicitCropId
+          ? (active.find((a) => a.cropId === explicitCropId)?.farmCropId ??
+            null)
+          : (pickFarmCrop(active, [
+              crops.map((c) => c.cropId),
+              previousSessionCropIds,
+            ]).farmCropId ?? null);
       }
     }
 
