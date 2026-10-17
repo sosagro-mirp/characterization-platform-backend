@@ -56,7 +56,7 @@ const SELECT_SURVEYS = `
   SELECT s.survey_id AS "surveyId"
     FROM surveys s
    WHERE s.origin = 'field'
-     AND (s.extraction_status IS NULL OR s.extraction_status IN ('backfilled', 'error'))
+     AND (s.extraction_status IS NULL OR s.extraction_status IN ('backfilled', 'error', 'no_identity', 'pending_alias'))
      AND EXISTS (SELECT 1 FROM responses r WHERE r.survey_id = s.survey_id)
      AND ($1::uuid[] IS NULL OR s.survey_id = ANY($1::uuid[]))
    ORDER BY s.created_at ASC, s.survey_id ASC`;
@@ -99,7 +99,7 @@ async function replayOne(
     }
     const message = err instanceof Error ? err.message : String(err);
     await manager.query(
-      `UPDATE surveys SET extraction_status = 'error', extraction_error = $2 WHERE survey_id = $1`,
+      `UPDATE surveys SET extraction_status = 'error', extraction_error = $2, extracted_at = NULL WHERE survey_id = $1`,
       [surveyId, message.slice(0, 2000)],
     );
     return {

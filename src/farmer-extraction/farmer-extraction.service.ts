@@ -63,6 +63,11 @@ export interface ExtractOptions {
   reviewedBy?: string;
   /** `false` en las llamadas internas para no re-extraer en cascada. */
   cascade?: boolean;
+  /**
+   * Solo la cascada: no toma `extract-farmer:<encuesta>` (el orden fijo de locks
+   * ya tiene tomado `farmer:<id>` y pedir otra encuesta podría interbloquear).
+   */
+  skipSurveyLock?: boolean;
 }
 
 export interface ExtractionChanges {
@@ -252,7 +257,7 @@ export class FarmerExtractionService {
     surveyId: string,
     opts: ExtractOptions,
   ): Promise<ExtractionResult> {
-    await this.lockSurvey(manager, surveyId);
+    if (!opts.skipSurveyLock) await this.lockSurvey(manager, surveyId);
 
     const survey = await manager.findOne(Survey, {
       where: { surveyId },
@@ -388,6 +393,13 @@ export class FarmerExtractionService {
     }
 
     await this.advisoryLock(manager, `farmer:${farmer.id}`);
+    // Otra extracción del mismo productor pudo completar campos mientras
+    // esperábamos el lock: se relee para no decidir con datos obsoletos.
+    if (!changes.farmerCreated) {
+      farmer = await manager.findOneOrFail(Farmer, {
+        where: { id: farmer.id },
+      });
+    }
 
     // ── encuesta sin nada que extraer: solo se ancla al productor conocido ──
     if (!extractable) {
@@ -820,7 +832,11 @@ export class FarmerExtractionService {
             manager,
           ),
         );
-        await this.extract(manager, id, { ...opts, cascade: false });
+        await this.extract(manager, id, {
+          trigger: opts.trigger,
+          cascade: false,
+          skipSurveyLock: true,
+        });
       }
     }
   }
@@ -1061,8 +1077,11 @@ export class FarmerExtractionService {
       const rows = await manager.query<{ discrepancy_id: string }[]>(
         `INSERT INTO entity_field_discrepancies
            (entity_type, farmer_id, farm_id, field, system_field, current_value, submitted_value, survey_id, response_id)
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9)
-         ON CONFLICT (entity_type, COALESCE(farmer_id, farm_id), field, survey_id) DO NOTHING
+         SELECT $1::varchar, $2::uuid, $3::uuid, $4::varchar, $5::varchar, $6::jsonb, $7::jsonb, $8::uuid, $9::uuid
+          WHERE NOT EXISTS (
+            SELECT 1 FROM entity_field_discrepancies d
+             WHERE d.entity_type = $1::varchar AND d.survey_id = $8::uuid AND d.field = $4::varchar
+               AND COALESCE(d.farmer_id, d.farm_id) = COALESCE($2::uuid, $3::uuid))
          RETURNING discrepancy_id`,
         [
           item.entityType,
