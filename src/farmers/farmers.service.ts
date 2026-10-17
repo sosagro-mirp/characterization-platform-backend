@@ -613,6 +613,18 @@ export class FarmersService {
         existingFarmer: { id },
       });
 
+      // 1 bis. Alias de identidad provisional y discrepancias del productor y de
+      // sus fincas (spec 95). El schema los borra por CASCADE; se borran aquí de
+      // forma explícita, con el mismo criterio defensivo del resto.
+      await manager.query(
+        'DELETE FROM farmer_client_aliases WHERE farmer_id = $1',
+        [id],
+      );
+      await manager.query(
+        'DELETE FROM entity_field_discrepancies WHERE farmer_id = $1',
+        [id],
+      );
+
       // 2. Encuestas de ambos caminos. Arrastra `responses` por el CASCADE
       // declarado en `response.entity.ts` (FK real en Postgres).
       if (surveyIds.length) {
