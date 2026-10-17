@@ -111,11 +111,12 @@ export class ProcessPreviewResponseDto implements ProcessPreview {
   })
   role?: string;
   @ApiPropertyOptional({
-    description: 'Spec 95 — cultivos que se sumarían a la finca.',
+    description:
+      'Spec 95 — cultivos que se sumarían a la finca; `farmCropId` es null si la finca es nueva o aún no tiene ese cultivo.',
     type: 'array',
     items: { type: 'object' },
   })
-  farmCrops?: { cropId: string; name: string }[];
+  farmCrops?: { farmCropId: string | null; cropId: string; name: string }[];
   @ApiPropertyOptional({
     description:
       'Spec 95 — valores que difieren de los guardados y quedarían como discrepancias.',

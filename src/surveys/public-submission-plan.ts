@@ -147,7 +147,7 @@ export interface ProcessPreview {
   /** Spec 95 — rol del productor en la finca (el del perfil declarado o `producer`). */
   role?: string;
   /** Spec 95 — cultivos que se sumarían a la finca. */
-  farmCrops?: { cropId: string; name: string }[];
+  farmCrops?: { farmCropId: string | null; cropId: string; name: string }[];
   /** Spec 95 — valores que difieren de los guardados y se registrarían como discrepancias. */
   discrepancies?: {
     entity: 'farmer' | 'farm';

@@ -51,7 +51,7 @@ import {
   buildSystemFieldMapWithWarnings,
   SystemFieldValue,
 } from './system-field-map';
-import { anchorSurvey } from 'src/farmer-farms/farm-links';
+import { anchorSurvey, listActiveFarmCrops } from 'src/farmer-farms/farm-links';
 import {
   FARMER_VIEW_RELATIONS,
   toFarmerView,
@@ -1592,10 +1592,22 @@ export class SurveysService {
         );
       }
     }
+    const existingFarmCrops = matched?.farm
+      ? new Map(
+          (await listActiveFarmCrops(manager, matched.farm.farmId)).map((c) => [
+            c.cropId,
+            c.farmCropId,
+          ]),
+        )
+      : new Map<string, string>();
     return {
       ...plan,
       role: roleFromProfiles(respondentProfiles),
-      farmCrops: plan.crops.resolved,
+      farmCrops: plan.crops.resolved.map((c) => ({
+        farmCropId: existingFarmCrops.get(c.cropId) ?? null,
+        cropId: c.cropId,
+        name: c.name,
+      })),
       discrepancies: discrepancies.map((d) => ({
         entity: d.entity,
         field: d.field,
