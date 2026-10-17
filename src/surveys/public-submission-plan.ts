@@ -144,6 +144,18 @@ export interface ProcessPreview {
   crops: PublicSubmissionPlanInput['crops'];
   fieldsToComplete: FieldToComplete[];
   warnings: { code: PreviewWarningCode; message?: string }[];
+  /** Spec 95 — rol del productor en la finca (el del perfil declarado o `producer`). */
+  role?: string;
+  /** Spec 95 — cultivos que se sumarían a la finca. */
+  farmCrops?: { cropId: string; name: string }[];
+  /** Spec 95 — valores que difieren de los guardados y se registrarían como discrepancias. */
+  discrepancies?: {
+    entity: 'farmer' | 'farm';
+    field: string;
+    systemField: string | null;
+    currentValue: unknown;
+    submittedValue: unknown;
+  }[];
 }
 
 /** Nombre o vereda comparables: sin tildes, mayúsculas ni signos, espacios colapsados. */

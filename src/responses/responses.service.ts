@@ -15,6 +15,7 @@ import {
 import { CreateResponseDto } from './dto/create-response.dto';
 import { Response } from './entities/response.entity';
 import { resolveOtherAnswer } from './other-option';
+import { FarmerExtractionService } from '../farmer-extraction/farmer-extraction.service';
 
 @Injectable()
 export class ResponsesService {
@@ -29,6 +30,7 @@ export class ResponsesService {
     private readonly optionsQuestionRepository: Repository<OptionQuestion>,
     @InjectRepository(MediaAttachment)
     private readonly attachmentRepository: Repository<MediaAttachment>,
+    private readonly farmerExtraction: FarmerExtractionService,
   ) {}
 
   async create(createResponseDto: CreateResponseDto): Promise<Response> {
@@ -118,6 +120,17 @@ export class ResponsesService {
         });
 
         if (existingCount > 0) {
+          // Spec 95 — un reintento también extrae si el primer intento no llegó
+          // a hacerlo (`extraction_status` NULL) o falló (`error`).
+          const sent = await manager.getRepository(Survey).findOne({
+            where: { surveyId },
+          });
+          if (
+            sent?.origin === 'field' &&
+            (sent.extractionStatus == null || sent.extractionStatus === 'error')
+          ) {
+            await this.farmerExtraction.runForBatch(manager, surveyId);
+          }
           return manager.getRepository(Response).find({
             where: { survey: { surveyId } },
             relations: { survey: true, question: true, option: true },
@@ -174,6 +187,12 @@ export class ResponsesService {
             manager,
           );
           responses.push(response);
+        }
+
+        // Spec 95 (D-H3-C) — el backend extrae al recibir la encuesta: productor,
+        // finca y cultivos, bajo un SAVEPOINT. Nunca hace fallar el batch.
+        if (survey.origin === 'field') {
+          await this.farmerExtraction.runForBatch(manager, surveyId);
         }
 
         return responses;

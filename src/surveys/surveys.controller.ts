@@ -515,6 +515,58 @@ export class SurveysController {
     return this.surveysService.findSurveyResponses(id, user);
   }
 
+  @Get(':id/extraction')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Estado de la extracción de una encuesta',
+    description:
+      'Spec 95: resultado de la extracción unificada del productor, la finca y los cultivos de la encuesta. ' +
+      '`status`: done | collision | no_identity | pending_alias | not_applicable | awaiting_review | error | backfilled | null. ' +
+      'Con una colisión de documento pendiente trae su detalle en `collision`. ' +
+      'Un POLLSTER solo ve sus propias encuestas (404 si es ajena, como en spec 92).',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta' })
+  @ApiResponse({
+    status: 200,
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', nullable: true },
+        farmerId: { type: 'string', format: 'uuid', nullable: true },
+        farmerName: { type: 'string', nullable: true },
+        existed: { type: 'boolean', nullable: true },
+        clientFarmerId: { type: 'string', nullable: true },
+        farm: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            farmId: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+          },
+        },
+        farmCropId: { type: 'string', format: 'uuid', nullable: true },
+        crops: { type: 'array', items: { type: 'object' } },
+        collision: {
+          type: 'object',
+          description: 'Solo con una colisión de documento pendiente.',
+        },
+        openDiscrepancies: { type: 'integer' },
+        extractedAt: { type: 'string', format: 'date-time', nullable: true },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta no encontrada, o ajena si el requester es POLLSTER.',
+  })
+  getExtraction(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.getExtraction(id, user);
+  }
+
   @Patch(':id/sync')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)

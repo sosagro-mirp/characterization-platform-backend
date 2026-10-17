@@ -16,6 +16,7 @@ import { ConsentRecord } from 'src/consents/entities/consent-record.entity';
 import { ConsentDocument } from 'src/consents/entities/consent-document.entity';
 import { ConsentDocumentsService } from 'src/consents/consent-documents.service';
 import { ConsentRecordsService } from 'src/consents/consent-records.service';
+import { FarmerExtractionService } from 'src/farmer-extraction/farmer-extraction.service';
 import { SurveysService } from 'src/surveys/surveys.service';
 import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 
@@ -152,5 +153,6 @@ export function createSurveysService(ds: DataSource): SurveysService {
     ds.getRepository(FarmerDocumentCollision),
     consentRecords,
     unavailableMediaCleanup(),
+    new FarmerExtractionService(ds, consentRecords),
   );
 }

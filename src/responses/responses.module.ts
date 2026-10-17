@@ -4,6 +4,7 @@ import { OptionQuestion } from 'src/options-question/entities/option-question.en
 import { Question } from 'src/questions/entities/question.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
 import { MediaAttachment } from 'src/media-attachments/entities/media-attachment.entity';
+import { FarmerExtractionModule } from '../farmer-extraction/farmer-extraction.module';
 import { ResponsesController } from './responses.controller';
 import { Response } from './entities/response.entity';
 import { ResponsesService } from './responses.service';
@@ -17,6 +18,7 @@ import { ResponsesService } from './responses.service';
       OptionQuestion,
       MediaAttachment,
     ]),
+    FarmerExtractionModule,
   ],
   controllers: [ResponsesController],
   providers: [ResponsesService],
