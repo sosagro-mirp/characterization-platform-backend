@@ -24,8 +24,7 @@ import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
-import { DeepPartial, EntityManager, In, IsNull, Repository } from 'typeorm';
-import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { ROLES } from '../auth/constants';
 import { resolveCropsFromResponses } from './crop-extraction';
@@ -40,36 +39,31 @@ import { SkipStepDto } from './dto/skip-step.dto';
 import { Survey } from './entities/survey.entity';
 import {
   buildPublicSubmissionPlan,
-  completeFields,
   ExistingFarmCandidate,
   FARM_COMPLETABLE_FIELDS,
   FARMER_COMPLETABLE_FIELDS,
-  FieldToComplete,
   normalizeFarmKey,
   PendingSubmissionPeer,
   PlanFarmerRecord,
   ProcessPreview,
 } from './public-submission-plan';
 import {
-  buildSystemFieldMap,
   buildSystemFieldMapWithWarnings,
   SystemFieldValue,
 } from './system-field-map';
-import { convertAreaToHectares } from './unit-conversion';
-import {
-  addFarmCrops,
-  anchorSurvey,
-  resolveFarmerFarmId,
-  linkFarmerToFarm,
-  listActiveFarmCrops,
-} from 'src/farmer-farms/farm-links';
-import { pickFarmCrop } from 'src/farmer-farms/pick-farm-crop';
+import { anchorSurvey, listActiveFarmCrops } from 'src/farmer-farms/farm-links';
 import {
   FARMER_VIEW_RELATIONS,
   toFarmerView,
 } from 'src/farmer-farms/farm-views';
 import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 import { ConsentRecordsService } from '../consents/consent-records.service';
+import { DocumentCollisionError } from '../farmer-extraction/document-collision';
+import {
+  planFieldChanges,
+  roleFromProfiles,
+} from '../farmer-extraction/extraction-plan';
+import { FarmerExtractionService } from '../farmer-extraction/farmer-extraction.service';
 
 export interface SurveyFilters {
   actorTypeId?: string;
@@ -96,20 +90,6 @@ export interface PublicSubmissionRow {
   // Spec 93 — identidad declarada en el envío, para decidir desde la lista.
   farmerName: string | null;
   farmerDocumentId: string | null;
-}
-
-// Spec 93 — colisión de documento detectada dentro de la transacción. Se
-// separa detectar de registrar: la transacción se revierte y la fila de
-// colisión pendiente se escribe aparte (`toCollisionConflict`) antes del 409.
-class DocumentCollisionError extends Error {
-  constructor(
-    readonly surveyId: string,
-    readonly documentId: string,
-    readonly submittedName: string,
-    readonly existingFarmer: Farmer,
-  ) {
-    super('document collision');
-  }
 }
 
 interface FarmerIdentity {
@@ -151,6 +131,7 @@ export class SurveysService {
     private readonly documentCollisionsRepository: Repository<FarmerDocumentCollision>,
     private readonly consentRecordsService: ConsentRecordsService,
     private readonly mediaCleanup: MediaCleanupService,
+    private readonly extraction: FarmerExtractionService,
   ) {}
 
   async create(
@@ -251,11 +232,37 @@ export class SurveysService {
     if (createSurveyDto.campaignSessionId) {
       campaignSession = await this.campaignSessionsRepository.findOne({
         where: { sessionId: createSurveyDto.campaignSessionId },
+        relations: ['farmer'],
       });
       if (!campaignSession) {
         throw new NotFoundException('CampaignSession not found');
       }
     }
+
+    // Spec 95 — el productor se hereda del alias provisional (si ya se resolvió)
+    // o de la sesión de campaña, cuando el cliente no lo indica.
+    if (!farmer && createSurveyDto.clientFarmerId) {
+      const [alias] = await this.surveysRepository.manager.query<
+        { farmer_id: string }[]
+      >(
+        'SELECT farmer_id FROM farmer_client_aliases WHERE client_farmer_id = $1',
+        [createSurveyDto.clientFarmerId],
+      );
+      if (alias) {
+        farmer = await this.farmersRepository.findOne({
+          where: { id: alias.farmer_id },
+        });
+      }
+    }
+    if (!farmer && campaignSession?.farmer) {
+      farmer = campaignSession.farmer;
+    }
+
+    const anchors = await this.resolveCreateAnchors(
+      createSurveyDto,
+      farmer,
+      crop,
+    );
 
     const survey = this.surveysRepository.create({
       farmer: farmer ?? undefined,
@@ -270,10 +277,21 @@ export class SurveysService {
       campaignSession: campaignSession ?? undefined,
       stepOrder: createSurveyDto.stepOrder,
       clientSurveyId: createSurveyDto.clientSurveyId,
+      clientFarmerId: createSurveyDto.clientFarmerId,
     });
 
     try {
-      return await this.surveysRepository.save(survey);
+      const saved = await this.surveysRepository.save(survey);
+      if (anchors.farmId) {
+        // `farm_id` / `farm_crop_id` se escriben solo con `anchorSurvey` (spec 94).
+        await anchorSurvey(this.surveysRepository.manager, saved.surveyId, {
+          farmId: anchors.farmId,
+          ...(anchors.farmCropId ? { farmCropId: anchors.farmCropId } : {}),
+        });
+        saved.farmId = anchors.farmId;
+        saved.farmCropId = anchors.farmCropId;
+      }
+      return saved;
     } catch (err) {
       // Spec 70, Fase 9 — carrera real: dos peticiones concurrentes con el
       // mismo clientSurveyId pueden pasar juntas la comprobación previa.
@@ -297,6 +315,61 @@ export class SurveysService {
 
       throw err;
     }
+  }
+
+  /**
+   * Spec 95 — `farmId` / `farmCropId` de `POST /surveys`, validados contra el
+   * productor y la finca. `cropId` se resuelve como cultivo activo de la finca.
+   */
+  private async resolveCreateAnchors(
+    dto: CreateSurveyDto,
+    farmer: Farmer | null,
+    crop: TypeOfCrop | null,
+  ): Promise<{ farmId: string | null; farmCropId: string | null }> {
+    const manager = this.surveysRepository.manager;
+    let farmId = dto.farmId ?? null;
+    let farmCropId = dto.farmCropId ?? null;
+
+    if (farmCropId) {
+      const [farmCrop] = await manager.query<{ farm_id: string }[]>(
+        'SELECT farm_id FROM farms_crops WHERE farm_crop_id = $1',
+        [farmCropId],
+      );
+      if (!farmCrop) throw new NotFoundException('Farm crop not found');
+      if (farmId && farmCrop.farm_id !== farmId) {
+        throw new BadRequestException('farmCropId does not belong to farmId');
+      }
+      farmId = farmCrop.farm_id;
+    }
+
+    if (farmId) {
+      const [farm] = await manager.query<{ farm_id: string }[]>(
+        'SELECT farm_id FROM farms WHERE farm_id = $1',
+        [farmId],
+      );
+      if (!farm) throw new NotFoundException('Farm not found');
+      if (farmer) {
+        const [linked] = await manager.query<{ ok: number }[]>(
+          `SELECT 1 AS ok FROM farmer_farms WHERE farmer_id = $1 AND farm_id = $2
+           UNION ALL SELECT 1 FROM farmers WHERE id = $1 AND farm_id = $2 LIMIT 1`,
+          [farmer.id, farmId],
+        );
+        if (!linked) {
+          throw new BadRequestException(
+            'The farm does not belong to the farmer',
+          );
+        }
+      }
+      if (!farmCropId && crop) {
+        const [match] = await manager.query<{ farm_crop_id: string }[]>(
+          `SELECT farm_crop_id FROM farms_crops
+            WHERE farm_id = $1 AND crop_id = $2 AND archived_at IS NULL`,
+          [farmId, crop.cropId],
+        );
+        farmCropId = match?.farm_crop_id ?? null;
+      }
+    }
+    return { farmId, farmCropId };
   }
 
   async findAll(filters: SurveyFilters): Promise<Survey[]> {
@@ -501,7 +574,16 @@ export class SurveysService {
     surveyId: string,
     dto: ExtractFarmerDto = {},
     requester?: AuthenticatedUser,
-  ): Promise<{ farmer: Farmer; existed: boolean }> {
+  ): Promise<{
+    farmer: Farmer;
+    existed: boolean;
+    crops: TypeOfCrop[];
+    extraction: {
+      status: string | null;
+      farmId: string | null;
+      farmCropId: string | null;
+    };
+  }> {
     try {
       // Spec 68, Fase 8 — "Corregir el documento". Para cuando el encuestador
       // ve el aviso, la encuesta ya está sincronizada y `createMany()` ignora
@@ -513,7 +595,7 @@ export class SurveysService {
       const { correctedDocumentId } = dto;
       if (correctedDocumentId) {
         await this.surveysRepository.manager.transaction(async (manager) => {
-          await this.lockSurvey(manager, surveyId);
+          await this.extraction.lockSurvey(manager, surveyId);
           await this.applyCorrectedDocumentId(
             manager,
             surveyId,
@@ -522,15 +604,34 @@ export class SurveysService {
           );
         });
       }
+      // Spec 95 — alias delgado sobre la extracción unificada. El batch ya pudo
+      // haber extraído: entonces esto es idempotente y devuelve al mismo productor.
       const result = await this.surveysRepository.manager.transaction(
         async (manager) => {
-          await this.lockSurvey(manager, surveyId);
-          return await this.extractFarmerLocked(surveyId, dto, manager);
+          const extracted = await this.extraction.extract(manager, surveyId, {
+            trigger: 'alias',
+            resolution: dto.resolution,
+          });
+          if (!extracted.farmer) {
+            throw new UnprocessableEntityException(
+              'farmer.name is required to extract farmer',
+            );
+          }
+          return extracted;
         },
       );
       // Spec 94 (C7) — el productor sale con `farm` (la principal, con
       // `crops`) y `farms[]`, igual que `GET /farmers/:id`.
-      return { ...result, farmer: await this.loadFarmerView(result.farmer) };
+      return {
+        farmer: await this.loadFarmerView(result.farmer!),
+        existed: result.existed,
+        crops: result.crops,
+        extraction: {
+          status: result.status,
+          farmId: result.farm?.farmId ?? null,
+          farmCropId: result.farmCropId,
+        },
+      };
     } catch (err) {
       throw await this.toCollisionConflict(err);
     }
@@ -545,21 +646,6 @@ export class SurveysService {
     return full ? toFarmerView(full) : farmer;
   }
 
-  // Lock por encuesta: dos llamadas concurrentes sobre la misma encuesta se
-  // serializan; sobre encuestas distintas no se estorban.
-  // Cota a la espera del lock: sin ella una petición colgada retiene una
-  // conexión del pool indefinidamente. Al expirar, Postgres lanza 55P03 y la
-  // petición falla rápido en vez de quedarse pendiente.
-  private async lockSurvey(
-    manager: EntityManager,
-    surveyId: string,
-  ): Promise<void> {
-    await manager.query("SET LOCAL lock_timeout = '10s'");
-    await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
-      `extract-farmer:${surveyId}`,
-    ]);
-  }
-
   // Spec 68 — una colisión sin resolución nunca fusiona en silencio: se
   // registra como pendiente y se rechaza con 409 sin haber mutado nada más.
   // La transacción principal ya se revirtió; la fila se escribe en una
@@ -569,14 +655,8 @@ export class SurveysService {
     if (!(err instanceof DocumentCollisionError)) return err;
     await this.documentCollisionsRepository.manager.transaction(
       async (manager) => {
-        await this.lockSurvey(manager, err.surveyId);
-        await this.upsertDocumentCollision(manager, {
-          documentId: err.documentId,
-          submittedName: err.submittedName,
-          existingFarmer: err.existingFarmer,
-          resolution: null,
-          survey: { surveyId: err.surveyId } as Survey,
-        });
+        await this.extraction.lockSurvey(manager, err.surveyId);
+        await this.extraction.recordPendingCollision(manager, err);
       },
     );
     return new ConflictException({
@@ -588,467 +668,6 @@ export class SurveysService {
         name: err.existingFarmer.name,
       },
     });
-  }
-
-  private async extractFarmerLocked(
-    surveyId: string,
-    dto: ExtractFarmerDto,
-    manager: EntityManager,
-  ): Promise<{ farmer: Farmer; existed: boolean }> {
-    const survey = await manager.findOne(Survey, {
-      where: { surveyId },
-      relations: [
-        'responses',
-        'responses.question',
-        'responses.option',
-        'campaignSession',
-        'farmer',
-      ],
-    });
-
-    if (!survey) throw new NotFoundException('Survey not found');
-
-    // Ya se extrajo de esta encuesta: devolver el mismo productor en vez de
-    // crear otro. Es lo que convierte un reintento en una operación inocua.
-    //
-    // Antes del lock, una segunda extracción volvía a ejecutar el enlace de
-    // la sesión y el backfill de constancias huérfanas — era, de hecho, la
-    // única vía para reparar una constancia que hubiera quedado sin
-    // productor. El retorno temprano la eliminaría, así que ambos se
-    // reejecutan aquí: son idempotentes (un UPDATE al mismo valor) y baratos.
-    if (survey.farmer) {
-      const farmer = survey.farmer;
-      // Spec 94 — un reintento también ancla la encuesta a la finca principal
-      // si aún no lo estaba (idempotente; no pisa un anclaje existente).
-      await this.anchorToPrimaryFarm(manager, surveyId, farmer.id, false);
-      if (survey.campaignSession) {
-        await manager.update(
-          CampaignSession,
-          { sessionId: survey.campaignSession.sessionId },
-          { farmer },
-        );
-        await manager.query('SAVEPOINT consent_backfill_retry');
-        try {
-          await this.consentRecordsService.linkOrphansToFarmer(
-            survey.campaignSession.sessionId,
-            farmer.id,
-            manager,
-          );
-          await manager.query('RELEASE SAVEPOINT consent_backfill_retry');
-        } catch (err) {
-          await manager.query('ROLLBACK TO SAVEPOINT consent_backfill_retry');
-          this.logger.error(
-            `[extractFarmer] retry backfill failed for session=${survey.campaignSession.sessionId}: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-            err instanceof Error ? err.stack : undefined,
-          );
-        }
-      }
-      return { farmer, existed: true };
-    }
-
-    const fieldMap = buildSystemFieldMap(survey.responses ?? []);
-
-    // Resolve farm.town from the selected option's metadataId (townId)
-    let resolvedTown: Town | null = null;
-    const townResponse = (survey.responses ?? []).find(
-      (r) => r.question?.systemField === 'farm.town',
-    );
-    if (townResponse?.option?.metadataId) {
-      resolvedTown = await manager.findOne(Town, {
-        where: { townId: townResponse.option.metadataId },
-      });
-      if (!resolvedTown) {
-        console.warn(
-          `[extractFarmer] Town not found for metadataId=${townResponse.option.metadataId} — farm.town left null`,
-        );
-      }
-    }
-
-    const identity = this.pickFarmerIdentity(fieldMap);
-    if (!identity.respondentIsProducer) {
-      await this.persistRespondentData(manager, surveyId, fieldMap);
-    }
-    const farmerName = identity.name;
-    const farmerPhone = identity.phone;
-    const farmerEmail = identity.email;
-    const farmerDocumentId = identity.documentId;
-
-    if (!farmerName) {
-      throw new UnprocessableEntityException(
-        'farmer.name is required to extract farmer',
-      );
-    }
-
-    // Dedup by two levels (documentId, then name + phone). Spec 68 — a shared
-    // documentId is no longer treated as absolute identity: an existing farmer
-    // with that document but a name that doesn't reasonably match is a
-    // collision, not automatically the same person. See
-    // `resolveExistingFarmer`, which throws when it is unresolved.
-    const resolved = await this.resolveExistingFarmer(manager, {
-      surveyId,
-      documentId: farmerDocumentId,
-      name: farmerName,
-      phone: farmerPhone,
-      resolution: dto.resolution,
-    });
-    let farmer: Farmer | null = resolved.farmer;
-    const existed = resolved.existed;
-    // Farmer this documentId already belonged to, set only when a
-    // collision was detected — used below to record/resolve it.
-    const collisionWithFarmer: Farmer | null = resolved.collisionWith;
-
-    if (!farmer) {
-      // Create Farm if at least a farm name is available
-      let farm: Farm | null = null;
-      const farmName = fieldMap['farm.name'] as string | undefined;
-      if (farmName) {
-        farm = await manager.save<Farm>(
-          manager.create(Farm, {
-            name: farmName,
-            location: null,
-            vereda: (fieldMap['farm.vereda'] as string | undefined) ?? null,
-            // Spec 84 — campo del instrumento de Registro (S_REG).
-            corregimiento:
-              (fieldMap['farm.corregimiento'] as string | undefined) ?? null,
-            latitude: (fieldMap['farm.latitude'] as number | undefined) ?? null,
-            longitude:
-              (fieldMap['farm.longitude'] as number | undefined) ?? null,
-            altitude: (fieldMap['farm.altitude'] as number | undefined) ?? null,
-            area: (fieldMap['farm.area'] as number | undefined) ?? null,
-            waterAccess:
-              (fieldMap['farm.waterAccess'] as boolean | undefined) ?? null,
-            internetAccess:
-              (fieldMap['farm.internetAccess'] as boolean | undefined) ?? null,
-            hasElectricityAccess:
-              (fieldMap['farm.hasElectricityAccess'] as boolean | undefined) ??
-              null,
-            mainAccessType:
-              (fieldMap['farm.mainAccessType'] as string | undefined) ?? null,
-            electricitySourceType:
-              (fieldMap['farm.electricitySourceType'] as string | undefined) ??
-              null,
-            waterSourceType:
-              (fieldMap['farm.waterSourceType'] as string | undefined) ?? null,
-            plotCount:
-              (fieldMap['farm.plotCount'] as number | undefined) ?? null,
-            town: resolvedTown ?? undefined,
-          }),
-        );
-      }
-
-      farmer = await manager.save<Farmer>(
-        manager.create(Farmer, {
-          name: farmerName,
-          documentId: farmerDocumentId ?? null,
-          phone: farmerPhone ?? null,
-          email: farmerEmail ?? null,
-          gender: (fieldMap['farmer.gender'] as string | undefined) ?? null,
-          age: (fieldMap['farmer.age'] as number | undefined) ?? null,
-          experienceYears:
-            (fieldMap['farmer.experienceYears'] as number | undefined) ?? null,
-          isMainIncome:
-            (fieldMap['farmer.isMainIncome'] as boolean | undefined) ?? null,
-          educationLevel:
-            (fieldMap['farmer.educationLevel'] as string | undefined) ?? null,
-          farm: farm ?? undefined,
-        }),
-      );
-      // Spec 94 — la finca nueva es el vínculo principal del productor
-      // (`farmer_farms`; `farmers.farm_id` queda como espejo).
-      if (farm) {
-        await linkFarmerToFarm(manager, {
-          farmerId: farmer.id,
-          farmId: farm.farmId,
-          role: 'producer',
-          isPrimary: true,
-          source: 'extraction',
-        });
-      }
-    }
-
-    // Spec 84 — deja constancia de qué productor salió de esta encuesta. Es
-    // la clave de idempotencia que lee la guarda del principio: sin esto, un
-    // segundo `extract-farmer` sobre la misma encuesta vuelve a crear.
-    await manager.update(Survey, surveyId, { farmer });
-    // Spec 94 — ancla la encuesta a la finca principal (nueva o ya existente).
-    await this.anchorToPrimaryFarm(manager, surveyId, farmer.id, true);
-
-    // Link farmer to the CampaignSession if the survey belongs to one
-    if (survey.campaignSession) {
-      await manager.update(
-        CampaignSession,
-        { sessionId: survey.campaignSession.sessionId },
-        { farmer },
-      );
-
-      // Spec 78, criterio 6 — el consentimiento se registra antes de S1,
-      // cuando el Farmer todavía no existe (ConsentRecord.farmer_id queda en
-      // null, anclado solo por session_id). Aquí es donde el Farmer recién
-      // resuelto (nuevo o ya existente) queda disponible por primera vez, así
-      // que es el punto correcto para el backfill. Best-effort: un fallo aquí
-      // no debe tumbar la extracción del agricultor, que ya se completó.
-      // Spec 84 — `SAVEPOINT` para que "mejor esfuerzo" siga significando lo
-      // mismo dentro de una transacción. Sin él, un fallo aquí aborta la
-      // transacción entera (Postgres 25P02), el `catch` de abajo se lo traga
-      // y el COMMIT final se degrada a ROLLBACK **sin lanzar**: el método
-      // devolvería 201 con un productor que nunca se guardó. El savepoint
-      // acota el daño al backfill y deja la extracción intacta, que es la
-      // decisión B4 del spec 78 (visible, no fatal).
-      await manager.query('SAVEPOINT consent_backfill');
-      try {
-        await this.consentRecordsService.linkOrphansToFarmer(
-          survey.campaignSession.sessionId,
-          farmer.id,
-          // Spec 84 — misma transacción: el agricultor todavía no está
-          // confirmado y otra conexión no lo vería (FK), dejando la
-          // constancia huérfana.
-          manager,
-        );
-        await manager.query('RELEASE SAVEPOINT consent_backfill');
-      } catch (err) {
-        await manager.query('ROLLBACK TO SAVEPOINT consent_backfill');
-        // B4 (auditoría spec 78) — `error`, no `warn`: un fallo aquí deja una
-        // constancia de consentimiento huérfana (criterio 6 incumplido) y
-        // debe quedar visible en los logs estructurados de producción, no
-        // perdido entre líneas de `console`.
-        this.logger.error(
-          `[extractFarmer] failed to link orphan consent records for session=${survey.campaignSession.sessionId}: ${
-            err instanceof Error ? err.message : String(err)
-          }`,
-          err instanceof Error ? err.stack : undefined,
-        );
-      }
-    }
-
-    // A resolution was declared for a previously-detected collision — record
-    // it as resolved (creates the row if this is the first and only call,
-    // e.g. a resolution submitted without a prior 409 round-trip).
-    if (collisionWithFarmer && dto.resolution) {
-      await this.upsertDocumentCollision(manager, {
-        documentId: farmerDocumentId!,
-        submittedName: farmerName,
-        existingFarmer: collisionWithFarmer,
-        resolution: dto.resolution,
-        survey,
-      });
-    }
-
-    return { farmer, existed };
-  }
-
-  /**
-   * Spec 94 — ancla la encuesta a la finca principal del productor. Con
-   * `overwrite=false` solo si la encuesta aún no tiene finca. Sin finca
-   * principal no hace nada.
-   */
-  private async anchorToPrimaryFarm(
-    manager: EntityManager,
-    surveyId: string,
-    farmerId: string,
-    overwrite: boolean,
-  ): Promise<void> {
-    const farmId = await resolveFarmerFarmId(manager, farmerId);
-    if (!farmId) return;
-    if (!overwrite) {
-      const [row] = await manager.query<{ farm_id: string | null }[]>(
-        'SELECT farm_id FROM surveys WHERE survey_id = $1',
-        [surveyId],
-      );
-      if (row?.farm_id) return;
-    }
-    await anchorSurvey(manager, surveyId, { farmerId, farmId });
-  }
-
-  // Quién es el respondiente y con qué datos se identifica. Q9 = false (otros
-  // instrumentos): el productor es otra persona y se usan sus campos; si faltan
-  // nombre o documento se toman provisionalmente los del respondiente.
-  private pickFarmerIdentity(
-    fieldMap: Record<string, SystemFieldValue>,
-  ): FarmerIdentity {
-    const str = (key: string): string | undefined => {
-      const value = fieldMap[key];
-      return value === undefined ? undefined : String(value);
-    };
-    // undefined means Q9 was not in the instrument (other instruments) → treat as true.
-    const respondentIsProducer = fieldMap['farmer.isRespondent'] !== false;
-    if (respondentIsProducer) {
-      return {
-        respondentIsProducer,
-        name: str('farmer.name'),
-        phone: str('farmer.phone'),
-        email: str('farmer.email'),
-        documentId: str('farmer.documentId'),
-      };
-    }
-    return {
-      respondentIsProducer,
-      name: str('farmer.producerName') || str('farmer.name'),
-      phone: str('farmer.producerPhone'),
-      email: str('farmer.producerEmail'),
-      documentId: str('farmer.producerDocumentId') || str('farmer.documentId'),
-    };
-  }
-
-  // Q9 = false: persist respondent data on the Survey.
-  private async persistRespondentData(
-    manager: EntityManager,
-    surveyId: string,
-    fieldMap: Record<string, SystemFieldValue>,
-  ): Promise<void> {
-    await manager.update(Survey, surveyId, {
-      respondentName:
-        (fieldMap['farmer.name'] as string | undefined) || undefined,
-      respondentPhone:
-        (fieldMap['farmer.phone'] as string | undefined) || undefined,
-      respondentDocumentId:
-        (fieldMap['farmer.documentId'] as string | undefined) || undefined,
-      respondentEmail:
-        (fieldMap['farmer.email'] as string | undefined) || undefined,
-    });
-  }
-
-  // Spec 93 (D-H2-8) — el documento se compara normalizado (sin puntos,
-  // espacios ni guiones; lo guardado no se reescribe) y con orden determinista:
-  // el más antiguo primero, con el id como desempate.
-  private async findFarmersByDocument(
-    manager: EntityManager,
-    documentKey: string,
-    withFarm = false,
-  ): Promise<Farmer[]> {
-    const qb = manager
-      .createQueryBuilder(Farmer, 'f')
-      .where(
-        "regexp_replace(f.document_id, '[.\\s-]', '', 'g') = :documentKey",
-        {
-          documentKey,
-        },
-      )
-      .orderBy('f.createdAt', 'ASC')
-      .addOrderBy('f.id', 'ASC');
-    if (withFarm) {
-      qb.leftJoinAndSelect('f.farm', 'farm').leftJoinAndSelect(
-        'farm.town',
-        'farmTown',
-      );
-    }
-    return qb.getMany();
-  }
-
-  // Dedup por documento y luego por nombre + teléfono. Con varios productores
-  // del mismo documento prefiere al que coincide en nombre. Lanza
-  // `DocumentCollisionError` ante una colisión sin resolución; con
-  // `separate_person` fuerza la creación de un productor nuevo (también se
-  // omite el nivel 2, que reutilizaría en silencio a otro por nombre + teléfono
-  // y contradiría la decisión explícita, spec 68 criterio 5).
-  private async resolveExistingFarmer(
-    manager: EntityManager,
-    params: {
-      surveyId: string;
-      documentId?: string;
-      name: string;
-      phone?: string;
-      resolution?: 'same_person' | 'separate_person';
-    },
-  ): Promise<{
-    farmer: Farmer | null;
-    existed: boolean;
-    collisionWith: Farmer | null;
-  }> {
-    let farmer: Farmer | null = null;
-    let collisionWith: Farmer | null = null;
-
-    const documentKey = normalizeDocumentId(params.documentId);
-    if (documentKey) {
-      const candidates = await this.findFarmersByDocument(manager, documentKey);
-      const selection = selectFarmerByDocument(candidates, params.name);
-      if (selection.match) {
-        farmer = selection.match;
-      } else if (selection.collisionWith) {
-        collisionWith = selection.collisionWith;
-        if (params.resolution === 'same_person') {
-          farmer = collisionWith;
-        } else if (params.resolution !== 'separate_person') {
-          throw new DocumentCollisionError(
-            params.surveyId,
-            params.documentId!,
-            params.name,
-            collisionWith,
-          );
-        }
-      }
-    }
-
-    if (!farmer && params.phone && params.resolution !== 'separate_person') {
-      farmer = await manager.findOne(Farmer, {
-        where: { name: params.name, phone: params.phone },
-        order: { createdAt: 'ASC', id: 'ASC' },
-      });
-    }
-
-    return { farmer, existed: farmer !== null, collisionWith };
-  }
-
-  // Spec 68 — one pending (unresolved) row per (documentId, submittedName,
-  // existingFarmer) combination: a retry without a resolution (e.g. the
-  // mobile sync queue retrying a deferred collision) updates the same row
-  // instead of piling up duplicates. Resolving it later updates that same
-  // row rather than inserting a second one.
-  private async upsertDocumentCollision(
-    manager: EntityManager,
-    params: {
-      documentId: string;
-      submittedName: string;
-      existingFarmer: Farmer;
-      resolution: 'same_person' | 'separate_person' | null;
-      survey: Survey;
-    },
-  ): Promise<void> {
-    const repository = manager.getRepository(FarmerDocumentCollision);
-    const existingRow = await repository.findOne({
-      where: {
-        documentId: params.documentId,
-        submittedName: params.submittedName,
-        existingFarmer: { id: params.existingFarmer.id },
-      },
-    });
-
-    if (existingRow) {
-      // Ya resuelta — se deja como está. Salvo `corrected`: esa fila cerró un
-      // error de captura, no una decisión sobre dos personas, así que un
-      // nuevo choque idéntico debe volver a quedar pendiente.
-      if (existingRow.resolution && existingRow.resolution !== 'corrected') {
-        return;
-      }
-      // `.update()`, not load-then-`.save()`: `existingRow` above doesn't
-      // fetch the `survey`/`existingFarmer` relations, and saving that
-      // partial entity back could null out `survey_id` on a repeated
-      // pending hit (e.g. a retried 409 without a resolution). `.update()`
-      // only touches the columns given here.
-      //
-      // Spec 93 — la fila pasa a apuntar a la encuesta que la vuelve a
-      // disparar: el mismo documento + nombre llega en envíos distintos y
-      // quien la resuelve la ve desde el envío que está revisando.
-      await repository.update(existingRow.collisionId, {
-        resolution: params.resolution,
-        resolvedAt: params.resolution ? new Date() : null,
-        survey: params.survey,
-      });
-      return;
-    }
-
-    await repository.save(
-      repository.create({
-        documentId: params.documentId,
-        submittedName: params.submittedName,
-        existingFarmer: params.existingFarmer,
-        existingFarmerName: params.existingFarmer.name,
-        resolution: params.resolution,
-        resolvedAt: params.resolution ? new Date() : null,
-        survey: params.survey,
-      }),
-    );
   }
 
   async checkDuplicate(
@@ -1395,6 +1014,11 @@ export class SurveysService {
     return { items, total, page, limit };
   }
 
+  /** Spec 95 — `GET /surveys/:id/extraction`. */
+  getExtraction(surveyId: string, requester: AuthenticatedUser) {
+    return this.extraction.getSurveyExtraction(surveyId, requester);
+  }
+
   async findSurveyResponses(surveyId: string, requester: AuthenticatedUser) {
     const survey = await this.surveysRepository.findOne({
       where: { surveyId },
@@ -1494,221 +1118,34 @@ export class SurveysService {
   }
 
   /**
-   * Spec 94 — mismo contrato de siempre (`{ crops }`, misma extracción), pero
-   * ADITIVO y anclando la encuesta:
-   *  - los cultivos se SUMAN a la finca (`ON CONFLICT … archived_at = NULL`);
-   *    ya no se reemplazan ni se borran los que no vienen en esta encuesta;
-   *  - la encuesta queda anclada a su finca y a su cultivo de finca
-   *    (`anchorSurvey`, que deriva `crop_id`);
-   *  - todo en UNA transacción bajo el lock `extract-farmer:<survey>`, el mismo
-   *    de `extract-farmer`, para que dos llamadas concurrentes no dupliquen la
-   *    finca. `campaign_sessions_crops` se sigue escribiendo como hoy (lo leen
-   *    las condiciones de paso hasta H8).
+   * Spec 95 — alias de `extract-crops`: devuelve los cultivos que resuelve la
+   * encuesta (nunca un `[]` sintético) y se asegura de que la extracción
+   * unificada haya corrido. La suma de cultivos a la finca, el ancla y la
+   * escritura de `campaign_sessions_crops` viven en `FarmerExtractionService`.
    */
   async extractCrops(surveyId: string): Promise<{ crops: TypeOfCrop[] }> {
     return this.surveysRepository.manager.transaction(async (manager) => {
-      await this.lockSurvey(manager, surveyId);
-      return this.extractCropsLocked(manager, surveyId);
-    });
-  }
-
-  private async extractCropsLocked(
-    manager: EntityManager,
-    surveyId: string,
-  ): Promise<{ crops: TypeOfCrop[] }> {
-    const survey = await manager.findOne(Survey, {
-      where: { surveyId },
-      relations: [
-        'responses',
-        'responses.question',
-        'responses.option',
-        'campaignSession',
-        'farmer',
-      ],
-    });
-
-    if (!survey) throw new NotFoundException('Survey not found');
-
-    // Collect farm.* fields to create/update Farm if the instrument includes
-    // them. Los cultivos (`crop.*` y `farm.mainCrop`, este último del
-    // instrumento de Registro S_REG, spec 84) los resuelve
-    // `resolveCropsFromResponses` (spec 93), compartido con el canal público.
-    const farmFieldMap: Record<string, string | number | boolean> = {};
-    for (const response of survey.responses ?? []) {
-      const sf = response.question?.systemField;
-      if (!sf || sf.startsWith('crop.') || sf === 'farm.mainCrop') continue;
-      if (sf.startsWith('farm.')) {
-        const value =
-          response.textValue ?? response.numericValue ?? response.booleanValue;
-        if (value === undefined || value === null) continue;
-        if (
-          sf === 'farm.area' &&
-          typeof response.numericValue === 'number' &&
-          response.option?.text
-        ) {
-          // Spec 93 — el área se guarda en hectáreas; unidad desconocida → sin área.
-          const { hectares } = convertAreaToHectares(
-            response.numericValue,
-            response.option.text,
-          );
-          if (hectares !== null) farmFieldMap[sf] = hectares;
-          continue;
-        }
-        farmFieldMap[sf] = value;
+      try {
+        const result = await this.extraction.extract(manager, surveyId, {
+          trigger: 'alias',
+        });
+        return { crops: result.crops };
+      } catch (err) {
+        // Con una colisión sin resolver este alias no decide nada sobre el
+        // productor: solo informa los cultivos de la encuesta.
+        if (!(err instanceof DocumentCollisionError)) throw err;
+        const survey = await manager.findOne(Survey, {
+          where: { surveyId },
+          relations: ['responses', 'responses.question', 'responses.option'],
+        });
+        if (!survey) throw new NotFoundException('Survey not found');
+        const { crops } = resolveCropsFromResponses(
+          survey.responses ?? [],
+          await manager.find(TypeOfCrop),
+        );
+        return { crops };
       }
-    }
-
-    const { crops } = resolveCropsFromResponses(
-      survey.responses ?? [],
-      await manager.find(TypeOfCrop),
-    );
-    const resolvedCropIds = crops.map((c) => c.cropId);
-
-    // Productor y finca a los que se ancla la encuesta; los cultivos "previos"
-    // de la sesión (antes de reemplazarlos) son el segundo criterio de elección.
-    let farmerId: string | null = survey.farmer?.id ?? null;
-    let farmId: string | null = null;
-    let previousSessionCropIds: string[] = [];
-
-    // Assign crops to CampaignSession via direct relation update to avoid cascading nulls
-    if (survey.campaignSession) {
-      const session = await manager.findOne(CampaignSession, {
-        where: { sessionId: survey.campaignSession.sessionId },
-        relations: ['crops', 'farmer'],
-      });
-      if (session) {
-        previousSessionCropIds = (session.crops ?? []).map((c) => c.cropId);
-        session.crops = crops;
-        await manager.save(CampaignSession, session);
-        farmerId = farmerId ?? session.farmer?.id ?? null;
-
-        // Create or update Farm from farm.* fields present in this survey (e.g. S1b)
-        const farmName = farmFieldMap['farm.name'] as string | undefined;
-        if (farmName && session.farmer) {
-          // Resolve farm.town from ANY survey in this session (may live in a different instrument)
-          let resolvedTown: Town | null = null;
-          const townResponse = await manager
-            .createQueryBuilder(Response, 'r')
-            .innerJoin('r.survey', 's')
-            .innerJoin('r.question', 'q')
-            .leftJoinAndSelect('r.option', 'o')
-            .where('s.campaignSession = :sessionId', {
-              sessionId: session.sessionId,
-            })
-            .andWhere('q.systemField = :sf', { sf: 'farm.town' })
-            .andWhere('o.metadataId IS NOT NULL')
-            .getOne();
-          if (townResponse?.option?.metadataId) {
-            resolvedTown = await manager.findOne(Town, {
-              where: { townId: townResponse.option.metadataId },
-            });
-          }
-
-          const primaryFarmId = await resolveFarmerFarmId(
-            manager,
-            session.farmer.id,
-          );
-          let farm: Farm | null = primaryFarmId
-            ? await manager.findOne(Farm, { where: { farmId: primaryFarmId } })
-            : null;
-          const farmFields = {
-            name: farmName,
-            town: resolvedTown ?? undefined,
-            area:
-              (farmFieldMap['farm.area'] as number | undefined) ?? undefined,
-            vereda:
-              (farmFieldMap['farm.vereda'] as string | undefined) ?? undefined,
-            // Spec 84 — campo del instrumento de Registro (S_REG).
-            corregimiento:
-              (farmFieldMap['farm.corregimiento'] as string | undefined) ??
-              undefined,
-            latitude:
-              (farmFieldMap['farm.latitude'] as number | undefined) ??
-              undefined,
-            longitude:
-              (farmFieldMap['farm.longitude'] as number | undefined) ??
-              undefined,
-            altitude:
-              (farmFieldMap['farm.altitude'] as number | undefined) ??
-              undefined,
-            waterAccess:
-              (farmFieldMap['farm.waterAccess'] as boolean | undefined) ??
-              undefined,
-            internetAccess:
-              (farmFieldMap['farm.internetAccess'] as boolean | undefined) ??
-              undefined,
-            hasElectricityAccess:
-              (farmFieldMap['farm.hasElectricityAccess'] as
-                | boolean
-                | undefined) ?? undefined,
-            mainAccessType:
-              (farmFieldMap['farm.mainAccessType'] as string | undefined) ??
-              undefined,
-            electricitySourceType:
-              (farmFieldMap['farm.electricitySourceType'] as
-                | string
-                | undefined) ?? undefined,
-            waterSourceType:
-              (farmFieldMap['farm.waterSourceType'] as string | undefined) ??
-              undefined,
-            plotCount:
-              (farmFieldMap['farm.plotCount'] as number | undefined) ??
-              undefined,
-          };
-          if (farm?.farmId) {
-            // Update existing farm (save, no update: maneja la relación `town`)
-            Object.assign(farm, farmFields);
-            await manager.save(Farm, farm);
-          } else {
-            // Create new farm and link to farmer (spec 94: vínculo principal
-            // en `farmer_farms`; el espejo `farmers.farm_id` lo escribe el helper)
-            farm = await manager.save(
-              Farm,
-              manager.create(Farm, { ...farmFields, location: null }),
-            );
-            await linkFarmerToFarm(manager, {
-              farmerId: session.farmer.id,
-              farmId: farm.farmId,
-              role: 'producer',
-              isPrimary: true,
-              source: 'extraction',
-            });
-          }
-          farmId = farm.farmId;
-          // Propagate crops to farm — ADITIVO (spec 94): suma y reactiva, no quita.
-          await addFarmCrops(manager, farmId, resolvedCropIds);
-        } else if (session.farmer) {
-          const primaryFarmId = await resolveFarmerFarmId(
-            manager,
-            session.farmer.id,
-          );
-          if (primaryFarmId) {
-            // No farm.* fields in this survey but farm already exists — just propagate crops
-            farmId = primaryFarmId;
-            await addFarmCrops(manager, farmId, resolvedCropIds);
-          }
-        }
-      }
-    } else if (survey.farmer) {
-      // Encuesta de un productor sin sesión: se ancla a su finca principal sin
-      // escribir cultivos (hoy tampoco se escribían).
-      farmId = await resolveFarmerFarmId(manager, survey.farmer.id);
-    }
-
-    if (farmId) {
-      const pick = pickFarmCrop(await listActiveFarmCrops(manager, farmId), [
-        resolvedCropIds,
-        previousSessionCropIds,
-      ]);
-      await anchorSurvey(manager, surveyId, {
-        // Solo se completa; nunca se cambia el productor de una encuesta.
-        ...(survey.farmer || !farmerId ? {} : { farmerId }),
-        farmId,
-        ...(pick.farmCropId ? { farmCropId: pick.farmCropId } : {}),
-      });
-    }
-
-    return { crops };
+    });
   }
 
   // ── Spec 79 — bandeja de revisión de envíos públicos ──────────────────────
@@ -2038,7 +1475,7 @@ export class SurveysService {
     const responses = survey.responses ?? [];
 
     const { fieldMap, warnings } = buildSystemFieldMapWithWarnings(responses);
-    const identity = this.pickFarmerIdentity(fieldMap);
+    const identity = this.extraction.pickFarmerIdentity(fieldMap);
     const town = await this.resolveSubmissionTown(
       manager,
       responses,
@@ -2060,7 +1497,11 @@ export class SurveysService {
     } else {
       if (documentKey) {
         documentCandidates = (
-          await this.findFarmersByDocument(manager, documentKey, true)
+          await this.extraction.findFarmersByDocument(
+            manager,
+            documentKey,
+            true,
+          )
         ).map((f) => this.toPlanFarmer(f));
       }
       if (documentCandidates.length === 0 && identity.name && identity.phone) {
@@ -2079,7 +1520,20 @@ export class SurveysService {
       (await manager.find(ActorType)).map((a) => [a.actorTypeId, a.name]),
     );
 
-    return buildPublicSubmissionPlan({
+    const respondentProfiles = responses.flatMap((r) => {
+      const actorType = r.option?.metadataId
+        ? actorTypes.get(r.option.metadataId)
+        : undefined;
+      return actorType && r.option
+        ? [{ optionText: r.option.text, actorType }]
+        : [];
+    });
+    const submittedFarm = this.submittedFarmValues(
+      fieldMap,
+      town?.townId ?? null,
+    );
+
+    const plan = buildPublicSubmissionPlan({
       surveyId,
       identity: {
         name: identity.name ?? null,
@@ -2095,21 +1549,14 @@ export class SurveysService {
           name: farmName ?? null,
           vereda: vereda ?? null,
           townId: town?.townId ?? null,
-          values: this.submittedFarmValues(fieldMap, town?.townId ?? null),
+          values: submittedFarm,
         },
       },
       crops: {
         resolved: crops.map((c) => ({ cropId: c.cropId, name: c.name })),
         unmapped,
       },
-      respondentProfiles: responses.flatMap((r) => {
-        const actorType = r.option?.metadataId
-          ? actorTypes.get(r.option.metadataId)
-          : undefined;
-        return actorType && r.option
-          ? [{ optionText: r.option.text, actorType }]
-          : [];
-      }),
+      respondentProfiles,
       fieldWarnings: warnings,
       existingFarmCandidates: farmName
         ? await this.findFarmsByNormalizedName(
@@ -2119,73 +1566,56 @@ export class SurveysService {
         : [],
       pendingPeers: await this.loadPendingPeers(manager, surveyId),
     });
-  }
 
-  private async applyCompletion(
-    manager: EntityManager,
-    entity: 'farmer' | 'farm',
-    id: string,
-    target: Farmer | Farm,
-    fields: FieldToComplete[],
-    town: Town | null,
-  ): Promise<void> {
-    if (fields.length === 0) return;
-    const patch: Record<string, unknown> = {};
-    for (const { field, value } of fields) {
-      if (field === 'townId') patch.town = town;
-      else patch[field] = value;
+    // Spec 95 — rol, cultivos y discrepancias que el procesado registraría.
+    const matched =
+      linkedFarmer ??
+      (documentCandidates.length > 0
+        ? selectFarmerByDocument(documentCandidates, identity.name ?? '').match
+        : phoneMatch);
+    const discrepancies: NonNullable<ProcessPreview['discrepancies']> = [];
+    if (matched) {
+      discrepancies.push(
+        ...planFieldChanges(
+          'farmer',
+          matched.values,
+          this.submittedFarmerValues(fieldMap, identity),
+        ).discrepancies,
+      );
+      const farmNameDiffers = plan.warnings.some(
+        (w) => w.code === 'different_farm_name_existing_farmer',
+      );
+      if (matched.farm && !farmNameDiffers) {
+        discrepancies.push(
+          ...planFieldChanges('farm', matched.farm.values, submittedFarm)
+            .discrepancies,
+        );
+      }
     }
-    if (entity === 'farmer') {
-      await manager.update(Farmer, id, patch as QueryDeepPartialEntity<Farmer>);
-    } else {
-      await manager.update(Farm, id, patch as QueryDeepPartialEntity<Farm>);
-    }
-    Object.assign(target, patch);
-  }
-
-  // Suma cultivos a la finca sin quitar ninguno (y reactiva los archivados,
-  // spec 94). No toca `campaign_sessions_crops`.
-  private async addCropsToFarm(
-    manager: EntityManager,
-    farmId: string,
-    crops: TypeOfCrop[],
-  ): Promise<void> {
-    await addFarmCrops(
-      manager,
-      farmId,
-      crops.map((c) => c.cropId),
-    );
-  }
-
-  // Finca para un productor que aún no tiene: vincular a una existente (el
-  // administrador la eligió, y no se le modifica ninguna columna) o crear la
-  // del envío si trae nombre.
-  private async createOrLinkFarm(
-    manager: EntityManager,
-    decision: ProcessPublicSubmissionDto['farm'],
-    fieldMap: Record<string, SystemFieldValue>,
-    town: Town | null,
-  ): Promise<Farm | null> {
-    if (decision?.mode === 'link') {
-      const farm = await manager.findOne(Farm, {
-        where: { farmId: decision.farmId },
-      });
-      if (!farm) throw new NotFoundException('Farm not found');
-      return farm;
-    }
-
-    const farmName = fieldMap['farm.name'] as string | undefined;
-    if (!farmName) return null;
-    const values = this.submittedFarmValues(fieldMap, null);
-    delete values.townId;
-    return manager.save<Farm>(
-      manager.create(Farm, {
-        ...(values as DeepPartial<Farm>),
-        name: farmName,
-        location: null,
-        town: town ?? undefined,
-      }),
-    );
+    const existingFarmCrops = matched?.farm
+      ? new Map(
+          (await listActiveFarmCrops(manager, matched.farm.farmId)).map((c) => [
+            c.cropId,
+            c.farmCropId,
+          ]),
+        )
+      : new Map<string, string>();
+    return {
+      ...plan,
+      role: roleFromProfiles(respondentProfiles),
+      farmCrops: plan.crops.resolved.map((c) => ({
+        farmCropId: existingFarmCrops.get(c.cropId) ?? null,
+        cropId: c.cropId,
+        name: c.name,
+      })),
+      discrepancies: discrepancies.map((d) => ({
+        entity: d.entity,
+        field: d.field,
+        systemField: d.systemField,
+        currentValue: d.currentValue,
+        submittedValue: d.submittedValue,
+      })),
+    };
   }
 
   // Criterio 11/12 — mismo criterio de colisión del spec 68 que `extractFarmer`.
@@ -2193,199 +1623,62 @@ export class SurveysService {
   // comprobar el estado, extraer, actuar sobre la finca, sumar cultivos,
   // reanclar la constancia y marcar `processed`. Si algo falla no queda nada;
   // ante colisión sin resolver responde 409 y el envío queda `pending`.
+  // Spec 95: la extracción es la del servicio unificado (`public_process`).
   async processPublicSubmission(
     surveyId: string,
     dto: ProcessPublicSubmissionDto,
     reviewedByUserId?: string,
-  ): Promise<{ farmer: Farmer; existed: boolean }> {
+  ): Promise<{
+    farmer: Farmer;
+    existed: boolean;
+    farm: { farmId: string; name: string } | null;
+    farmCrops: { farmCropId: string; cropId: string; name: string }[];
+    role: string;
+  }> {
     try {
       return await this.surveysRepository.manager.transaction(
         async (manager) => {
-          await this.lockSurvey(manager, surveyId);
-          return await this.processPublicLocked(
-            manager,
-            surveyId,
-            dto,
-            reviewedByUserId,
-          );
+          await this.extraction.lockSurvey(manager, surveyId);
+          // Se relee dentro del lock: un procesado concurrente ya pudo terminar.
+          await this.loadPendingPublicSubmission(manager, surveyId);
+          const result = await this.extraction.extract(manager, surveyId, {
+            trigger: 'public_process',
+            resolution: dto.resolution,
+            farmDecision: dto.farm ?? null,
+            townId: dto.townId,
+            role: dto.role,
+            reviewedBy: reviewedByUserId,
+          });
+          if (!result.farmer) {
+            throw new UnprocessableEntityException(
+              'farmer.name is required to extract farmer',
+            );
+          }
+          await manager.update(Survey, surveyId, {
+            reviewStatus: 'processed',
+            reviewedBy: reviewedByUserId
+              ? ({ userId: reviewedByUserId } as User)
+              : null,
+            reviewedAt: new Date(),
+          });
+          const farmer = await manager.findOneOrFail(Farmer, {
+            where: { id: result.farmer.id },
+            relations: ['farm', 'farm.town'],
+          });
+          return {
+            farmer,
+            existed: result.existed,
+            farm: result.farm
+              ? { farmId: result.farm.farmId, name: result.farm.name }
+              : null,
+            farmCrops: result.farmCrops,
+            role: result.role ?? 'producer',
+          };
         },
       );
     } catch (err) {
       throw await this.toCollisionConflict(err);
     }
-  }
-
-  private async processPublicLocked(
-    manager: EntityManager,
-    surveyId: string,
-    dto: ProcessPublicSubmissionDto,
-    reviewedByUserId?: string,
-  ): Promise<{ farmer: Farmer; existed: boolean }> {
-    // Se relee dentro del lock: un procesado concurrente ya pudo terminar.
-    const survey = await this.loadPendingPublicSubmission(manager, surveyId);
-    const responses = survey.responses ?? [];
-
-    const { fieldMap } = buildSystemFieldMapWithWarnings(responses);
-    const identity = this.pickFarmerIdentity(fieldMap);
-    if (!identity.name) {
-      throw new UnprocessableEntityException(
-        'farmer.name is required to extract farmer',
-      );
-    }
-    if (!identity.respondentIsProducer) {
-      await this.persistRespondentData(manager, surveyId, fieldMap);
-    }
-
-    const town = await this.resolveSubmissionTown(
-      manager,
-      responses,
-      dto.townId,
-    );
-    const { crops } = resolveCropsFromResponses(
-      responses,
-      await manager.find(TypeOfCrop),
-    );
-
-    let farmer: Farmer | null = survey.farmer ?? null;
-    let existed = farmer !== null;
-    let collisionWith: Farmer | null = null;
-    if (!farmer) {
-      const resolved = await this.resolveExistingFarmer(manager, {
-        surveyId,
-        documentId: identity.documentId,
-        name: identity.name,
-        phone: identity.phone,
-        resolution: dto.resolution,
-      });
-      farmer = resolved.farmer;
-      existed = resolved.existed;
-      collisionWith = resolved.collisionWith;
-    }
-
-    let farm: Farm | null;
-    if (farmer) {
-      // Misma persona: completa solo lo vacío, nunca pisa un valor no nulo.
-      farmer = await this.reloadFarmerWithFarm(manager, farmer.id);
-      const plan = this.toPlanFarmer(farmer);
-      await this.applyCompletion(
-        manager,
-        'farmer',
-        farmer.id,
-        farmer,
-        completeFields(
-          'farmer',
-          plan.values,
-          this.submittedFarmerValues(fieldMap, identity),
-        ),
-        town,
-      );
-      farm = farmer.farm ?? null;
-      if (farm && plan.farm) {
-        // D-H2-3: con otra finca de otro nombre no se crea una segunda ni se
-        // completan sus campos (vereda, área, coordenadas, municipio) — solo
-        // la advertencia `different_farm_name_existing_farmer`. Los cultivos
-        // del envío sí se suman (son aditivos y no pisan nada; cubierto por
-        // el propio criterio 2 y el caso C06c).
-        const submittedFarmName = fieldMap['farm.name'] as string | undefined;
-        const farmNameDiffers =
-          !!submittedFarmName &&
-          normalizeFarmKey(submittedFarmName) !== normalizeFarmKey(farm.name);
-        if (!farmNameDiffers) {
-          await this.applyCompletion(
-            manager,
-            'farm',
-            farm.farmId,
-            farm,
-            completeFields(
-              'farm',
-              plan.farm.values,
-              this.submittedFarmValues(fieldMap, town?.townId ?? null),
-            ),
-            town,
-          );
-        }
-      } else {
-        // Una finca por productor hasta H3: si ya tiene, no se crea otra.
-        farm = await this.createOrLinkFarm(manager, dto.farm, fieldMap, town);
-        if (farm) {
-          await manager.update(Farmer, farmer.id, { farm });
-          farmer.farm = farm;
-        }
-      }
-    } else {
-      farm = await this.createOrLinkFarm(manager, dto.farm, fieldMap, town);
-      farmer = await manager.save<Farmer>(
-        manager.create(Farmer, {
-          name: identity.name,
-          documentId: identity.documentId ?? null,
-          phone: identity.phone ?? null,
-          email: identity.email ?? null,
-          gender: (fieldMap['farmer.gender'] as string | undefined) ?? null,
-          age: (fieldMap['farmer.age'] as number | undefined) ?? null,
-          experienceYears:
-            (fieldMap['farmer.experienceYears'] as number | undefined) ?? null,
-          isMainIncome:
-            (fieldMap['farmer.isMainIncome'] as boolean | undefined) ?? null,
-          educationLevel:
-            (fieldMap['farmer.educationLevel'] as string | undefined) ?? null,
-          farm: farm ?? undefined,
-        }),
-      );
-    }
-
-    if (farm) {
-      // Spec 94 — vínculo productor–finca (idempotente: si ya existe no se
-      // toca; si el productor no tenía principal, este queda principal y se
-      // actualiza el espejo `farmers.farm_id`). Rol `producer`.
-      await linkFarmerToFarm(manager, {
-        farmerId: farmer.id,
-        farmId: farm.farmId,
-        role: 'producer',
-        source: 'public_process',
-      });
-      await this.addCropsToFarm(manager, farm.farmId, crops);
-    }
-
-    await manager.update(Survey, surveyId, {
-      farmer: { id: farmer.id } as Farmer,
-      reviewStatus: 'processed',
-      reviewedBy: reviewedByUserId
-        ? ({ userId: reviewedByUserId } as User)
-        : null,
-      reviewedAt: new Date(),
-    });
-
-    // Spec 94 — la encuesta pública queda anclada a la finca y, si las
-    // respuestas o la finca deciden uno, a su cultivo de finca.
-    if (farm) {
-      const pick = pickFarmCrop(
-        await listActiveFarmCrops(manager, farm.farmId),
-        [crops.map((c) => c.cropId)],
-      );
-      await anchorSurvey(manager, surveyId, {
-        farmerId: farmer.id,
-        farmId: farm.farmId,
-        ...(pick.farmCropId ? { farmCropId: pick.farmCropId } : {}),
-      });
-    }
-
-    await this.consentRecordsService.linkOrphansToFarmerBySurvey(
-      surveyId,
-      farmer.id,
-      manager,
-    );
-
-    if (collisionWith && dto.resolution) {
-      await this.upsertDocumentCollision(manager, {
-        documentId: identity.documentId!,
-        submittedName: identity.name,
-        existingFarmer: collisionWith,
-        resolution: dto.resolution,
-        survey,
-      });
-    }
-
-    return { farmer, existed };
   }
 
   // Criterio 13 — descartar es un cambio de estado, no un borrado: la
@@ -2395,23 +1688,32 @@ export class SurveysService {
     surveyId: string,
     reviewedByUserId?: string,
   ): Promise<{ surveyId: string; reviewStatus: string }> {
-    const survey = await this.findPublicSurveyOrThrow(surveyId);
-
-    if (survey.reviewStatus === 'processed') {
-      throw new ConflictException(
-        'Este envío ya fue procesado y no puede descartarse.',
-      );
-    }
-
-    if (survey.reviewStatus !== 'discarded') {
-      await this.surveysRepository.update(surveyId, {
-        reviewStatus: 'discarded',
-        reviewedBy: reviewedByUserId
-          ? ({ userId: reviewedByUserId } as User)
-          : null,
-        reviewedAt: new Date(),
-      });
-    }
+    // Spec 95 (D-H3-10) — bajo el lock de la encuesta: un procesado concurrente
+    // no puede terminar entre la comprobación y la escritura.
+    await this.surveysRepository.manager.transaction(async (manager) => {
+      await this.extraction.lockSurvey(manager, surveyId);
+      const survey = await manager.findOne(Survey, { where: { surveyId } });
+      if (!survey) throw new NotFoundException('Survey not found');
+      if (survey.origin !== 'public') {
+        throw new ConflictException(
+          'Esta encuesta no es un envío del canal público.',
+        );
+      }
+      if (survey.reviewStatus === 'processed') {
+        throw new ConflictException(
+          'Este envío ya fue procesado y no puede descartarse.',
+        );
+      }
+      if (survey.reviewStatus !== 'discarded') {
+        await manager.update(Survey, surveyId, {
+          reviewStatus: 'discarded',
+          reviewedBy: reviewedByUserId
+            ? ({ userId: reviewedByUserId } as User)
+            : null,
+          reviewedAt: new Date(),
+        });
+      }
+    });
 
     return { surveyId, reviewStatus: 'discarded' };
   }

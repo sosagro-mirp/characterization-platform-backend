@@ -15,6 +15,7 @@ import { SurveysController } from './surveys.controller';
 import { Survey } from './entities/survey.entity';
 import { SurveysService } from './surveys.service';
 import { ConsentsModule } from '../consents/consents.module';
+import { FarmerExtractionModule } from '../farmer-extraction/farmer-extraction.module';
 import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.module';
 
 @Module({
@@ -34,6 +35,7 @@ import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.
       Response,
     ]),
     ConsentsModule,
+    FarmerExtractionModule,
     MediaAttachmentsModule,
   ],
   controllers: [SurveysController],

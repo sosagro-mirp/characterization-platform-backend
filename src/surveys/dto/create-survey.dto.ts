@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -114,4 +115,33 @@ export class CreateSurveyDto {
   @IsString()
   @MaxLength(100)
   clientSurveyId?: string;
+
+  /**
+   * Spec 95 — id provisional del productor (`local_farmer_<uuid>`) que el móvil
+   * usa antes de que su registro llegue al servidor. Si ya hay un alias para ese
+   * id, la encuesta hereda a ese productor; si no, queda esperando su registro.
+   */
+  @ApiPropertyOptional({
+    example: 'local_farmer_9c3f1b2a-8e7d-4f2e-9a1b-2c3d4e5f6a7b',
+    maxLength: 100,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^local_farmer_/, {
+    message: 'clientFarmerId must start with local_farmer_',
+  })
+  clientFarmerId?: string;
+
+  /** Spec 95 — finca a la que se ancla la encuesta (debe ser del productor). */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  farmId?: string;
+
+  /** Spec 95 — cultivo de finca al que se ancla la encuesta (debe ser de `farmId`). */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  farmCropId?: string;
 }

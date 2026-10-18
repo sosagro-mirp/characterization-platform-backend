@@ -7,6 +7,8 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { FARMER_FARM_ROLES } from '../../farmer-farms/entities/farmer-farm.entity';
+import type { FarmerFarmRole } from '../../farmer-farms/entities/farmer-farm.entity';
 import { ExtractFarmerDto } from './extract-farmer.dto';
 
 export class ProcessPublicFarmDecisionDto {
@@ -47,6 +49,16 @@ export class ProcessPublicSubmissionDto extends ExtractFarmerDto {
   @IsOptional()
   @IsUUID()
   townId?: string;
+
+  // Spec 95 (D-H3-3) — rol del productor en la finca que se vincula o crea.
+  @ApiPropertyOptional({
+    enum: FARMER_FARM_ROLES,
+    description:
+      'Rol del productor en la finca. Por defecto el del perfil declarado en el envío, o `producer`.',
+  })
+  @IsOptional()
+  @IsIn([...FARMER_FARM_ROLES])
+  role?: FarmerFarmRole;
 }
 
 export class ProcessPreviewQueryDto {
