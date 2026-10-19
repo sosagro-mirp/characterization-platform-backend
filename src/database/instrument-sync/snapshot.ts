@@ -25,6 +25,10 @@ const TABLES_TO_CLEAR = [
   'responses',
   'consent_records',
   'farmer_document_collisions',
+  // Spec 95 — alias de identidad provisional y discrepancias: dependen de
+  // `surveys`, así que se vacían antes que ella.
+  'farmer_client_aliases',
+  'entity_field_discrepancies',
   'surveys_instruments',
   'campaign_sessions_crops',
   'step_conditions',

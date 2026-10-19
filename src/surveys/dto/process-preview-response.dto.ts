@@ -105,4 +105,23 @@ export class ProcessPreviewResponseDto implements ProcessPreview {
   @ApiProperty({ type: [PreviewFieldToCompleteDto] })
   fieldsToComplete: PreviewFieldToCompleteDto[];
   @ApiProperty({ type: [PreviewWarningDto] }) warnings: PreviewWarningDto[];
+  @ApiPropertyOptional({
+    description:
+      'Spec 95 — rol del productor en la finca (el del perfil declarado o `producer`).',
+  })
+  role?: string;
+  @ApiPropertyOptional({
+    description:
+      'Spec 95 — cultivos que se sumarían a la finca; `farmCropId` es null si la finca es nueva o aún no tiene ese cultivo.',
+    type: 'array',
+    items: { type: 'object' },
+  })
+  farmCrops?: { farmCropId: string | null; cropId: string; name: string }[];
+  @ApiPropertyOptional({
+    description:
+      'Spec 95 — valores que difieren de los guardados y quedarían como discrepancias.',
+    type: 'array',
+    items: { type: 'object' },
+  })
+  discrepancies?: ProcessPreview['discrepancies'];
 }

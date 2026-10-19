@@ -24,10 +24,25 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
+export const EXTRACTION_STATUSES = [
+  'done',
+  'collision',
+  'no_identity',
+  'pending_alias',
+  'not_applicable',
+  'awaiting_review',
+  'error',
+  'backfilled',
+] as const;
+export type ExtractionStatus = (typeof EXTRACTION_STATUSES)[number];
+
 @Entity({ name: 'surveys' })
 @Index('IDX_surveys_farmer', ['farmer'])
 @Index('IDX_surveys_farm', ['farmId'])
 @Index('IDX_surveys_farm_crop', ['farmCropId'])
+@Index('IDX_surveys_client_farmer_pending', ['clientFarmerId'], {
+  where: '"client_farmer_id" IS NOT NULL AND "farmer_id" IS NULL',
+})
 @Check(
   'CHK_surveys_farm_crop_requires_farm',
   '"farm_crop_id" IS NULL OR "farm_id" IS NOT NULL',
@@ -156,6 +171,32 @@ export class Survey {
     nullable: true,
   })
   clientSurveyId?: string;
+
+  // Spec 95 — identidad provisional del productor (`local_farmer_<uuid>`) que el
+  // móvil usa antes de que su registro llegue al servidor; ver `farmer_client_aliases`.
+  @Column({
+    name: 'client_farmer_id',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  clientFarmerId?: string | null;
+
+  // Spec 95 — resultado de la extracción unificada del productor, la finca y los
+  // cultivos (`FarmerExtractionService`). NULL = aún no se ha extraído.
+  @Column({
+    name: 'extraction_status',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  extractionStatus?: ExtractionStatus | null;
+
+  @Column({ name: 'extraction_error', type: 'text', nullable: true })
+  extractionError?: string | null;
+
+  @Column({ name: 'extracted_at', type: 'timestamp', nullable: true })
+  extractedAt?: Date | null;
 
   @Column({ name: 'respondent_name', type: 'text', nullable: true })
   respondentName?: string;

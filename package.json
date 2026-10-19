@@ -39,7 +39,8 @@
     "public-submissions:plan": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts plan",
     "public-submissions:apply": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts apply",
     "public-submissions:revert": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts revert",
-    "spec94:verify": "ts-node -r tsconfig-paths/register src/database/spec94/verify.ts"
+    "spec94:verify": "ts-node -r tsconfig-paths/register src/database/spec94/verify.ts",
+    "extraction:replay": "ts-node -r tsconfig-paths/register src/database/spec95/replay.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1070.0",
