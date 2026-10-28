@@ -183,6 +183,7 @@ const MUNICIPIOS: Record<string, string[]> = {
     'Medio Baudó',
     'Medio San Juan',
     'Nóvita',
+    'Nuevo Belén de Bajirá',
     'Nuquí',
     'Quibdó',
     'Río Iro',
