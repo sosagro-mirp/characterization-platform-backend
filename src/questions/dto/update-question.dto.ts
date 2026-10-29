@@ -56,6 +56,7 @@ export class UpdateQuestionDto {
   @MaxLength(50)
   conditionValue?: string | null;
 
+  /** Spec 97 — clave del catálogo `GET /system-fields`; `null` quita el destino. */
   @ApiPropertyOptional({ example: 'farmer.name', maxLength: 100 })
   @IsOptional()
   @IsString()

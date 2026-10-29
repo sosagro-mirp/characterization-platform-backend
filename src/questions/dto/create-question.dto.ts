@@ -78,7 +78,11 @@ export class CreateQuestionDto {
   @MaxLength(50)
   conditionValue?: string;
 
-  /** Campo del dominio al que mapea esta pregunta. Formato: 'entidad.campo' (ej. 'farmer.name', 'farm.latitude', 'crop.Café') */
+  /**
+   * Destino del dato: clave del catálogo `GET /system-fields` (ej. 'farmer.name',
+   * 'farm.crops'). Spec 97: se valida en el servicio (códigos `SYSTEM_FIELD_*`)
+   * y se guarda en su clave canónica; un alias se acepta y se normaliza.
+   */
   @ApiPropertyOptional({ example: 'farmer.name', maxLength: 100 })
   @IsOptional()
   @IsString()

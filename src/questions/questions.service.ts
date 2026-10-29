@@ -16,6 +16,17 @@ import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { SearchQuestionsDto } from './dto/search-questions.dto';
 import { Question } from './entities/question.entity';
+import {
+  keysFor,
+  resolveSystemField,
+  SystemFieldDef,
+} from './system-fields/system-field-registry';
+import {
+  assertAssignableSystemField,
+  assertTypeCompatible,
+  SystemFieldWarningBody,
+  systemFieldError,
+} from './system-fields/system-field-validation';
 
 export interface CopyQuestionResult {
   // El entity `Question` no expone `conditionQuestionId`/`conditionValue` como
@@ -27,7 +38,12 @@ export interface CopyQuestionResult {
     conditionValue: string | null;
   };
   droppedCondition: boolean;
+  /** Spec 97 — el destino de la pregunta ya existe en otro instrumento. */
+  warnings?: SystemFieldWarningBody[];
 }
+
+/** Spec 97 — `warnings[]` solo viaja cuando hay algo que avisar. */
+export type WithWarnings<T> = T & { warnings?: SystemFieldWarningBody[] };
 
 export interface SearchQuestionsItem {
   questionId: string;
@@ -210,14 +226,57 @@ export class QuestionsService {
     };
   }
 
+  /**
+   * Spec 97 (D-H4-9) — dónde más vive este destino. El mismo destino dos veces
+   * en el mismo instrumento es 409 (salvo las claves de valor múltiple); en
+   * otro instrumento se permite, con un aviso. Las archivadas no cuentan.
+   */
+  private async checkSystemFieldPlacement(
+    def: SystemFieldDef,
+    instrumentId: string,
+    excludeQuestionId?: string,
+  ): Promise<SystemFieldWarningBody[]> {
+    const rows = await this.questionsRepository
+      .createQueryBuilder('question')
+      .innerJoin('question.section', 'section')
+      .innerJoin('section.instrument', 'instrument')
+      .select('question.questionId', 'questionId')
+      .addSelect('instrument.instrumentId', 'instrumentId')
+      .where('question.systemField IN (:...keys)', { keys: keysFor(def.key) })
+      .andWhere('question.archivedAt IS NULL')
+      .getRawMany<{ questionId: string; instrumentId: string }>();
+
+    const others = rows.filter((r) => r.questionId !== excludeQuestionId);
+    if (
+      !def.multiValue &&
+      others.some((r) => r.instrumentId === instrumentId)
+    ) {
+      throw new ConflictException(
+        systemFieldError(
+          'SYSTEM_FIELD_DUPLICATE',
+          `«${def.key}» ya está asignado a otra pregunta de este instrumento.`,
+        ),
+      );
+    }
+    return others.some((r) => r.instrumentId !== instrumentId)
+      ? [
+          {
+            code: 'SYSTEM_FIELD_IN_OTHER_INSTRUMENT',
+            message: `«${def.key}» también está asignado en otro instrumento.`,
+          },
+        ]
+      : [];
+  }
+
   async create(
     sectionId: string,
     createQuestionDto: CreateQuestionDto,
-  ): Promise<Question> {
+  ): Promise<WithWarnings<Question>> {
     const { typeId, conditionQuestionId, ...questionData } = createQuestionDto;
 
     const section = await this.sectionsRepository.findOne({
       where: { sectionId },
+      relations: ['instrument'],
     });
 
     if (!section) {
@@ -230,6 +289,22 @@ export class QuestionsService {
 
     if (!type) {
       throw new NotFoundException('Type of question not found');
+    }
+
+    // Spec 97 — destino validado contra el catálogo y guardado en su clave canónica.
+    let warnings: SystemFieldWarningBody[] = [];
+    if (questionData.systemField?.trim()) {
+      const def = assertAssignableSystemField(
+        questionData.systemField,
+        type.name,
+      );
+      questionData.systemField = def.key;
+      warnings = await this.checkSystemFieldPlacement(
+        def,
+        section.instrument.instrumentId,
+      );
+    } else {
+      questionData.systemField = undefined;
     }
 
     let conditionQuestion: Question | undefined;
@@ -265,10 +340,12 @@ export class QuestionsService {
       await this.seedComplianceOptions(saved);
     }
 
-    return (await this.questionsRepository.findOne({
+    const created = (await this.questionsRepository.findOne({
       where: { questionId: saved.questionId },
       relations: ['type', 'options'],
-    })) as Question;
+    })) as WithWarnings<Question>;
+    if (warnings.length > 0) created.warnings = warnings;
+    return created;
   }
 
   async findOne(questionId: string): Promise<Question> {
@@ -288,10 +365,16 @@ export class QuestionsService {
     sectionId: string,
     questionId: string,
     updateQuestionDto: UpdateQuestionDto,
-  ): Promise<Question> {
+  ): Promise<WithWarnings<Question>> {
     const question = await this.questionsRepository.findOne({
       where: { questionId, section: { sectionId } },
-      relations: ['type', 'options', 'conditionQuestion', 'section'],
+      relations: [
+        'type',
+        'options',
+        'conditionQuestion',
+        'section',
+        'section.instrument',
+      ],
     });
 
     if (!question) {
@@ -307,6 +390,39 @@ export class QuestionsService {
     // `count + 1` = 4, colisionando con la que ya tiene ese orden: no hay
     // índice único que lo impida (verificado en la Fase 0).
     let movedFrom: { sectionId: string; order: number } | null = null;
+
+    // Spec 97 — el destino se valida contra el tipo resultante, ANTES de
+    // cualquier efecto (cambiar de tipo borra opciones). Con un `typeId` nuevo
+    // y sin tocar `systemField`, se revalida el destino que la pregunta ya tiene.
+    let newTypeName = question.type?.name;
+    if (typeId !== undefined && typeId !== question.type?.typeId) {
+      const target = await this.typesOfQuestionsRepository.findOne({
+        where: { typeId },
+      });
+      if (!target) {
+        throw new NotFoundException('Type of question not found');
+      }
+      newTypeName = target.name;
+    }
+    let warnings: SystemFieldWarningBody[] = [];
+    if (rest.systemField !== undefined) {
+      if (rest.systemField === null || !rest.systemField.trim()) {
+        rest.systemField = null;
+      } else {
+        const def = assertAssignableSystemField(rest.systemField, newTypeName, {
+          unchanged: rest.systemField === question.systemField,
+        });
+        rest.systemField = def.key;
+        warnings = await this.checkSystemFieldPlacement(
+          def,
+          question.section.instrument.instrumentId,
+          questionId,
+        );
+      }
+    } else if (newTypeName !== question.type?.name) {
+      const current = resolveSystemField(question.systemField);
+      if (current) assertTypeCompatible(current, newTypeName);
+    }
 
     if (typeId !== undefined && typeId !== question.type?.typeId) {
       // Spec 84 — "editar en sitio + archivar": una pregunta con respuestas
@@ -433,10 +549,12 @@ export class QuestionsService {
       await this.seedComplianceOptions(saved);
     }
 
-    return (await this.questionsRepository.findOne({
+    const updated = (await this.questionsRepository.findOne({
       where: { questionId: saved.questionId },
       relations: ['type', 'options'],
-    })) as Question;
+    })) as WithWarnings<Question>;
+    if (warnings.length > 0) updated.warnings = warnings;
+    return updated;
   }
 
   async remove(sectionId: string, questionId: string): Promise<void> {
@@ -565,6 +683,7 @@ export class QuestionsService {
   ): Promise<CopyQuestionResult> {
     const targetSection = await this.sectionsRepository.findOne({
       where: { sectionId: targetSectionId },
+      relations: ['instrument'],
     });
     if (!targetSection) {
       throw new NotFoundException('Target section not found');
@@ -580,6 +699,20 @@ export class QuestionsService {
 
     const droppedCondition = !!source.conditionQuestion;
 
+    // Spec 97 — la copia conserva la clave canónica. No se exige que sea
+    // asignable (la pregunta de origen ya existía), pero sí que el destino no
+    // choque con otro del instrumento de destino.
+    const sourceDef = resolveSystemField(source.systemField);
+    const systemField = sourceDef
+      ? sourceDef.key
+      : (source.systemField ?? undefined);
+    const warnings = sourceDef
+      ? await this.checkSystemFieldPlacement(
+          sourceDef,
+          targetSection.instrument.instrumentId,
+        )
+      : [];
+
     const newQuestionId = await this.questionsRepository.manager.transaction(
       async (manager: EntityManager) => {
         const siblingCount = await manager.count(Question, {
@@ -594,7 +727,7 @@ export class QuestionsService {
           isSelectionCriteria: source.isSelectionCriteria,
           isKeyQuestion: source.isKeyQuestion,
           order: siblingCount + 1,
-          systemField: source.systemField ?? undefined,
+          systemField,
         });
         const savedQuestion = await manager.save(Question, questionCopy);
 
@@ -624,6 +757,10 @@ export class QuestionsService {
       conditionValue: null,
     };
 
-    return { question, droppedCondition };
+    return {
+      question,
+      droppedCondition,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   }
 }
