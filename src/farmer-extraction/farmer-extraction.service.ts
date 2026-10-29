@@ -1,3 +1,5 @@
+import { resolveDocumentType } from '../farmers/document-type';
+import { canonicalKey } from '../questions/system-fields/system-field-registry';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
@@ -350,6 +352,8 @@ export class FarmerExtractionService {
           manager.create(Farmer, {
             name: identity.name,
             documentId: identity.documentId ?? null,
+            documentType:
+              resolveDocumentType(fieldMap['farmer.documentType']) ?? null,
             phone: identity.phone ?? null,
             email: identity.email ?? null,
             gender: (fieldMap['farmer.gender'] as string | undefined) ?? null,
@@ -439,7 +443,8 @@ export class FarmerExtractionService {
     );
     const responseIdBySystemField = new Map<string, string>();
     for (const r of responses) {
-      const sf = r.question?.systemField;
+      const raw = r.question?.systemField;
+      const sf = raw ? (canonicalKey(raw) ?? raw) : raw;
       if (sf && !responseIdBySystemField.has(sf)) {
         responseIdBySystemField.set(sf, r.responseId);
       }
@@ -916,6 +921,7 @@ export class FarmerExtractionService {
     return {
       phone: identity.phone,
       email: identity.email,
+      documentType: resolveDocumentType(fieldMap['farmer.documentType']),
       gender: fieldMap['farmer.gender'],
       age: fieldMap['farmer.age'],
       experienceYears: fieldMap['farmer.experienceYears'],

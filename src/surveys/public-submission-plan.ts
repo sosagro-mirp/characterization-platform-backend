@@ -22,6 +22,7 @@ export type FarmAction = 'create' | 'link' | 'complete' | 'none';
 export const FARMER_COMPLETABLE_FIELDS = [
   'phone',
   'email',
+  'documentType',
   'gender',
   'age',
   'experienceYears',

@@ -101,7 +101,7 @@ describe('buildSystemFieldMapWithWarnings (spec 93)', () => {
 
   it('unidad desconocida deja el área fuera del mapa y advierte', () => {
     const r = buildSystemFieldMapWithWarnings([
-      response('farm.area', { numericValue: 2, option: { text: 'fanegada' } }),
+      response('farm.area', { numericValue: 2, option: { text: 'acre' } }),
     ]);
     expect(r.fieldMap['farm.area']).toBeUndefined();
     expect(r.warnings.map((w) => w.code)).toEqual(['area_unit_unknown']);

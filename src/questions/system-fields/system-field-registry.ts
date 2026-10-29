@@ -348,7 +348,7 @@ export const SYSTEM_FIELDS: readonly SystemFieldDef[] = [
       key: `farm.hasCrop.${flag}`,
       dataType: 'boolean',
       questionTypes: BOOLEAN_TYPES,
-      metadataCatalog: null,
+      metadataCatalog: 'crop',
       label: `Finca · ${label}`,
       status: 'active',
       aliases: [`crop.${flag}`],

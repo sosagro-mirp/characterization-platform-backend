@@ -1,3 +1,4 @@
+import { canonicalKey } from '../../questions/system-fields/system-field-registry';
 import { DataSource, EntityManager } from 'typeorm';
 import { exportManifest } from './export';
 import { contentEqual, contentOf, flatten, FlatManifest } from './diff';
@@ -471,7 +472,8 @@ async function applyQuestionWrite(
       question.isSelectionCriteria,
       question.isKeyQuestion,
       question.order,
-      question.systemField,
+      // Spec 97 — se normaliza a la clave canónica al escribir.
+      canonicalKey(question.systemField) ?? question.systemField,
       question.archivedAt,
     ],
   );

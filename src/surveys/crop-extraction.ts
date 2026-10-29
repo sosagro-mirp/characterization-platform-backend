@@ -3,13 +3,16 @@
  *
  * Junta las dos formas en que un instrumento declara cultivos y las cruza con
  * el catálogo `types_of_crops`:
- *  - `crop.<clave>` (sí/no): suma el cultivo si la respuesta es afirmativa.
- *  - `farm.mainCrop` (selección): suma el cultivo al que apunta el
+ *  - `farm.hasCrop.<clave>` (sí/no; alias `crop.<clave>`): suma el cultivo si
+ *    la respuesta es afirmativa.
+ *  - `farm.crops` (selección; alias `farm.mainCrop`): suma el cultivo al que apunta el
  *    `metadataId` de la opción elegida; una opción sin `metadataId` (por
  *    ejemplo «Caucho» u «Otro») no crea cultivos y se informa como no mapeada.
  */
 
-/** Claves ASCII de `crop.*` → nombre en `types_of_crops`. */
+import { canonicalKey } from '../questions/system-fields/system-field-registry';
+
+/** Claves ASCII de `farm.hasCrop.*` (antes `crop.*`) → nombre en `types_of_crops`. */
 export const CROP_FIELD_MAP: Record<string, string> = {
   cacao: 'Cacao',
   cafe: 'Café',
@@ -31,7 +34,7 @@ export interface CropCatalogEntry {
 export interface ResolvedCrops<T extends CropCatalogEntry> {
   /** Cultivos del catálogo, sin duplicados; primero los `crop.*`. */
   crops: T[];
-  /** Textos de opciones de `farm.mainCrop` sin cultivo asociado. */
+  /** Textos de opciones de `farm.crops` sin cultivo asociado. */
   unmapped: string[];
 }
 
@@ -47,15 +50,20 @@ export function resolveCropsFromResponses<T extends CropCatalogEntry>(
   const unmapped: string[] = [];
 
   for (const response of responses) {
-    const sf = response.question?.systemField;
-    if (!sf) continue;
+    const raw = response.question?.systemField;
+    if (!raw) continue;
+    // Un `crop.<x>` fuera del catálogo (p. ej. `crop.Café`, de instrumentos
+    // viejos) no tiene canónica: se lee como el marcador `farm.hasCrop.<x>`.
+    const sf =
+      canonicalKey(raw) ??
+      (raw.startsWith('crop.') ? `farm.hasCrop.${raw.slice(5)}` : raw);
 
-    if (sf.startsWith('crop.')) {
+    if (sf.startsWith('farm.hasCrop.')) {
       if (response.booleanValue !== true) continue;
-      const key = sf.split('.')[1];
+      const key = sf.slice('farm.hasCrop.'.length);
       const crop = byName.get(CROP_FIELD_MAP[key] ?? key);
       if (crop) resolved.set(crop.cropId, crop);
-    } else if (sf === 'farm.mainCrop' && response.option) {
+    } else if (sf === 'farm.crops' && response.option) {
       const crop = response.option.metadataId
         ? byId.get(response.option.metadataId)
         : undefined;
