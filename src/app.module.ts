@@ -1,3 +1,5 @@
+import { existsSync, readdirSync } from 'fs';
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
@@ -50,6 +52,19 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { ConsentsModule } from './consents/consents.module';
 import { PublicSurveysModule } from './public-surveys/public-surveys.module';
+
+/**
+ * Spec 97 (D-H4-13): las migraciones de datos (`*Data.js`) no corren solas al
+ * arrancar; se aplican a mano con `pnpm migration:run`. Sin `dist/migrations`
+ * (p. ej. pruebas sin compilar) no hay nada que correr.
+ */
+function autoRunMigrations(): string[] {
+  const dir = join(process.cwd(), 'dist', 'migrations');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((file) => file.endsWith('.js') && !file.endsWith('Data.js'))
+    .map((file) => join(dir, file));
+}
 
 @Module({
   imports: [
@@ -109,7 +124,9 @@ import { PublicSurveysModule } from './public-surveys/public-surveys.module';
           autoLoadEntities: true,
           synchronize: configService.get<string>('DB_SYNC') === 'true',
           migrationsRun: nodeEnv === 'production',
-          migrations: ['dist/migrations/*.js'],
+          // Spec 97 (D-H4-13): las migraciones de datos (`*Data.js`) no corren
+          // solas al arrancar; se aplican a mano con `pnpm migration:run`.
+          migrations: autoRunMigrations(),
           logging: nodeEnv !== 'production',
         };
       },
