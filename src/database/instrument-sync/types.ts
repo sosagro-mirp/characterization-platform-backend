@@ -42,6 +42,9 @@ export interface ManifestQuestion {
   isRequired: boolean;
   isSelectionCriteria: boolean;
   isKeyQuestion: boolean;
+  /** Spec 97 — escala invertida y marca de «Demanda digital». */
+  isInvertedScale?: boolean;
+  isDigitalDemandItem?: boolean;
   order: number;
   systemField: string | null;
   conditionQuestionId: string | null;

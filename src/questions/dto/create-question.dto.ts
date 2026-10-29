@@ -88,4 +88,16 @@ export class CreateQuestionDto {
   @IsString()
   @MaxLength(100)
   systemField?: string;
+
+  /** Spec 97 — escala Likert invertida (puntaje = 6 - valor). */
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isInvertedScale?: boolean;
+
+  /** Spec 97 — ítem de la vista «Demanda digital» del dashboard. */
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDigitalDemandItem?: boolean;
 }

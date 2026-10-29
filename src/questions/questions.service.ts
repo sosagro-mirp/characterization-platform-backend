@@ -325,6 +325,8 @@ export class QuestionsService {
       ...questionData,
       isSelectionCriteria: questionData.isSelectionCriteria ?? false,
       isKeyQuestion: questionData.isKeyQuestion ?? false,
+      isInvertedScale: questionData.isInvertedScale ?? false,
+      isDigitalDemandItem: questionData.isDigitalDemandItem ?? false,
       section,
       type,
       conditionQuestion,
@@ -726,6 +728,8 @@ export class QuestionsService {
           isRequired: source.isRequired,
           isSelectionCriteria: source.isSelectionCriteria,
           isKeyQuestion: source.isKeyQuestion,
+          isInvertedScale: source.isInvertedScale,
+          isDigitalDemandItem: source.isDigitalDemandItem,
           order: siblingCount + 1,
           systemField,
         });

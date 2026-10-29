@@ -29,6 +29,7 @@ import {
   DashboardQuestionDto,
   DashboardResponseDto,
 } from './dto/dashboard-response.dto';
+import { keysFor } from '../questions/system-fields/system-field-registry';
 import { DashboardCategoryDto } from './dto/dashboard-category.dto';
 import {
   DASHBOARD_CATEGORIES,
@@ -69,7 +70,8 @@ const MIN_SAMPLE_THRESHOLD = 5;
  */
 type ResolvedResponseFilter = {
   key: string;
-  questionId: string;
+  /** Spec 97: todas las preguntas que alimentan el destino (alias y otros instrumentos). */
+  questionIds: string[];
   matchType: ResponseFilterSource['matchType'];
   range?: { min?: number; max?: number };
   optionTexts?: string[];
@@ -84,12 +86,16 @@ const EXCLUDED_QUESTION_TYPES = [
   'video',
 ];
 
+// Spec 97 — la denylist se expresa en claves canónicas y se expande con sus alias.
 const DENIED_SYSTEM_FIELDS = [
   'farm.latitude',
   'farm.longitude',
   'farm.name',
   'farm.vereda',
-];
+].flatMap((key) => keysFor(key));
+
+/** Spec 97 — una pregunta, más las demás que alimentan el mismo destino. */
+type DestinationQuestion = Question & { destinationQuestionIds?: string[] };
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
@@ -296,8 +302,9 @@ export class DashboardService {
     systemField: string,
     responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationNumericDto | null> {
-    const question = await this.questionRepo.findOne({
-      where: { systemField },
+    const question = await this.resolveQuestionByLocator({
+      locate: 'systemField',
+      systemField,
     });
     if (!question) return null;
 
@@ -560,7 +567,7 @@ export class DashboardService {
         const bucket = filters[source.key] as AgeRangeBucket;
         resolved.push({
           key: source.key,
-          questionId: question.questionId,
+          questionIds: this.idsOf(question),
           matchType: 'range',
           range: AGE_RANGE_BOUNDS[bucket],
         });
@@ -571,14 +578,14 @@ export class DashboardService {
           .filter(Boolean);
         resolved.push({
           key: source.key,
-          questionId: question.questionId,
+          questionIds: this.idsOf(question),
           matchType: 'multiOption',
           optionTexts,
         });
       } else {
         resolved.push({
           key: source.key,
-          questionId: question.questionId,
+          questionIds: this.idsOf(question),
           matchType: 'option',
           optionTexts: [(filters[source.key] as string).trim()],
         });
@@ -586,6 +593,64 @@ export class DashboardService {
     }
 
     return resolved;
+  }
+
+  /**
+   * Spec 97 (D-H4-12) — todas las preguntas que alimentan un destino: la clave
+   * canónica y sus alias, en cualquier instrumento y archivadas o no. Las
+   * vigentes (no archivadas, de un instrumento activo) van primero.
+   */
+  async findQuestionsBySystemField(
+    systemField: string,
+    opts: { withOptions?: boolean; withType?: boolean } = {},
+  ): Promise<Question[]> {
+    const keys = keysFor(systemField);
+    const qb = this.questionRepo
+      .createQueryBuilder('question')
+      .leftJoinAndSelect('question.section', 'section')
+      .leftJoinAndSelect('section.instrument', 'instrument')
+      .where('question.systemField IN (:...keys)', {
+        keys: keys.length ? keys : [systemField],
+      });
+    if (opts.withOptions) qb.leftJoinAndSelect('question.options', 'options');
+    if (opts.withType) qb.leftJoinAndSelect('question.type', 'type');
+    const questions = await qb.orderBy('question.questionId', 'ASC').getMany();
+
+    const isCurrent = (q: Question): boolean =>
+      q.archivedAt == null && q.section?.instrument?.isActive !== false;
+    return [
+      ...questions.filter(isCurrent),
+      ...questions.filter((q) => !isCurrent(q)),
+    ];
+  }
+
+  /** Spec 97 — ítems Likert de la vista «Demanda digital» (columna `is_digital_demand_item`). */
+  async findDigitalDemandQuestions(): Promise<Question[]> {
+    return this.questionRepo
+      .createQueryBuilder('question')
+      .leftJoinAndSelect('question.section', 'section')
+      .innerJoin('question.type', 'type')
+      .where('type.name = :typeName', { typeName: 'likert' })
+      .andWhere('question.isDigitalDemandItem = true')
+      .orderBy('question.order', 'ASC')
+      .getMany();
+  }
+
+  /** Ids de las preguntas a leer para una pregunta resuelta por destino. */
+  private idsOf(question: DestinationQuestion): string[] {
+    return question.destinationQuestionIds ?? [question.questionId];
+  }
+
+  /** Cuenta filas, o encuestas distintas si el destino viene de varias preguntas. */
+  private countRows(
+    qb: SelectQueryBuilder<Response>,
+    questionIds: string[],
+  ): Promise<number> {
+    if (questionIds.length <= 1) return qb.getCount();
+    return qb
+      .select('COUNT(DISTINCT response.survey)', 'count')
+      .getRawOne<{ count: string }>()
+      .then((raw) => Number(raw?.count ?? 0));
   }
 
   /** Localiza una pregunta sin `systemField` dedicado por instrumento + texto exacto (D3). */
@@ -622,14 +687,18 @@ export class DashboardService {
   private async resolveQuestionByLocator(
     locator: QuestionLocator,
     opts: { withOptions?: boolean; withType?: boolean } = {},
-  ): Promise<Question | null> {
+  ): Promise<DestinationQuestion | null> {
     if (locator.locate === 'systemField') {
-      const relations: string[] = [];
-      if (opts.withOptions) relations.push('options');
-      if (opts.withType) relations.push('type');
-      return this.questionRepo.findOne({
-        where: { systemField: locator.systemField },
-        relations: relations.length ? relations : undefined,
+      // Spec 97 (D-H4-12): el destino puede estar en varias preguntas (alias,
+      // otros instrumentos, archivadas). La representante —la vigente primero—
+      // aporta tipo y opciones; las agregaciones leen todas con `idsOf`.
+      const all = await this.findQuestionsBySystemField(
+        locator.systemField,
+        opts,
+      );
+      if (all.length === 0) return null;
+      return Object.assign(all[0], {
+        destinationQuestionIds: all.map((q) => q.questionId),
       });
     }
     return this.findQuestionByInstrumentAndText(
@@ -763,9 +832,9 @@ export class DashboardService {
 
       if (filter.matchType === 'range') {
         const { min, max } = filter.range ?? {};
-        const conditions = ['r.question_id = :' + questionParam];
+        const conditions = ['r.question_id IN (:...' + questionParam + ')'];
         const params: Record<string, unknown> = {
-          [questionParam]: filter.questionId,
+          [questionParam]: filter.questionIds,
         };
         if (min !== undefined) {
           const minParam = `respFilter${index}Min`;
@@ -784,9 +853,9 @@ export class DashboardService {
       } else {
         const optionsParam = `respFilter${index}Options`;
         qb.andWhere(
-          `survey.surveyId IN (SELECT r.survey_id FROM responses r INNER JOIN options_question o ON o.option_id = r.option_id WHERE r.question_id = :${questionParam} AND o.text IN (:...${optionsParam}))`,
+          `survey.surveyId IN (SELECT r.survey_id FROM responses r INNER JOIN options_question o ON o.option_id = r.option_id WHERE r.question_id IN (:...${questionParam}) AND o.text IN (:...${optionsParam}))`,
           {
-            [questionParam]: filter.questionId,
+            [questionParam]: filter.questionIds,
             [optionsParam]: filter.optionTexts ?? [],
           },
         );
@@ -834,14 +903,16 @@ export class DashboardService {
   }
 
   private buildResponseBaseQuery(
-    questionId: string,
+    questionIds: string | string[],
     filters: DashboardFiltersDto,
     responseFilters: ResolvedResponseFilters = [],
   ): SelectQueryBuilder<Response> {
     const qb = this.responseRepo
       .createQueryBuilder('response')
       .innerJoin('response.survey', 'survey')
-      .where('response.question = :questionId', { questionId })
+      .where('response.question IN (:...questionIds)', {
+        questionIds: Array.isArray(questionIds) ? questionIds : [questionIds],
+      })
       .andWhere('survey.sincronized = true');
     this.applySurveyFilters(qb, filters, undefined, responseFilters);
     return qb;
@@ -968,7 +1039,7 @@ export class DashboardService {
     instrument?: Instrument,
   ): Promise<DashboardQuestionDto> {
     const typeName = question.type.name;
-    const isInverted = (question.systemField ?? '').startsWith('inverted:');
+    const isInverted = question.isInvertedScale;
 
     const answeredCount = await this.countAnswered(
       question,
@@ -1009,16 +1080,13 @@ export class DashboardService {
   }
 
   private async countAnswered(
-    question: Question,
+    question: DestinationQuestion,
     typeName: string,
     filters: DashboardFiltersDto,
     responseFilters: ResolvedResponseFilters = [],
   ): Promise<number> {
-    const qb = this.buildResponseBaseQuery(
-      question.questionId,
-      filters,
-      responseFilters,
-    );
+    const ids = this.idsOf(question);
+    const qb = this.buildResponseBaseQuery(ids, filters, responseFilters);
 
     if (typeName === 'numeric') {
       qb.andWhere('response.numericValue IS NOT NULL');
@@ -1030,7 +1098,8 @@ export class DashboardService {
 
     // D9: para multiple_choice el denominador es el número de respondentes (encuestas),
     // no el número de filas de respuesta (una por opción marcada).
-    if (typeName === 'multiple_choice') {
+    // Spec 97: con varias preguntas por destino, una encuesta cuenta una sola vez.
+    if (typeName === 'multiple_choice' || ids.length > 1) {
       const raw = await qb
         .select('COUNT(DISTINCT response.survey)', 'count')
         .getRawOne<{ count: string }>();
@@ -1087,20 +1156,19 @@ export class DashboardService {
   }
 
   private async aggregateYesNo(
-    question: Question,
+    question: DestinationQuestion,
     filters: DashboardFiltersDto,
     answeredCount: number,
     responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationYesNoDto> {
-    const raw = await this.buildResponseBaseQuery(
-      question.questionId,
-      filters,
-      responseFilters,
-    )
-      .andWhere('response.booleanValue = true')
-      .getCount();
-
-    const yesCount = raw;
+    const yesCount = await this.countRows(
+      this.buildResponseBaseQuery(
+        this.idsOf(question),
+        filters,
+        responseFilters,
+      ).andWhere('response.booleanValue = true'),
+      this.idsOf(question),
+    );
     const noCount = answeredCount - yesCount;
 
     return {
@@ -1113,28 +1181,34 @@ export class DashboardService {
   }
 
   private async aggregateChoices(
-    question: Question,
+    question: DestinationQuestion,
     filters: DashboardFiltersDto,
     typeName: string,
     answeredCount: number,
     responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationChoicesDto> {
+    // Spec 97: con varias preguntas por destino las opciones se agrupan por
+    // texto (los ids difieren entre preguntas) y se cuenta por encuesta.
+    const multi = this.idsOf(question).length > 1;
     const countExpression =
-      typeName === 'multiple_choice'
+      typeName === 'multiple_choice' || multi
         ? 'COUNT(DISTINCT response.survey)'
         : 'COUNT(response.responseId)';
 
     const rows = await this.buildResponseBaseQuery(
-      question.questionId,
+      this.idsOf(question),
       filters,
       responseFilters,
     )
       .innerJoin('response.option', 'option')
-      .select('option.optionId', 'optionId')
+      .select(
+        multi ? 'MIN(option.optionId::text)' : 'option.optionId',
+        'optionId',
+      )
       .addSelect('option.text', 'text')
       .addSelect('option.value', 'value')
       .addSelect(countExpression, 'count')
-      .groupBy('option.optionId')
+      .groupBy(multi ? 'option.text' : 'option.optionId')
       .addGroupBy('option.text')
       .addGroupBy('option.value')
       .getRawMany<{
@@ -1161,16 +1235,16 @@ export class DashboardService {
   }
 
   /** D8: media de acuerdo (1-5) usando OptionQuestion.value; castea text si no hay value;
-   * invierte (6 - value) si el ítem tiene systemField "inverted:...". */
+   * invierte (6 - value) si el ítem tiene `isInvertedScale` (spec 97). */
   private async aggregateLikert(
-    question: Question,
+    question: DestinationQuestion,
     filters: DashboardFiltersDto,
     isInverted: boolean,
     answeredCount: number,
     responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationLikertDto> {
     const rows = await this.buildResponseBaseQuery(
-      question.questionId,
+      this.idsOf(question),
       filters,
       responseFilters,
     )
@@ -1224,13 +1298,13 @@ export class DashboardService {
   }
 
   private async aggregateNumeric(
-    question: Question,
+    question: DestinationQuestion,
     filters: DashboardFiltersDto,
     answeredCount: number,
     responseFilters: ResolvedResponseFilters = [],
   ): Promise<AggregationNumericDto> {
     const stats = await this.buildResponseBaseQuery(
-      question.questionId,
+      this.idsOf(question),
       filters,
       responseFilters,
     )
@@ -1258,7 +1332,7 @@ export class DashboardService {
     // D7: el array de valores crudos solo se expone si la muestra supera el umbral de privacidad.
     if (answeredCount >= MIN_SAMPLE_THRESHOLD) {
       const valueRows = await this.buildResponseBaseQuery(
-        question.questionId,
+        this.idsOf(question),
         filters,
         responseFilters,
       )
@@ -1380,7 +1454,7 @@ export class DashboardService {
         if (answeredCount < MIN_SAMPLE_THRESHOLD) {
           return { ...base, value: null, suppressed: true };
         }
-        const isInverted = (question.systemField ?? '').startsWith('inverted:');
+        const isInverted = question.isInvertedScale;
         const agreeCount = await this.countLikertAtOrAbove(
           question,
           filters,
@@ -1410,16 +1484,18 @@ export class DashboardService {
         if (answeredCount < MIN_SAMPLE_THRESHOLD) {
           return { ...base, value: null, suppressed: true };
         }
-        const acceptedCount = await this.buildResponseBaseQuery(
-          question.questionId,
-          filters,
-          responseFilters,
-        )
-          .innerJoin('response.option', 'option')
-          .andWhere('option.text IN (:...acceptedOptionTexts)', {
-            acceptedOptionTexts: operation.acceptedOptionTexts,
-          })
-          .getCount();
+        const acceptedCount = await this.countRows(
+          this.buildResponseBaseQuery(
+            this.idsOf(question),
+            filters,
+            responseFilters,
+          )
+            .innerJoin('response.option', 'option')
+            .andWhere('option.text IN (:...acceptedOptionTexts)', {
+              acceptedOptionTexts: operation.acceptedOptionTexts,
+            }),
+          this.idsOf(question),
+        );
         return {
           ...base,
           value: round2((acceptedCount / answeredCount) * 100),
@@ -1476,7 +1552,7 @@ export class DashboardService {
     isInverted: boolean,
   ): Promise<number> {
     return this.buildResponseBaseQuery(
-      question.questionId,
+      this.idsOf(question),
       filters,
       responseFilters,
     )
@@ -1523,18 +1599,9 @@ export class DashboardService {
     return Number(raw?.count ?? 0);
   }
 
-  /** Preguntas Likert ★ (D4): todo instrumento, `systemField` = tag estratégico. */
-  private async getStrategicLikertQuestions(): Promise<Question[]> {
-    return this.questionRepo
-      .createQueryBuilder('question')
-      .leftJoinAndSelect('question.section', 'section')
-      .innerJoin('question.type', 'type')
-      .where('type.name = :typeName', { typeName: 'likert' })
-      .andWhere('question.systemField = :systemField', {
-        systemField: DIGITAL_DEMAND_SOURCES.strategicSystemField,
-      })
-      .orderBy('question.order', 'ASC')
-      .getMany();
+  /** Preguntas Likert ★ (D4): todo instrumento, marcadas con `isDigitalDemandItem` (spec 97). */
+  private getStrategicLikertQuestions(): Promise<Question[]> {
+    return this.findDigitalDemandQuestions();
   }
 
   /**
@@ -1663,7 +1730,7 @@ export class DashboardService {
       );
       if (answeredCount < MIN_SAMPLE_THRESHOLD) continue;
 
-      const isInverted = (question.systemField ?? '').startsWith('inverted:');
+      const isInverted = question.isInvertedScale;
       let weightedSum = 0;
       let scoredCount = 0;
 
@@ -1816,7 +1883,7 @@ export class DashboardService {
       );
       if (answeredCount < MIN_SAMPLE_THRESHOLD) continue;
 
-      const isInverted = (question.systemField ?? '').startsWith('inverted:');
+      const isInverted = question.isInvertedScale;
       const aggregation = await this.aggregateLikert(
         question,
         filters,
@@ -1870,7 +1937,7 @@ export class DashboardService {
         continue;
       }
 
-      const isInverted = (question.systemField ?? '').startsWith('inverted:');
+      const isInverted = question.isInvertedScale;
       const aggregation = await this.aggregateLikert(
         question,
         filters,
