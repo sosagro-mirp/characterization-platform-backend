@@ -1,3 +1,4 @@
+import { resolveSystemField } from '../questions/system-fields/system-field-registry';
 import {
   BadRequestException,
   Injectable,
@@ -490,6 +491,11 @@ export class InstrumentsService {
           isKeyQuestion: question.isKeyQuestion,
           order: question.order,
           systemField: question.systemField ?? null,
+          // Spec 97 — etiqueta del destino y marcas que antes viajaban en `systemField`.
+          systemFieldLabel:
+            resolveSystemField(question.systemField)?.label ?? null,
+          isInvertedScale: question.isInvertedScale ?? false,
+          isDigitalDemandItem: question.isDigitalDemandItem ?? false,
           type: question.type
             ? {
                 typeId: question.type.typeId,
@@ -616,6 +622,11 @@ export class InstrumentsService {
           isKeyQuestion: question.isKeyQuestion,
           order: question.order,
           systemField: question.systemField ?? null,
+          // Spec 97 — etiqueta del destino y marcas que antes viajaban en `systemField`.
+          systemFieldLabel:
+            resolveSystemField(question.systemField)?.label ?? null,
+          isInvertedScale: question.isInvertedScale ?? false,
+          isDigitalDemandItem: question.isDigitalDemandItem ?? false,
           archivedAt: question.archivedAt ?? null,
           responseCount: questionResponseCounts.get(question.questionId) ?? 0,
           type: question.type
