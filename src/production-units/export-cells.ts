@@ -69,11 +69,12 @@ export function questionHeaders(qs: { text: string; typeName: string }[]) {
 
 /** Nombres de hoja: ≤31 caracteres, sin `[]:*?/\` y únicos. */
 export function uniqueSheetName(base: string, used: Set<string>): string {
+  // Un nombre largo conserva inicio y final: los instrumentos de una misma
+  // familia comparten el prefijo y se distinguen por el final (spec 99, C10c).
+  const safe = base.replace(/[[\]:*?/\\]/g, '-').trim();
   const clean =
-    base
-      .replace(/[[\]:*?/\\]/g, '-')
-      .slice(0, 28)
-      .trim() || 'Instrumento';
+    (safe.length > 28 ? `${safe.slice(0, 12)}…${safe.slice(-15)}` : safe) ||
+    'Instrumento';
   let name = clean;
   for (let n = 2; used.has(name); n++) name = `${clean.slice(0, 26)}-${n}`;
   used.add(name);

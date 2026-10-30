@@ -10,5 +10,6 @@ import { ProductionUnitsService } from './production-units.service';
   imports: [TypeOrmModule.forFeature([DataExportLog]), ConsentsModule],
   controllers: [ProductionUnitsController],
   providers: [ProductionUnitsService, ProductionUnitsExportService],
+  exports: [ProductionUnitsService],
 })
 export class ProductionUnitsModule {}

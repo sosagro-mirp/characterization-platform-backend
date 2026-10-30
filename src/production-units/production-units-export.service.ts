@@ -31,6 +31,12 @@ const STATUS_LABEL: Record<string, string> = {
   no_aplica: 'No aplica',
 };
 
+const SELECTION_LABEL: Record<string, string> = {
+  included: 'Incluida',
+  excluded: 'Excluida',
+  in_review: 'En revisión',
+};
+
 const REASON_LABEL: Record<string, string> = {
   sin_productor: 'Sin productor',
   productor_sin_finca: 'Productor sin finca',
@@ -78,6 +84,28 @@ export function extendAutoFilters(wb: ExcelJS.Workbook): void {
       to: { row: ws.rowCount, column: range.to.column },
     };
   }
+}
+
+/**
+ * Hoja con encabezado en negrita, fila fija y autofiltro provisional: la hoja
+ * todavía no tiene filas, así que `extendAutoFilters` lo estira hasta la última
+ * al cerrar el libro.
+ */
+export function addFilteredSheet(
+  wb: ExcelJS.Workbook,
+  name: string,
+  header: string[],
+): ExcelJS.Worksheet {
+  const ws = wb.addWorksheet(name, {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+  ws.addRow(header).font = { bold: true };
+  ws.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: header.length },
+  };
+  ws.columns.forEach((c) => (c.width = 22));
+  return ws;
 }
 
 @Injectable()
@@ -147,6 +175,8 @@ export class ProductionUnitsExportService {
       'Teléfono',
       'Rol',
       'Consentimiento',
+      'Decisión',
+      'Motivo de la decisión',
       'Área',
       'Altitud',
       'Latitud',
@@ -174,6 +204,8 @@ export class ProductionUnitsExportService {
         farm.farmers.map((p) => p.phone ?? '').join('; '),
         farm.farmers.map((p) => p.role ?? '').join('; '),
         consent.join('; '),
+        row.selection ? SELECTION_LABEL[row.selection.status] : 'Sin decisión',
+        row.selection?.reason ?? null,
         detail?.area ?? null,
         detail?.altitude ?? null,
         detail?.latitude ?? null,
@@ -301,18 +333,7 @@ export class ProductionUnitsExportService {
   }
 
   private sheet(wb: ExcelJS.Workbook, name: string, header: string[]) {
-    const ws = wb.addWorksheet(name, {
-      views: [{ state: 'frozen', ySplit: 1 }],
-    });
-    ws.addRow(header).font = { bold: true };
-    // Rango provisional: la hoja todavía no tiene filas. `extendAutoFilters`
-    // lo estira hasta la última al cerrar el libro.
-    ws.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: 1, column: header.length },
-    };
-    ws.columns.forEach((c) => (c.width = 22));
-    return ws;
+    return addFilteredSheet(wb, name, header);
   }
 
   private async farmDetails(ids: string[]) {
