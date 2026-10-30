@@ -10,6 +10,9 @@ export interface ResponseRow {
   is_other: boolean | null;
 }
 
+/** Spec 42: número y unidad viajan en la misma fila (`numericValue` + `optionId`). */
+export const NUMERIC_WITH_UNIT = 'numeric_with_unit';
+
 /** Valor de la celda de una pregunta: números y fechas conservan su tipo. */
 export function cellValue(
   q: { typeName: string },
@@ -18,6 +21,13 @@ export function cellValue(
 ): string | number | Date | null {
   if (attachments > 0) return attachments;
   if (rows.length === 0) return null;
+  // El número va en esta celda y la unidad en la columna contigua: si cayera
+  // por la rama de opciones de abajo, la fila trae `option_text` (la unidad) y
+  // la celda perdería el valor numérico.
+  if (q.typeName === NUMERIC_WITH_UNIT) {
+    // Respuestas históricas sin parsear conservan su texto (spec 42, D5).
+    return rows[0].numeric_value ?? rows[0].text_value;
+  }
   if (rows.length > 1 || rows[0].option_text !== null) {
     return rows
       .map((r) => {
@@ -37,6 +47,24 @@ export function cellValue(
     if (!Number.isNaN(d.getTime())) return d;
   }
   return r.text_value;
+}
+
+/** Unidad de una pregunta `numeric_with_unit`, para la columna contigua. */
+export function unitCellValue(rows: ResponseRow[]): string | null {
+  return rows.length === 0 ? null : rows[0].option_text;
+}
+
+/**
+ * Encabezados de las preguntas: `numeric_with_unit` ocupa dos columnas, el
+ * valor y su unidad. El orden debe coincidir con el de las celdas que arma
+ * `addResponseSheets`.
+ */
+export function questionHeaders(qs: { text: string; typeName: string }[]) {
+  return qs.flatMap((q) =>
+    q.typeName === NUMERIC_WITH_UNIT
+      ? [q.text, `${q.text} (unidad)`]
+      : [q.text],
+  );
 }
 
 /** Nombres de hoja: ≤31 caracteres, sin `[]:*?/\` y únicos. */
