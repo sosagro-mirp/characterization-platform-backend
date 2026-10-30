@@ -6,9 +6,12 @@ import { DataSource, Repository } from 'typeorm';
 import { isCountableSurvey } from '../coverage/coverage-calculator';
 import {
   cellValue,
+  NUMERIC_WITH_UNIT,
+  questionHeaders,
   ResponseRow,
   uniqueHeaders,
   uniqueSheetName,
+  unitCellValue,
 } from './export-cells';
 import { DataExportLog } from './entities/data-export-log.entity';
 import {
@@ -501,7 +504,7 @@ export class ProductionUnitsExportService {
         'Cultivo',
         'Encuesta',
         'Fecha',
-        ...uniqueHeaders(visible.map((q) => q.text)),
+        ...uniqueHeaders(questionHeaders(visible)),
       ];
       const ws = this.sheet(wb, name, header);
       for (const p of used) {
@@ -514,13 +517,17 @@ export class ProductionUnitsExportService {
           p.cropName ?? null,
           p.survey.survey_id,
           p.survey.created_at,
-          ...visible.map((q) =>
-            cellValue(
+          ...visible.flatMap((q) => {
+            const rows = answers?.get(q.questionId) ?? [];
+            const value = cellValue(
               q,
-              answers?.get(q.questionId) ?? [],
+              rows,
               attachCount.get(`${p.survey.survey_id}|${q.questionId}`) ?? 0,
-            ),
-          ),
+            );
+            return q.typeName === NUMERIC_WITH_UNIT
+              ? [value, unitCellValue(rows)]
+              : [value];
+          }),
         ]);
       }
 
