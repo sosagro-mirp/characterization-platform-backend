@@ -27,7 +27,7 @@ export interface CoverageColumn {
 
 export interface ProductionUnitRow {
   farmId: string;
-  farmName: string;
+  name: string;
   department: { departmentId: string; name: string } | null;
   town: { townId: string; name: string } | null;
   crops: { farmCropId: string; cropId: string; name: string }[];
@@ -151,7 +151,7 @@ export class ProductionUnitsService {
     if (farm.farmers.length === 0) warnings.push('sin_productor');
     return {
       farmId: farm.farmId,
-      farmName: farm.farmName,
+      name: farm.farmName,
       department: farm.department,
       town: farm.town,
       crops: farm.crops,
