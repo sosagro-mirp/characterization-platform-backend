@@ -47,6 +47,7 @@ import { ChangeRequestsModule } from './change-requests/change-requests.module';
 import { MediaAttachmentsModule } from './media-attachments/media-attachments.module';
 import { StorageModule } from './storage/storage.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ProductionUnitsModule } from './production-units/production-units.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { ConsentsModule } from './consents/consents.module';
 import { PublicSurveysModule } from './public-surveys/public-surveys.module';
@@ -150,6 +151,7 @@ import { PublicSurveysModule } from './public-surveys/public-surveys.module';
     MediaAttachmentsModule,
     StorageModule,
     DashboardModule,
+    ProductionUnitsModule,
     ApiKeysModule,
     ConsentsModule,
     PublicSurveysModule,
