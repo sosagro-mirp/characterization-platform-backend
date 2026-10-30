@@ -26,6 +26,14 @@ export interface CoverageColumn {
   memberIds: string[];
 }
 
+/** Decisión vigente de la selección (spec 99); `null` = sin decisión. */
+export interface RowSelection {
+  status: 'included' | 'excluded' | 'in_review';
+  reason: string;
+  version: number;
+  updatedAt: string;
+}
+
 export interface ProductionUnitRow {
   farmId: string;
   name: string;
@@ -47,6 +55,7 @@ export interface ProductionUnitRow {
   unsyncedWithResponses: number;
   coverage: Record<string, CoverageCell>;
   warnings: string[];
+  selection: RowSelection | null;
 }
 
 export interface UnlocatedSurvey {
@@ -196,6 +205,7 @@ export class ProductionUnitsService {
       ).length,
       coverage,
       warnings,
+      selection: data.selections.get(farm.farmId) ?? null,
     };
   }
 
@@ -306,45 +316,51 @@ export class ProductionUnitsService {
   async load(): Promise<LoadedData> {
     const q = <T>(sql: string) => this.dataSource.query<T[]>(sql);
 
-    const [farmRows, farmerRows, cropRows, surveyRows, instrumentRows] =
-      await Promise.all([
-        q<{
-          farm_id: string;
-          name: string;
-          town_id: string | null;
-          town_name: string | null;
-          department_id: string | null;
-          department_name: string | null;
-        }>(`SELECT f.farm_id, f.name, t.town_id, t.name AS town_name,
+    const [
+      farmRows,
+      farmerRows,
+      cropRows,
+      surveyRows,
+      instrumentRows,
+      selectionRows,
+    ] = await Promise.all([
+      q<{
+        farm_id: string;
+        name: string;
+        town_id: string | null;
+        town_name: string | null;
+        department_id: string | null;
+        department_name: string | null;
+      }>(`SELECT f.farm_id, f.name, t.town_id, t.name AS town_name,
                    d.department_id, d.name AS department_name
               FROM farms f
               LEFT JOIN towns t ON t.town_id = f.town_id
               LEFT JOIN departments d ON d.department_id = t.department_id
              ORDER BY f.name`),
-        q<{
-          farm_id: string;
-          farmer_id: string;
-          name: string;
-          document_id: string | null;
-          phone: string | null;
-          role: string | null;
-          is_primary: boolean;
-        }>(`SELECT ff.farm_id, ff.farmer_id, fr.name, fr.document_id, fr.phone,
+      q<{
+        farm_id: string;
+        farmer_id: string;
+        name: string;
+        document_id: string | null;
+        phone: string | null;
+        role: string | null;
+        is_primary: boolean;
+      }>(`SELECT ff.farm_id, ff.farmer_id, fr.name, fr.document_id, fr.phone,
                    ff.role, ff.is_primary
               FROM farmer_farms ff
               JOIN farmers fr ON fr.id = ff.farmer_id
              ORDER BY ff.is_primary DESC, fr.name`),
-        q<{
-          farm_id: string;
-          farm_crop_id: string;
-          crop_id: string;
-          name: string;
-        }>(`SELECT fc.farm_id, fc.farm_crop_id, fc.crop_id, c.name
+      q<{
+        farm_id: string;
+        farm_crop_id: string;
+        crop_id: string;
+        name: string;
+      }>(`SELECT fc.farm_id, fc.farm_crop_id, fc.crop_id, c.name
               FROM farms_crops fc
               JOIN types_of_crops c ON c.crop_id = fc.crop_id
              WHERE fc.archived_at IS NULL
              ORDER BY c.name`),
-        q<RawSurvey>(`SELECT s.survey_id, s.farmer_id, s.farm_id, s.farm_crop_id,
+      q<RawSurvey>(`SELECT s.survey_id, s.farmer_id, s.farm_id, s.farm_crop_id,
                    s.sincronized, s.origin, s.review_status, s.respondent_name,
                    s.created_at,
                    (SELECT count(*)::int FROM responses r
@@ -353,21 +369,42 @@ export class ProductionUnitsService {
                       FROM surveys_instruments si
                      WHERE si.survey_id = s.survey_id) AS instrument_ids
               FROM surveys s`),
-        q<{
-          instrument_id: string;
-          name: string;
-          code: string | null;
-          is_active: boolean;
-          scope_level: ScopedInstrument['scopeLevel'] | null;
-          coverage_group: string | null;
-          crop_ids: string[] | null;
-        }>(`SELECT i.instrument_id, i.name, i.code, i.is_active, i.scope_level,
+      q<{
+        instrument_id: string;
+        name: string;
+        code: string | null;
+        is_active: boolean;
+        scope_level: ScopedInstrument['scopeLevel'] | null;
+        coverage_group: string | null;
+        crop_ids: string[] | null;
+      }>(`SELECT i.instrument_id, i.name, i.code, i.is_active, i.scope_level,
                    i.coverage_group,
                    (SELECT array_agg(ic.crop_id) FROM instruments_crops ic
                      WHERE ic.instrument_id = i.instrument_id) AS crop_ids
               FROM instruments i
              ORDER BY i.name`),
-      ]);
+      q<{
+        farm_id: string;
+        status: RowSelection['status'];
+        reason: string;
+        version: number;
+        updated_at: Date;
+      }>(
+        `SELECT farm_id, status, reason, version, updated_at FROM farm_selections`,
+      ),
+    ]);
+
+    const selections = new Map<string, RowSelection>(
+      selectionRows.map((r) => [
+        r.farm_id,
+        {
+          status: r.status,
+          reason: r.reason,
+          version: r.version,
+          updatedAt: r.updated_at.toISOString(),
+        },
+      ]),
+    );
 
     const farmerFarmCounts: Record<string, number> = {};
     for (const r of farmerRows) {
@@ -461,6 +498,7 @@ export class ProductionUnitsService {
       rawSurveys: surveyRows,
       farmerFarmCounts,
       consentPending,
+      selections,
       withoutScope: instrumentRows.filter(
         (i) => i.is_active && i.scope_level === null,
       ).length,
@@ -487,5 +525,7 @@ export interface LoadedData {
   farmerFarmCounts: Record<string, number>;
   /** farmerId → true si su consentimiento está pendiente (false = vigente). */
   consentPending: Map<string, boolean>;
+  /** farmId → decisión vigente de la selección (spec 99). */
+  selections: Map<string, RowSelection>;
   withoutScope: number;
 }

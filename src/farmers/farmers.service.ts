@@ -498,11 +498,23 @@ export class FarmersService {
         ORDER BY mine.is_primary DESC, mine.created_at ASC`,
       [id, surveyIds],
     );
+    // Spec 99 — una finca con decisiones de selección no se borra (FK RESTRICT).
+    const decided = farmRows.length
+      ? await this.farmersRepository.manager.query<{ farmId: string }[]>(
+          `SELECT farm_id AS "farmId" FROM farm_selection_events
+            WHERE farm_id = ANY($1::uuid[]) GROUP BY farm_id`,
+          [farmRows.map((r) => r.farmId)],
+        )
+      : [];
+    const decidedIds = new Set(decided.map((d) => d.farmId));
     const farms: FarmDeletionInfo[] = farmRows.map((row) => ({
       farmId: row.farmId,
       name: row.name,
       shared: row.shared,
       willBeDeleted: !row.shared,
+      ...(decidedIds.has(row.farmId) && !row.shared
+        ? { blockedBy: 'selection' as const }
+        : {}),
     }));
     // `farm` (contrato histórico) = la principal.
     const farmInfo: FarmerDeletionPreviewDto['farm'] =
@@ -598,6 +610,13 @@ export class FarmersService {
       farms,
     } = await this.computeDeletionPlan(id);
     const surveyIds = surveys.map((s) => s.surveyId);
+    const blocked = farms.filter((f) => f.blockedBy === 'selection');
+    if (blocked.length) {
+      throw new ConflictException(
+        `No se puede borrar: la finca ${blocked.map((f) => f.name).join(', ')} ` +
+          `tiene decisiones de selección (spec 99).`,
+      );
+    }
     const farmsToDelete = farms.filter((f) => f.willBeDeleted);
     let mediaKeys: string[] = [];
 

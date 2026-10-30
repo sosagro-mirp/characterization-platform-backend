@@ -167,6 +167,18 @@ describe('Spec 98 — export-cells', () => {
       expect(name.length).toBeLessThanOrEqual(31);
     });
 
+    it('instrumentos de una misma familia se distinguen por el final', () => {
+      const used = new Set<string>();
+      const a = uniqueSheetName('Talleres de co-creación — SosAgro 4.C', used);
+      const b = uniqueSheetName(
+        'Talleres de co-creación — SosAgro 4.C - Tablets',
+        used,
+      );
+      expect(a).not.toBe(b);
+      expect(b).not.toMatch(/-\d$/);
+      expect(b.length).toBeLessThanOrEqual(31);
+    });
+
     it('nombres repetidos reciben sufijo', () => {
       const used = new Set<string>();
       const a = uniqueSheetName('Talleres de co-creación — SosAgro 4.C', used);
