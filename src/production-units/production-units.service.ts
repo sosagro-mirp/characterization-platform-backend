@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { ConsentRecordsService } from '../consents/consent-records.service';
 import {
   computeFarmCoverage,
   isCountableSurvey,
@@ -38,7 +39,10 @@ export interface ProductionUnitRow {
     phone: string | null;
     role: string | null;
     isPrimary: boolean;
+    consentPending: boolean;
   }[];
+  /** Algún productor de la finca tiene el consentimiento pendiente. */
+  hasPendingConsent: boolean;
   totalSurveys: number;
   unsyncedWithResponses: number;
   coverage: Record<string, CoverageCell>;
@@ -74,7 +78,7 @@ export interface FarmCoverageDetail {
   instruments: (CoverageColumn & { cell: CoverageCell })[];
 }
 
-interface RawSurvey {
+export interface RawSurvey {
   survey_id: string;
   farmer_id: string | null;
   farm_id: string | null;
@@ -90,7 +94,10 @@ interface RawSurvey {
 
 @Injectable()
 export class ProductionUnitsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly consents: ConsentRecordsService,
+  ) {}
 
   async getOverview(): Promise<ProductionUnitsResult> {
     const data = await this.load();
@@ -140,7 +147,7 @@ export class ProductionUnitsService {
     );
   }
 
-  private buildRow(farm: LoadedFarm, data: LoadedData): ProductionUnitRow {
+  buildRow(farm: LoadedFarm, data: LoadedData): ProductionUnitRow {
     const coverage: Record<string, CoverageCell> = {};
     for (const column of data.columns) {
       coverage[column.instrumentId] = this.cell(farm, column, data);
@@ -155,7 +162,13 @@ export class ProductionUnitsService {
       department: farm.department,
       town: farm.town,
       crops: farm.crops,
-      farmers: farm.farmers,
+      farmers: farm.farmers.map((p) => ({
+        ...p,
+        consentPending: data.consentPending.get(p.farmerId) !== false,
+      })),
+      hasPendingConsent: farm.farmers.some(
+        (p) => data.consentPending.get(p.farmerId) !== false,
+      ),
       totalSurveys: mine.filter((s) => isCountableSurvey(this.toInput(s, '')))
         .length,
       unsyncedWithResponses: mine.filter(
@@ -176,7 +189,7 @@ export class ProductionUnitsService {
     );
   }
 
-  private findUnlocated(data: LoadedData): UnlocatedSurvey[] {
+  findUnlocated(data: LoadedData): UnlocatedSurvey[] {
     const out: UnlocatedSurvey[] = [];
     for (const s of data.rawSurveys) {
       if (!s.sincronized) continue;
@@ -220,7 +233,7 @@ export class ProductionUnitsService {
     };
   }
 
-  private async load(): Promise<LoadedData> {
+  async load(): Promise<LoadedData> {
     const q = <T>(sql: string) => this.dataSource.query<T[]>(sql);
 
     const [farmRows, farmerRows, cropRows, surveyRows, instrumentRows] =
@@ -366,6 +379,10 @@ export class ProductionUnitsService {
       }
     }
 
+    const consentPending = await this.consents.getPendingConsentMap(
+      Object.keys(farmerFarmCounts),
+    );
+
     return {
       farms,
       columns,
@@ -373,6 +390,7 @@ export class ProductionUnitsService {
       surveys,
       rawSurveys: surveyRows,
       farmerFarmCounts,
+      consentPending,
       withoutScope: instrumentRows.filter(
         (i) => i.is_active && i.scope_level === null,
       ).length,
@@ -380,22 +398,24 @@ export class ProductionUnitsService {
   }
 }
 
-interface LoadedFarm {
+export interface LoadedFarm {
   farmId: string;
   farmName: string;
   department: ProductionUnitRow['department'];
   town: ProductionUnitRow['town'];
   crops: ProductionUnitRow['crops'];
-  farmers: ProductionUnitRow['farmers'];
+  farmers: Omit<ProductionUnitRow['farmers'][number], 'consentPending'>[];
   input: FarmInput;
 }
 
-interface LoadedData {
+export interface LoadedData {
   farms: LoadedFarm[];
   columns: CoverageColumn[];
   scoped: ScopedInstrument[];
   surveys: SurveyInput[];
   rawSurveys: RawSurvey[];
   farmerFarmCounts: Record<string, number>;
+  /** farmerId → true si su consentimiento está pendiente (false = vigente). */
+  consentPending: Map<string, boolean>;
   withoutScope: number;
 }
