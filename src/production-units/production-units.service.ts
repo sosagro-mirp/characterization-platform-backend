@@ -57,7 +57,11 @@ export interface UnlocatedSurvey {
   respondentName: string | null;
   responseCount: number;
   instrumentIds: string[];
-  reason: 'sin_productor' | 'productor_sin_finca' | 'productor_varias_fincas';
+  reason:
+    | 'sin_productor'
+    | 'productor_sin_finca'
+    | 'productor_varias_fincas'
+    | 'cultivo_ambiguo';
 }
 
 export interface ProductionUnitsResult {
@@ -99,9 +103,25 @@ export class ProductionUnitsService {
     private readonly consents: ConsentRecordsService,
   ) {}
 
-  async getOverview(): Promise<ProductionUnitsResult> {
+  /**
+   * `maskPersonal` quita documento y teléfono de los productores: se usa con
+   * API keys, que nunca deben recibir datos personales (spec 98).
+   */
+  async getOverview(maskPersonal = false): Promise<ProductionUnitsResult> {
     const data = await this.load();
-    const rows = data.farms.map((farm) => this.buildRow(farm, data));
+    const rows = data.farms.map((farm) => {
+      const row = this.buildRow(farm, data);
+      return maskPersonal
+        ? {
+            ...row,
+            farmers: row.farmers.map((p) => ({
+              ...p,
+              documentId: null,
+              phone: null,
+            })),
+          }
+        : row;
+    });
     const unlocated = this.findUnlocated(data);
     return {
       instruments: data.columns,
@@ -191,15 +211,11 @@ export class ProductionUnitsService {
 
   findUnlocated(data: LoadedData): UnlocatedSurvey[] {
     const out: UnlocatedSurvey[] = [];
+    const farmsById = new Map(data.farms.map((f) => [f.farmId, f]));
     for (const s of data.rawSurveys) {
       if (!s.sincronized) continue;
       if (s.origin === 'public' && s.review_status !== 'processed') continue;
-      if (s.farm_id) continue;
-      const farms = s.farmer_id
-        ? (data.farmerFarmCounts[s.farmer_id] ?? 0)
-        : -1;
-      if (farms === 1) continue;
-      out.push({
+      const base = {
         surveyId: s.survey_id,
         origin: s.origin,
         createdAt: s.created_at.toISOString(),
@@ -207,6 +223,41 @@ export class ProductionUnitsService {
         respondentName: s.respondent_name,
         responseCount: s.response_count,
         instrumentIds: s.instrument_ids ?? [],
+      };
+
+      if (s.farm_id) {
+        // Con finca, pero sin cultivo de finca en un instrumento por cultivo
+        // y con varios cultivos aplicables: el cálculo no la atribuye a
+        // ninguno, así que debe verse aquí en vez de perderse en silencio.
+        const farm = farmsById.get(s.farm_id);
+        if (
+          farm &&
+          s.farm_crop_id === null &&
+          this.cropAmbiguous(s, farm, data)
+        ) {
+          out.push({ ...base, reason: 'cultivo_ambiguo' });
+        }
+        continue;
+      }
+
+      const farms = s.farmer_id
+        ? (data.farmerFarmCounts[s.farmer_id] ?? 0)
+        : -1;
+      if (farms === 1) {
+        const farm = data.farms.find((f) =>
+          f.input.farmerIds.includes(s.farmer_id!),
+        );
+        if (
+          farm &&
+          s.farm_crop_id === null &&
+          this.cropAmbiguous(s, farm, data)
+        ) {
+          out.push({ ...base, reason: 'cultivo_ambiguo' });
+        }
+        continue;
+      }
+      out.push({
+        ...base,
         reason:
           farms === -1
             ? 'sin_productor'
@@ -216,6 +267,25 @@ export class ProductionUnitsService {
       });
     }
     return out;
+  }
+
+  private cropAmbiguous(
+    s: RawSurvey,
+    farm: LoadedFarm,
+    data: LoadedData,
+  ): boolean {
+    return (s.instrument_ids ?? []).some((instrumentId) => {
+      const instrument = data.scoped.find(
+        (i) => i.instrumentId === instrumentId,
+      );
+      if (instrument?.scopeLevel !== 'farm_crop') return false;
+      const applicable = farm.input.farmCrops.filter(
+        (fc) =>
+          instrument.cropIds.length === 0 ||
+          instrument.cropIds.includes(fc.cropId),
+      );
+      return applicable.length > 1;
+    });
   }
 
   private toInput(s: RawSurvey, instrumentId: string): SurveyInput {

@@ -189,12 +189,7 @@ describe('Spec 98 — coverage-calculator', () => {
         coverageGroup: 'TALLER',
         isActive: false,
       });
-      const cell = compute(
-        farm(),
-        a,
-        [survey({ instrumentId: 'b' })],
-        [a, b],
-      );
+      const cell = compute(farm(), a, [survey({ instrumentId: 'b' })], [a, b]);
       expect(cell.status).toBe('aplicado');
     });
   });

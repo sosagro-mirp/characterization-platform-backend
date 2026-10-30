@@ -196,9 +196,10 @@ describe('Spec 98 — exploración de unidades productivas (e2e)', () => {
       [farmId, farmNoSurveysId],
     ]);
     await safe(`DELETE FROM farmers WHERE id = $1`, [farmerId]);
-    await safe(`DELETE FROM instruments WHERE instrument_id = ANY($1::uuid[])`, [
-      [scopedInstrumentId, unscopedInstrumentId],
-    ]);
+    await safe(
+      `DELETE FROM instruments WHERE instrument_id = ANY($1::uuid[])`,
+      [[scopedInstrumentId, unscopedInstrumentId]],
+    );
     await safe(`DELETE FROM users WHERE email LIKE $1`, [`${PREFIX}-%`]);
     await app.close();
   });
@@ -387,6 +388,59 @@ describe('Spec 98 — exploración de unidades productivas (e2e)', () => {
         [scopedInstrumentId],
       );
       expect(scoped.scope_level).toBe('farm');
+    });
+  });
+  describe('C09 — encuesta con finca pero sin cultivo, con varios cultivos aplicables', () => {
+    it('sale en "Sin ubicar" con su motivo', async () => {
+      const crops = await ds.query<{ crop_id: string }[]>(
+        `SELECT crop_id FROM types_of_crops ORDER BY name LIMIT 2`,
+      );
+      const [farm] = await ds.query<{ farm_id: string }[]>(
+        `INSERT INTO farms (farm_id, name) VALUES (gen_random_uuid(), $1)
+         RETURNING farm_id`,
+        [`Spec98 Ambigua ${RUN}`],
+      );
+      for (const c of crops) {
+        await ds.query(
+          `INSERT INTO farms_crops (farm_id, crop_id) VALUES ($1, $2)`,
+          [farm.farm_id, c.crop_id],
+        );
+      }
+      const instrumentId = await insertInstrument(`Spec98 Por cultivo ${RUN}`);
+      await ds.query(
+        `UPDATE instruments SET scope_level = 'farm_crop' WHERE instrument_id = $1`,
+        [instrumentId],
+      );
+      const [survey] = await ds.query<{ survey_id: string }[]>(
+        `INSERT INTO surveys (survey_id, sincronized, origin, farm_id)
+         VALUES (gen_random_uuid(), true, 'field', $1) RETURNING survey_id`,
+        [farm.farm_id],
+      );
+      await ds.query(
+        `INSERT INTO surveys_instruments (survey_id, instrument_id) VALUES ($1, $2)`,
+        [survey.survey_id, instrumentId],
+      );
+      try {
+        const body = await getUnits();
+        const found = (
+          body.unlocated as { surveyId: string; reason: string }[]
+        ).find((u) => u.surveyId === survey.survey_id);
+        expect(found?.reason).toBe('cultivo_ambiguo');
+      } finally {
+        await ds.query(`DELETE FROM surveys_instruments WHERE survey_id = $1`, [
+          survey.survey_id,
+        ]);
+        await ds.query(`DELETE FROM surveys WHERE survey_id = $1`, [
+          survey.survey_id,
+        ]);
+        await ds.query(`DELETE FROM farms_crops WHERE farm_id = $1`, [
+          farm.farm_id,
+        ]);
+        await ds.query(`DELETE FROM farms WHERE farm_id = $1`, [farm.farm_id]);
+        await ds.query(`DELETE FROM instruments WHERE instrument_id = $1`, [
+          instrumentId,
+        ]);
+      }
     });
   });
 });

@@ -111,12 +111,19 @@ export async function applyInstrumentScopeMatrix(
           [row.instrument_id, entry.level, entry.group ?? null],
         );
         if (entry.crops?.length) {
-          await manager.query(
+          const inserted: unknown[] = await manager.query(
             `INSERT INTO instruments_crops (instrument_id, crop_id)
              SELECT $1, crop_id FROM types_of_crops WHERE name = ANY($2::text[])
-             ON CONFLICT DO NOTHING`,
+             ON CONFLICT DO NOTHING RETURNING crop_id`,
             [row.instrument_id, entry.crops],
           );
+          // Un nombre de cultivo que no coincide dejaría el instrumento
+          // aplicando a "todos los cultivos" sin avisar: se aborta todo.
+          if (inserted.length !== entry.crops.length) {
+            throw new Error(
+              `${value}: se esperaban ${entry.crops.length} cultivos (${entry.crops.join(', ')}) y se vincularon ${inserted.length}`,
+            );
+          }
         }
         result.updated += 1;
       }

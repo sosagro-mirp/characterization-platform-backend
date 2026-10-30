@@ -225,6 +225,9 @@ export class InstrumentsService {
       }
     }
 
+    if (typeof rest.coverageGroup === 'string') {
+      rest.coverageGroup = rest.coverageGroup.trim() || null;
+    }
     Object.assign(instrument, rest);
 
     // Spec 98 — los cultivos solo tienen sentido con alcance `farm_crop`; al

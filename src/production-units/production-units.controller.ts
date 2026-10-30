@@ -6,11 +6,13 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Req,
   StreamableFile,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
+import { JwtOnly } from '../auth/decorators/jwt-only.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { ExportProductionUnitsDto } from './dto/export-production-units.dto';
@@ -33,11 +35,13 @@ export class ProductionUnitsController {
     description:
       'Una fila por finca, una columna por instrumento activo con alcance declarado. Sin paginar: se filtra en el cliente.',
   })
-  getOverview() {
-    return this.service.getOverview();
+  getOverview(@Req() req: { apiKey?: unknown }) {
+    // Las API keys (p. ej. el MCP) nunca reciben documento ni teléfono.
+    return this.service.getOverview(Boolean(req.apiKey));
   }
 
   @Post('export')
+  @JwtOnly()
   @Header(
     'Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -57,6 +61,7 @@ export class ProductionUnitsController {
   }
 
   @Get('exports')
+  @JwtOnly()
   @Roles(ROLES.ADMIN)
   @ApiOperation({ summary: 'Registro de exportaciones (solo ADMIN)' })
   listExports() {

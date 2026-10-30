@@ -4,6 +4,12 @@ import { createHash } from 'crypto';
 import * as ExcelJS from 'exceljs';
 import { DataSource, Repository } from 'typeorm';
 import { isCountableSurvey } from '../coverage/coverage-calculator';
+import {
+  cellValue,
+  ResponseRow,
+  uniqueHeaders,
+  uniqueSheetName,
+} from './export-cells';
 import { DataExportLog } from './entities/data-export-log.entity';
 import {
   LoadedData,
@@ -26,6 +32,7 @@ const REASON_LABEL: Record<string, string> = {
   sin_productor: 'Sin productor',
   productor_sin_finca: 'Productor sin finca',
   productor_varias_fincas: 'Productor con varias fincas',
+  cultivo_ambiguo: 'Finca con varios cultivos y encuesta sin cultivo',
 };
 
 interface ExportActor {
@@ -41,16 +48,6 @@ interface QuestionMeta {
   typeName: string;
   archived: boolean;
   options: string[];
-}
-
-interface ResponseRow {
-  survey_id: string;
-  question_id: string;
-  text_value: string | null;
-  numeric_value: number | null;
-  boolean_value: boolean | null;
-  option_text: string | null;
-  is_other: boolean | null;
 }
 
 export interface ExportResult {
@@ -176,7 +173,15 @@ export class ProductionUnitsExportService {
             cell.totalFarmers && cell.totalFarmers > 1
               ? ` (${cell.coveredFarmers} de ${cell.totalFarmers})`
               : '';
-          return `${STATUS_LABEL[cell.status]}${extra}`;
+          const marks =
+            cell.outOfScope || cell.inferredCrop || cell.inferredFarm
+              ? '*'
+              : '';
+          const repeated =
+            cell.surveyCount && cell.surveyCount > 1
+              ? ` [${cell.surveyCount} encuestas]`
+              : '';
+          return `${STATUS_LABEL[cell.status]}${extra}${marks}${repeated}`;
         }),
       ]);
     });
@@ -253,6 +258,9 @@ export class ProductionUnitsExportService {
         'Solo salen hojas de respuestas de instrumentos con al menos una encuesta incluida.',
       ],
       ['Multimedia: solo el conteo de adjuntos, sin URL.'],
+      [
+        'En Cobertura, * marca una encuesta fuera de alcance o con cultivo/finca inferidos.',
+      ],
       [],
       ['Encuestas excluidas (todas las del sistema, por motivo)'],
       ['No sincronizadas', excludedByReason.unsynced],
@@ -328,10 +336,14 @@ export class ProductionUnitsExportService {
       for (const instrumentId of s.instrument_ids ?? []) {
         const scoped = data.scoped.find((i) => i.instrumentId === instrumentId);
         const level = scoped?.scopeLevel ?? 'farm';
+        // Solo atribución directa o por productor de una sola finca; un
+        // productor con varias fincas no se reparte arbitrariamente (va a
+        // "Sin ubicar"). Excepción: a nivel productor la fila es del
+        // productor, así que cualquier finca suya filtrada sirve de contexto.
         const farm =
           (s.farm_id ? farmById.get(s.farm_id) : undefined) ??
           (s.farmer_id ? farmOfFarmer.get(s.farmer_id) : undefined) ??
-          (s.farmer_id
+          (level === 'farmer' && s.farmer_id
             ? farms.find((f) =>
                 f.farmers.some((p) => p.farmerId === s.farmer_id),
               )
@@ -451,7 +463,7 @@ export class ProductionUnitsExportService {
           used.some((p) => bySurvey.get(p.survey.survey_id)?.has(q.questionId)),
       );
 
-      const name = this.uniqueName(
+      const name = uniqueSheetName(
         instrument.code ?? instrument.name,
         usedNames,
       );
@@ -463,7 +475,7 @@ export class ProductionUnitsExportService {
         'Cultivo',
         'Encuesta',
         'Fecha',
-        ...this.uniqueHeaders(visible.map((q) => q.text)),
+        ...uniqueHeaders(visible.map((q) => q.text)),
       ];
       const ws = this.sheet(wb, name, header);
       for (const p of used) {
@@ -477,7 +489,7 @@ export class ProductionUnitsExportService {
           p.survey.survey_id,
           p.survey.created_at,
           ...visible.map((q) =>
-            this.cellValue(
+            cellValue(
               q,
               answers?.get(q.questionId) ?? [],
               attachCount.get(`${p.survey.survey_id}|${q.questionId}`) ?? 0,
@@ -497,56 +509,6 @@ export class ProductionUnitsExportService {
       }
     }
     return excluded;
-  }
-
-  private cellValue(
-    q: QuestionMeta,
-    rows: ResponseRow[],
-    attachments: number,
-  ): string | number | Date | null {
-    if (attachments > 0) return attachments;
-    if (rows.length === 0) return null;
-    if (rows.length > 1 || rows[0].option_text !== null) {
-      return rows
-        .map((r) => {
-          if (r.option_text === null) return r.text_value ?? '';
-          return r.is_other && r.text_value
-            ? `${r.option_text}: ${r.text_value}`
-            : r.option_text;
-        })
-        .filter((v) => v !== '')
-        .join('; ');
-    }
-    const r = rows[0];
-    if (r.numeric_value !== null) return r.numeric_value;
-    if (r.boolean_value !== null) return r.boolean_value ? 'Sí' : 'No';
-    if (r.text_value !== null && /date/i.test(q.typeName)) {
-      const d = new Date(r.text_value);
-      if (!Number.isNaN(d.getTime())) return d;
-    }
-    return r.text_value;
-  }
-
-  /** Nombres de hoja: ≤31 caracteres, sin `[]:*?/\` y únicos. */
-  private uniqueName(base: string, used: Set<string>): string {
-    const clean =
-      base
-        .replace(/[[\]:*?/\\]/g, '-')
-        .slice(0, 28)
-        .trim() || 'Instrumento';
-    let name = clean;
-    for (let n = 2; used.has(name); n++) name = `${clean.slice(0, 26)}-${n}`;
-    used.add(name);
-    return name;
-  }
-
-  private uniqueHeaders(headers: string[]): string[] {
-    const seen = new Map<string, number>();
-    return headers.map((h) => {
-      const n = (seen.get(h) ?? 0) + 1;
-      seen.set(h, n);
-      return n === 1 ? h : `${h} (${n})`;
-    });
   }
 }
 
