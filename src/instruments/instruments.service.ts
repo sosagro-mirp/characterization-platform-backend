@@ -228,13 +228,23 @@ export class InstrumentsService {
     if (typeof rest.coverageGroup === 'string') {
       rest.coverageGroup = rest.coverageGroup.trim() || null;
     }
+    // El DTO trae las propiedades ausentes como `undefined` (target ES2023) y
+    // Object.assign las copiaría sobre el valor guardado, que aquí se lee
+    // después para decidir sobre los cultivos y se devuelve en la respuesta.
+    const currentScopeLevel = instrument.scopeLevel;
+    const currentCoverageGroup = instrument.coverageGroup;
     Object.assign(instrument, rest);
+    if (rest.scopeLevel === undefined)
+      instrument.scopeLevel = currentScopeLevel;
+    if (rest.coverageGroup === undefined) {
+      instrument.coverageGroup = currentCoverageGroup;
+    }
 
     // Spec 98 — los cultivos solo tienen sentido con alcance `farm_crop`; al
     // cambiar a otro nivel se limpian para no dejar alcance huérfano.
     if (cropIds !== undefined || rest.scopeLevel !== undefined) {
       const level =
-        rest.scopeLevel !== undefined ? rest.scopeLevel : instrument.scopeLevel;
+        rest.scopeLevel !== undefined ? rest.scopeLevel : currentScopeLevel;
       if (level !== 'farm_crop') {
         if (cropIds && cropIds.length > 0) {
           throw new BadRequestException(

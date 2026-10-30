@@ -243,6 +243,32 @@ describe('Spec 98 — exploración de unidades productivas (e2e)', () => {
       expect(res.body).toMatchObject({ scopeLevel: 'farm' });
     });
 
+    it('acepta cropIds en un PATCH aparte cuando ya es farm_crop', async () => {
+      const [crop] = await ds.query<{ crop_id: string }[]>(
+        `SELECT crop_id FROM types_of_crops ORDER BY name LIMIT 1`,
+      );
+      await http()
+        .patch(`/api/instruments/${scopedInstrumentId}`)
+        .set(auth(adminToken))
+        .send({ scopeLevel: 'farm_crop' })
+        .expect(200);
+      const res = await http()
+        .patch(`/api/instruments/${scopedInstrumentId}`)
+        .set(auth(adminToken))
+        .send({ cropIds: [crop.crop_id] })
+        .expect(200);
+      expect(res.body).toMatchObject({
+        scopeLevel: 'farm_crop',
+        cropIds: [crop.crop_id],
+      });
+      // restaura el alcance que esperan las pruebas siguientes
+      await http()
+        .patch(`/api/instruments/${scopedInstrumentId}`)
+        .set(auth(adminToken))
+        .send({ scopeLevel: 'farm' })
+        .expect(200);
+    });
+
     it('rechaza un nivel inválido', async () => {
       await http()
         .patch(`/api/instruments/${scopedInstrumentId}`)
