@@ -11,6 +11,11 @@ export interface FarmDeletionInfo {
   shared: boolean;
   /** `false` cuando la finca es compartida: sobrevive al borrado. */
   willBeDeleted: boolean;
+  /**
+   * Spec 99 — `'selection'` si la finca tiene decisiones de selección: no se
+   * borra, y el borrado en cascada del productor se rechaza con 409.
+   */
+  blockedBy?: 'selection';
 }
 
 export interface DeletionCounts {
