@@ -276,12 +276,15 @@ export const SYSTEM_FIELDS: readonly SystemFieldDef[] = [
     status: 'active',
     multiValue: true,
   }),
+  // Fase 8: «Fuente de energía eléctrica» es de selección múltiple en S_FINCA;
+  // igual que los otros dos de valor múltiple, las opciones se concatenan.
   entry('farm', 'electricitySourceType', {
-    dataType: 'option',
-    questionTypes: OPTION_TYPES,
+    dataType: 'optionList',
+    questionTypes: OPTION_LIST_TYPES,
     metadataCatalog: null,
     label: 'Finca · Fuente de electricidad',
     status: 'active',
+    multiValue: true,
   }),
   entry('farm', 'hasElectricityAccess', {
     dataType: 'boolean',

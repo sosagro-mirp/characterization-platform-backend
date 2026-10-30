@@ -43,6 +43,14 @@ describe('buildSystemFieldMap', () => {
 });
 
 describe('buildSystemFieldMapWithWarnings (spec 93)', () => {
+  it('spec 97: la fuente eléctrica de selección múltiple también concatena', () => {
+    const { fieldMap } = buildSystemFieldMapWithWarnings([
+      response('farm.electricitySourceType', { option: { text: 'Red' } }),
+      response('farm.electricitySourceType', { option: { text: 'Paneles' } }),
+    ]);
+    expect(fieldMap['farm.electricitySourceType']).toBe('Paneles; Red');
+  });
+
   it('concatena las opciones múltiples ordenadas con «; »', () => {
     const { fieldMap, warnings } = buildSystemFieldMapWithWarnings([
       response('farm.waterSourceType', { option: { text: 'Nacimiento' } }),

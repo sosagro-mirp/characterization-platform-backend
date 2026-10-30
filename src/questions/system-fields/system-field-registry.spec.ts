@@ -37,6 +37,18 @@ describe('system-field-registry', () => {
     expect(isSelectable(resolveSystemField('farm.location')!)).toBe(true);
   });
 
+  it('los destinos de selección múltiple admiten multiple_choice y repetirse', () => {
+    for (const key of [
+      'farm.mainAccessType',
+      'farm.waterSourceType',
+      'farm.electricitySourceType',
+    ]) {
+      const def = resolveSystemField(key)!;
+      expect(def.multiValue).toBe(true);
+      expect(def.questionTypes).toContain('multiple_choice');
+    }
+  });
+
   describe('validación', () => {
     it('rechaza claves desconocidas, legacy e incompatibles con códigos estables', () => {
       const codeOf = (fn: () => unknown) => {
