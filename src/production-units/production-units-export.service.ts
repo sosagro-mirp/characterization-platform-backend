@@ -6,9 +6,12 @@ import { DataSource, Repository } from 'typeorm';
 import { isCountableSurvey } from '../coverage/coverage-calculator';
 import {
   cellValue,
+  NUMERIC_WITH_UNIT,
+  questionHeaders,
   ResponseRow,
   uniqueHeaders,
   uniqueSheetName,
+  unitCellValue,
 } from './export-cells';
 import { DataExportLog } from './entities/data-export-log.entity';
 import {
@@ -53,6 +56,28 @@ interface QuestionMeta {
 export interface ExportResult {
   buffer: Buffer;
   rowCount: number;
+}
+
+interface FilterRange {
+  from: { row: number; column: number };
+  to: { row: number; column: number };
+}
+
+/**
+ * Estira el autofiltro de cada hoja hasta su última fila. Las hojas se crean
+ * vacías, y un rango que solo cubre el encabezado deja los desplegables de
+ * Excel sin valores: las flechas aparecen pero no se puede filtrar nada.
+ */
+export function extendAutoFilters(wb: ExcelJS.Workbook): void {
+  for (const ws of wb.worksheets) {
+    const range = ws.autoFilter as FilterRange | string | undefined;
+    if (!range || typeof range === 'string') continue;
+    if (ws.rowCount <= range.to.row) continue;
+    ws.autoFilter = {
+      from: range.from,
+      to: { row: ws.rowCount, column: range.to.column },
+    };
+  }
 }
 
 @Injectable()
@@ -270,6 +295,8 @@ export class ProductionUnitsExportService {
     meta.getColumn(1).width = 60;
     meta.getColumn(2).width = 40;
 
+    extendAutoFilters(wb);
+
     return Buffer.from(await wb.xlsx.writeBuffer());
   }
 
@@ -278,6 +305,8 @@ export class ProductionUnitsExportService {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
     ws.addRow(header).font = { bold: true };
+    // Rango provisional: la hoja todavía no tiene filas. `extendAutoFilters`
+    // lo estira hasta la última al cerrar el libro.
     ws.autoFilter = {
       from: { row: 1, column: 1 },
       to: { row: 1, column: header.length },
@@ -475,7 +504,7 @@ export class ProductionUnitsExportService {
         'Cultivo',
         'Encuesta',
         'Fecha',
-        ...uniqueHeaders(visible.map((q) => q.text)),
+        ...uniqueHeaders(questionHeaders(visible)),
       ];
       const ws = this.sheet(wb, name, header);
       for (const p of used) {
@@ -488,13 +517,17 @@ export class ProductionUnitsExportService {
           p.cropName ?? null,
           p.survey.survey_id,
           p.survey.created_at,
-          ...visible.map((q) =>
-            cellValue(
+          ...visible.flatMap((q) => {
+            const rows = answers?.get(q.questionId) ?? [];
+            const value = cellValue(
               q,
-              answers?.get(q.questionId) ?? [],
+              rows,
               attachCount.get(`${p.survey.survey_id}|${q.questionId}`) ?? 0,
-            ),
-          ),
+            );
+            return q.typeName === NUMERIC_WITH_UNIT
+              ? [value, unitCellValue(rows)]
+              : [value];
+          }),
         ]);
       }
 

@@ -1,8 +1,10 @@
 import {
   cellValue,
+  questionHeaders,
   ResponseRow,
   uniqueHeaders,
   uniqueSheetName,
+  unitCellValue,
 } from './export-cells';
 
 // Spec 98, C12 — selección múltiple y «Otros» legibles; números y fechas con su tipo.
@@ -99,6 +101,61 @@ describe('Spec 98 — export-cells', () => {
 
     it('multimedia: solo el conteo de adjuntos, sin URL', () => {
       expect(cellValue({ typeName: 'image' }, [row()], 3)).toBe(3);
+    });
+
+    // Bug — la unidad llega como `option_text` en la misma fila que el número,
+    // y la rama de opciones devolvía solo la unidad.
+    it('número con unidad: la celda conserva el número, no la unidad', () => {
+      expect(
+        cellValue(
+          { typeName: 'numeric_with_unit' },
+          [row({ numeric_value: 12.5, option_text: 'ha' })],
+          0,
+        ),
+      ).toBe(12.5);
+    });
+
+    it('número con unidad: el cero no se pierde', () => {
+      expect(
+        cellValue(
+          { typeName: 'numeric_with_unit' },
+          [row({ numeric_value: 0, option_text: 'm²' })],
+          0,
+        ),
+      ).toBe(0);
+    });
+
+    it('número con unidad sin parsear: conserva el texto histórico', () => {
+      expect(
+        cellValue(
+          { typeName: 'numeric_with_unit' },
+          [row({ text_value: '0/15' })],
+          0,
+        ),
+      ).toBe('0/15');
+    });
+  });
+
+  describe('unitCellValue', () => {
+    it('devuelve la unidad elegida', () => {
+      expect(
+        unitCellValue([row({ numeric_value: 12.5, option_text: 'ha' })]),
+      ).toBe('ha');
+    });
+
+    it('sin respuesta: celda vacía', () => {
+      expect(unitCellValue([])).toBeNull();
+    });
+  });
+
+  describe('questionHeaders', () => {
+    it('número con unidad ocupa dos columnas', () => {
+      expect(
+        questionHeaders([
+          { text: 'Área cultivada', typeName: 'numeric_with_unit' },
+          { text: 'Variedad', typeName: 'open_text' },
+        ]),
+      ).toEqual(['Área cultivada', 'Área cultivada (unidad)', 'Variedad']);
     });
   });
 
