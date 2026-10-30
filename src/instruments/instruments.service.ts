@@ -22,6 +22,7 @@ import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
 import { DuplicateInstrumentDto } from './dto/duplicate-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
+import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { SYSTEM_INSTRUMENT_CODES } from './system-instrument-codes';
 
 @Injectable()
@@ -96,6 +97,7 @@ export class InstrumentsService {
     const qb = this.instrumentsRepository
       .createQueryBuilder('instrument')
       .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.crops', 'crop')
       .leftJoin('instrument.createdBy', 'createdBy')
       .leftJoin('instrument.updatedBy', 'updatedBy')
       .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
@@ -165,6 +167,7 @@ export class InstrumentsService {
     const instrument = await this.instrumentsRepository
       .createQueryBuilder('instrument')
       .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.crops', 'crop')
       .leftJoin('instrument.createdBy', 'createdBy')
       .leftJoin('instrument.updatedBy', 'updatedBy')
       .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
@@ -186,14 +189,14 @@ export class InstrumentsService {
   ): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
-      relations: { actorTypes: true },
+      relations: { actorTypes: true, crops: true },
     });
 
     if (!instrument) {
       throw new NotFoundException('Instrument not found');
     }
 
-    const { actorTypeIds, ...rest } = updateInstrumentDto;
+    const { actorTypeIds, cropIds, ...rest } = updateInstrumentDto;
 
     // Spec 79, criterio 3 — activar el enlace público se rechaza si el
     // instrumento tiene alguna pregunta multimedia. Solo se valida cuando
@@ -223,6 +226,34 @@ export class InstrumentsService {
     }
 
     Object.assign(instrument, rest);
+
+    // Spec 98 — los cultivos solo tienen sentido con alcance `farm_crop`; al
+    // cambiar a otro nivel se limpian para no dejar alcance huérfano.
+    if (cropIds !== undefined || rest.scopeLevel !== undefined) {
+      const level =
+        rest.scopeLevel !== undefined ? rest.scopeLevel : instrument.scopeLevel;
+      if (level !== 'farm_crop') {
+        if (cropIds && cropIds.length > 0) {
+          throw new BadRequestException(
+            'cropIds solo se admite con scopeLevel = farm_crop',
+          );
+        }
+        instrument.crops = [];
+      } else if (cropIds !== undefined) {
+        const crops = cropIds.length
+          ? await this.instrumentsRepository.manager
+              .getRepository(TypeOfCrop)
+              .find({
+                where: { cropId: In(cropIds) },
+              })
+          : [];
+        if (crops.length !== new Set(cropIds).size) {
+          throw new NotFoundException('One or more crops were not found');
+        }
+        instrument.crops = crops;
+      }
+      instrument.cropIds = (instrument.crops ?? []).map((c) => c.cropId);
+    }
 
     if (actorTypeIds !== undefined) {
       if (actorTypeIds.length > 0) {
@@ -298,6 +329,7 @@ export class InstrumentsService {
     const source = await this.instrumentsRepository
       .createQueryBuilder('instrument')
       .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.crops', 'crop')
       .leftJoinAndSelect('instrument.sections', 'section')
       .leftJoinAndSelect('section.questions', 'question')
       .leftJoinAndSelect('question.type', 'type')
@@ -329,6 +361,10 @@ export class InstrumentsService {
             isActive: false,
             code: undefined,
             actorTypes: source.actorTypes ?? [],
+            // Spec 98 — la copia hereda el alcance.
+            scopeLevel: source.scopeLevel ?? null,
+            coverageGroup: source.coverageGroup ?? null,
+            crops: source.crops ?? [],
             createdBy: user,
             updatedBy: user,
           });
