@@ -83,7 +83,8 @@ export class UnitSelectionsService {
 
       let rows: SelectionState[];
       if (current) {
-        rows = await manager.query<SelectionState[]>(
+        // En un UPDATE, TypeORM devuelve `[filas, afectadas]`.
+        [rows] = await manager.query<[SelectionState[], number]>(
           `UPDATE farm_selections
               SET status = $2, reason = $3, version = version + 1,
                   updated_by = $4, updated_at = now()

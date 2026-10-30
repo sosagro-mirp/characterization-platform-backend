@@ -228,11 +228,16 @@ describe('Spec 99 — selección de unidades productivas (e2e)', () => {
 
   describe('C03 y C04 — historial', () => {
     it('conserva cada cambio con su cobertura', async () => {
-      await put(farmId, adminToken, {
+      const updated = await put(farmId, adminToken, {
         status: 'included',
         reason: 'Cumple',
         expectedVersion: 1,
       }).expect(200);
+      expect(updated.body as SelectionBody).toMatchObject({
+        farmId,
+        status: 'included',
+        version: 2,
+      });
 
       const res = await http()
         .get(`/api/unit-selections/${farmId}/history`)
