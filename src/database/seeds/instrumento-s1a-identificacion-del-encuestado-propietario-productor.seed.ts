@@ -696,6 +696,10 @@ export async function seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioPr
         metadataId: 'e6cc6c97-7e0a-4dd2-9147-773bc4d29c92',
       },
       { text: `Nóvita`, metadataId: 'ee09f273-9109-4cf1-ae6a-9e88b0e934e6' },
+      {
+        text: `Nuevo Belén de Bajirá`,
+        metadataId: 'e1a3b624-7fc2-4359-94a1-363dab767e6d',
+      },
       { text: `Nuquí`, metadataId: 'b7c5021e-326a-4cf4-846f-8c48ec151a77' },
       { text: `Quibdó`, metadataId: '2ad3de21-bbad-45b2-ac2a-5d3bd2db2ac6' },
       { text: `Río Iro`, metadataId: '0e225ace-7dfa-4a7a-bec9-7922f4718fc5' },
