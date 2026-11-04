@@ -3,6 +3,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -10,6 +11,8 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { INSTRUMENT_SCOPE_LEVELS } from '../entities/instrument.entity';
+import type { InstrumentScopeLevel } from '../entities/instrument.entity';
 
 export class UpdateInstrumentDto {
   @ApiPropertyOptional({ example: 'Diagnóstico Cafetero 2025', maxLength: 255 })
@@ -55,4 +58,28 @@ export class UpdateInstrumentDto {
   @IsArray()
   @IsUUID(undefined, { each: true })
   actorTypeIds?: string[];
+
+  /** Spec 98 — a quién se aplica: `farmer`, `farm` o `farm_crop`. `null` = sin declarar. */
+  @ApiPropertyOptional({
+    enum: INSTRUMENT_SCOPE_LEVELS,
+    nullable: true,
+    example: 'farm_crop',
+  })
+  @IsOptional()
+  @IsIn(INSTRUMENT_SCOPE_LEVELS)
+  scopeLevel?: InstrumentScopeLevel | null;
+
+  /** Spec 98 — solo con `farm_crop`. Vacío = todos los cultivos. */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  cropIds?: string[];
+
+  /** Spec 98 — los instrumentos del mismo grupo cuentan como una sola columna. */
+  @ApiPropertyOptional({ example: 'REGISTRO', maxLength: 50, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  coverageGroup?: string | null;
 }
