@@ -45,6 +45,7 @@ export const FARM_COMPLETABLE_FIELDS = [
   'electricitySourceType',
   'waterSourceType',
   'plotCount',
+  'technicalAssistanceAccess',
   'townId',
 ] as const;
 

@@ -429,11 +429,17 @@ export class QuestionsService {
           unchanged: rest.systemField === question.systemField,
         });
         rest.systemField = def.key;
-        warnings = await this.checkSystemFieldPlacement(
-          def,
-          question.section.instrument.instrumentId,
-          questionId,
-        );
+        // Un PATCH que reenvía el mismo destino no es una asignación nueva: no se
+        // vuelve a validar el duplicado (hay instrumentos vigentes que ya lo repiten).
+        const unchangedKey =
+          resolveSystemField(question.systemField)?.key === def.key;
+        if (!unchangedKey) {
+          warnings = await this.checkSystemFieldPlacement(
+            def,
+            question.section.instrument.instrumentId,
+            questionId,
+          );
+        }
       }
     } else if (newTypeName !== question.type?.name) {
       const current = resolveSystemField(question.systemField);

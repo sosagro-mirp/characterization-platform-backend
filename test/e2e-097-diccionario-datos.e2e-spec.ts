@@ -659,40 +659,52 @@ describe('spec-097 — diccionario de datos (e2e)', () => {
         [inverted],
       );
 
+      // La migración se ejecuta sobre TODA la tabla `questions`: se corre dentro de una
+      // transacción que siempre se revierte, para no dejar la base de desarrollo
+      // con la migración aplicada ni revertida (el registro `migrations` no cambia).
       const Migration = loadDataMigration();
       const migration = new Migration();
       const runner = ds.createQueryRunner();
+      await runner.connect();
+      await runner.startTransaction();
+      const sfIn = async (id: string): Promise<string | null> => {
+        const rows = (await runner.query(
+          `SELECT system_field FROM questions WHERE question_id = $1`,
+          [id],
+        )) as { system_field: string | null }[];
+        return rows[0]?.system_field ?? null;
+      };
       try {
         await migration.up(runner);
 
-        expect(await systemFieldOfQuestion(strategic)).toBeNull();
-        expect(await systemFieldOfQuestion(inverted)).toBeNull();
-        expect(await systemFieldOfQuestion(alias)).toBe('farm.crops');
-        expect(await systemFieldOfQuestion(legacy)).toBe('farmer.isRespondent');
-        const left = await ds.query<{ n: string }[]>(
+        expect(await sfIn(strategic)).toBeNull();
+        expect(await sfIn(inverted)).toBeNull();
+        expect(await sfIn(alias)).toBe('farm.crops');
+        expect(await sfIn(legacy)).toBe('farmer.isRespondent');
+        const left = (await runner.query(
           `SELECT count(*) AS n FROM questions
             WHERE system_field = $1 OR system_field LIKE 'inverted:%'
                OR system_field = 'farm.mainCrop' OR system_field LIKE 'crop.%'`,
           [STRATEGIC_TAG],
-        );
+        )) as { n: string }[];
         expect(Number(left[0].n)).toBe(0);
-        const flags = await ds.query<
-          { is_inverted_scale: boolean; is_digital_demand_item: boolean }[]
-        >(
+        const flags = (await runner.query(
           `SELECT is_inverted_scale, is_digital_demand_item FROM questions
             WHERE question_id = ANY($1::uuid[]) ORDER BY question_id = $2 DESC`,
           [[strategic, inverted], strategic],
-        );
+        )) as { is_inverted_scale: boolean; is_digital_demand_item: boolean }[];
         expect(flags[0].is_digital_demand_item).toBe(true);
         expect(flags[1].is_inverted_scale).toBe(true);
-      } finally {
+
         await migration.down(runner);
+
+        expect(await sfIn(strategic)).toBe(STRATEGIC_TAG);
+        expect(await sfIn(inverted)).toBe('inverted:B9.9');
+        expect(await sfIn(alias)).toBe('farm.mainCrop');
+      } finally {
+        await runner.rollbackTransaction();
         await runner.release();
       }
-
-      expect(await systemFieldOfQuestion(strategic)).toBe(STRATEGIC_TAG);
-      expect(await systemFieldOfQuestion(inverted)).toBe('inverted:B9.9');
-      expect(await systemFieldOfQuestion(alias)).toBe('farm.mainCrop');
     });
   });
 
