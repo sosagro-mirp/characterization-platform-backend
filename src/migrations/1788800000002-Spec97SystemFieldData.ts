@@ -18,6 +18,15 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 // adoptado en las tabletas, y con autorización explícita.
 const STRATEGIC_TAG = 'Pregunta estratégica de caracterización tecnológica';
 const BACKUP_TABLE = 'questions_system_field_backup_097';
+// Solo las cuatro claves del registro (alias de `farm.hasCrop.*`); un `LIKE 'crop.%'`
+// reescribiría también cualquier clave ajena que empiece igual.
+const CROP_ALIASES = [
+  'crop.cacao',
+  'crop.cafe',
+  'crop.cannabis',
+  'crop.canamo',
+];
+const CROP_ALIASES_SQL = CROP_ALIASES.map((k) => `'${k}'`).join(', ');
 
 export class Spec97SystemFieldData1788800000002 implements MigrationInterface {
   name = 'Spec97SystemFieldData1788800000002';
@@ -52,7 +61,7 @@ export class Spec97SystemFieldData1788800000002 implements MigrationInterface {
         WHERE system_field = $1
            OR system_field LIKE 'inverted:%'
            OR system_field = 'farm.mainCrop'
-           OR system_field LIKE 'crop.%'
+           OR system_field IN (${CROP_ALIASES_SQL})
        ON CONFLICT ("question_id") DO NOTHING`,
       [STRATEGIC_TAG],
     );
@@ -68,7 +77,7 @@ export class Spec97SystemFieldData1788800000002 implements MigrationInterface {
     );
     await queryRunner.query(
       `UPDATE questions SET system_field = 'farm.hasCrop.' || substr(system_field, 6)
-        WHERE system_field LIKE 'crop.%'`,
+        WHERE system_field IN (${CROP_ALIASES_SQL})`,
     );
   }
 

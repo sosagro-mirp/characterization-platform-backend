@@ -708,6 +708,33 @@ describe('spec-097 — diccionario de datos (e2e)', () => {
     });
   });
 
+  describe('C12 (aborto) — la migración de datos se niega a correr si las columnas no están pobladas', () => {
+    it('lanza un error y no escribe nada cuando hay una estratégica sin marcar', async () => {
+      const inst = await createInstrument('C12-abort');
+      // Etiqueta estratégica SIN su marca en la columna (migración B pendiente).
+      const unmarked = await insertQuestion(
+        inst,
+        'likert',
+        STRATEGIC_TAG,
+        true,
+      );
+      const Migration = loadDataMigration();
+      const migration = new Migration();
+      const runner = ds.createQueryRunner();
+      await runner.connect();
+      await runner.startTransaction();
+      try {
+        await expect(migration.up(runner)).rejects.toThrow(
+          /Corra primero la migración B/,
+        );
+      } finally {
+        await runner.rollbackTransaction();
+        await runner.release();
+      }
+      expect(await systemFieldOfQuestion(unmarked)).toBe(STRATEGIC_TAG);
+    });
+  });
+
   // ── C13 ──────────────────────────────────────────────────────────────────
 
   describe('C13 — «Demanda digital» se apoya en is_digital_demand_item, no en el texto de system_field', () => {
