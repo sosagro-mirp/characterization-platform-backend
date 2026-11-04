@@ -1,3 +1,4 @@
+import { resolveDocumentType } from '../farmers/document-type';
 import {
   BadRequestException,
   ConflictException,
@@ -1324,6 +1325,7 @@ export class SurveysService {
     return {
       phone: identity.phone,
       email: identity.email,
+      documentType: resolveDocumentType(fieldMap['farmer.documentType']),
       gender: fieldMap['farmer.gender'],
       age: fieldMap['farmer.age'],
       experienceYears: fieldMap['farmer.experienceYears'],
@@ -1350,6 +1352,7 @@ export class SurveysService {
       electricitySourceType: fieldMap['farm.electricitySourceType'],
       waterSourceType: fieldMap['farm.waterSourceType'],
       plotCount: fieldMap['farm.plotCount'],
+      technicalAssistanceAccess: fieldMap['farm.technicalAssistanceAccess'],
       townId,
     };
   }

@@ -106,7 +106,7 @@ export class AggregationLikertDto {
 
   @ApiProperty({
     description:
-      'true si el ítem tiene systemField que empieza por "inverted:" y su puntaje ya fue recalculado como 6 - value.',
+      'true si la pregunta está marcada como escala invertida (`isInvertedScale`) y su puntaje ya fue recalculado como 6 - value.',
   })
   isInverted: boolean;
 }
@@ -167,7 +167,7 @@ export class DashboardQuestionDto {
 
   @ApiProperty({
     description:
-      'true si systemField empieza por "inverted:" (escala likert invertida).',
+      'true si la pregunta está marcada como escala invertida (`isInvertedScale`).',
   })
   isInverted: boolean;
 

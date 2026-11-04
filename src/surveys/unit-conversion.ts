@@ -1,9 +1,10 @@
 /**
  * Spec 93 — conversión de área a hectáreas para `farm.area`.
  *
- * Los talleres capturan el área con una unidad (ha, m², km²). Unidades
- * regionales como la fanegada quedan fuera (H4): dan `hectares = null` y la
- * señal `unitUnknown`, para no guardar un valor con la escala equivocada.
+ * Los talleres capturan el área con una unidad (ha, m², km², o las regionales
+ * fanegada, cuadra y plaza — spec 97). Una unidad que no se reconoce da
+ * `hectares = null` y la señal `unitUnknown`, para no guardar un valor con la
+ * escala equivocada.
  */
 
 export interface AreaConversion {
@@ -13,6 +14,13 @@ export interface AreaConversion {
   /** La unidad no se reconoce: no se guarda el área. */
   unitUnknown: boolean;
 }
+
+/**
+ * Spec 97 (D-H4-10) — fanegada, cuadra y plaza = 6.400 m² (0,64 ha), el valor
+ * de uso común en Colombia. Varía por región: si el equipo de campo confirma
+ * otro, solo cambia esta constante.
+ */
+const REGIONAL_AREA_HECTARES = 0.64;
 
 const HECTARES_PER_UNIT: Record<string, number> = {
   ha: 1,
@@ -25,6 +33,12 @@ const HECTARES_PER_UNIT: Record<string, number> = {
   km2: 100,
   'kilometro cuadrado': 100,
   'kilometros cuadrados': 100,
+  fanegada: REGIONAL_AREA_HECTARES,
+  fanegadas: REGIONAL_AREA_HECTARES,
+  cuadra: REGIONAL_AREA_HECTARES,
+  cuadras: REGIONAL_AREA_HECTARES,
+  plaza: REGIONAL_AREA_HECTARES,
+  plazas: REGIONAL_AREA_HECTARES,
 };
 
 function normalizeUnit(unit: string): string {

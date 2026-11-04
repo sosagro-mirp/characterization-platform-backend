@@ -10,6 +10,8 @@
  * `actor_type` sin escribir en ninguna entidad.
  */
 
+import { resolveSystemField } from '../questions/system-fields/system-field-registry';
+
 export type MetadataCatalogKind = 'department' | 'town' | 'crop' | 'actorType';
 
 export const METADATA_CATALOGS: Record<
@@ -45,10 +47,7 @@ const ALL_KINDS: MetadataCatalogKind[] = [
 export function catalogsForSystemField(
   systemField?: string | null,
 ): MetadataCatalogKind[] {
-  const field = systemField?.trim();
-  if (!field) return ALL_KINDS;
-  if (field === 'farm.town') return ['town'];
-  if (field === 'farm.department') return ['department'];
-  if (field === 'farm.mainCrop' || field.startsWith('crop.')) return ['crop'];
-  return ALL_KINDS;
+  // Spec 97 — el catálogo lo fija el registro (clave canónica o alias).
+  const catalog = resolveSystemField(systemField)?.metadataCatalog;
+  return catalog ? [catalog] : ALL_KINDS;
 }
