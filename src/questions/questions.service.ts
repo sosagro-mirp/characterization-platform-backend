@@ -242,9 +242,14 @@ export class QuestionsService {
       .innerJoin('section.instrument', 'instrument')
       .select('question.questionId', 'questionId')
       .addSelect('instrument.instrumentId', 'instrumentId')
+      .addSelect('instrument.name', 'instrumentName')
       .where('question.systemField IN (:...keys)', { keys: keysFor(def.key) })
       .andWhere('question.archivedAt IS NULL')
-      .getRawMany<{ questionId: string; instrumentId: string }>();
+      .getRawMany<{
+        questionId: string;
+        instrumentId: string;
+        instrumentName: string;
+      }>();
 
     const others = rows.filter((r) => r.questionId !== excludeQuestionId);
     if (
@@ -258,14 +263,23 @@ export class QuestionsService {
         ),
       );
     }
-    return others.some((r) => r.instrumentId !== instrumentId)
-      ? [
-          {
-            code: 'SYSTEM_FIELD_IN_OTHER_INSTRUMENT',
-            message: `«${def.key}» también está asignado en otro instrumento.`,
-          },
-        ]
-      : [];
+    const otherNames = [
+      ...new Set(
+        others
+          .filter((r) => r.instrumentId !== instrumentId)
+          .map((r) => r.instrumentName),
+      ),
+    ];
+    if (otherNames.length === 0) return [];
+    const shown = otherNames.slice(0, 3).map((n) => `«${n}»`);
+    const extra =
+      otherNames.length > 3 ? ` y ${otherNames.length - 3} más` : '';
+    return [
+      {
+        code: 'SYSTEM_FIELD_IN_OTHER_INSTRUMENT',
+        message: `«${def.label}» también está asignado en otro instrumento: ${shown.join(', ')}${extra}.`,
+      },
+    ];
   }
 
   async create(
