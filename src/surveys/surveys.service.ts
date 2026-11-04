@@ -1352,6 +1352,7 @@ export class SurveysService {
       electricitySourceType: fieldMap['farm.electricitySourceType'],
       waterSourceType: fieldMap['farm.waterSourceType'],
       plotCount: fieldMap['farm.plotCount'],
+      technicalAssistanceAccess: fieldMap['farm.technicalAssistanceAccess'],
       townId,
     };
   }

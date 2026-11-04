@@ -514,6 +514,17 @@ describe('spec-097 — diccionario de datos (e2e)', () => {
       expect((dup.body as ErrorBody).code).toBe('SYSTEM_FIELD_DUPLICATE');
     });
 
+    it('un PATCH que reenvía el mismo destino no vuelve a revisar duplicados', async () => {
+      const inst = await createInstrument('C7 mismo destino');
+      // Dos preguntas con farm.crops ya existentes (como en el taller vigente).
+      const a = await insertQuestion(inst, 'single_choice', 'farm.crops');
+      await insertQuestion(inst, 'single_choice', 'farm.crops');
+      const res = await auth(
+        http().patch(`/api/sections/${sectionOf[inst]}/questions/${a}`),
+      ).send({ systemField: 'farm.crops' });
+      expect(res.status).toBe(200);
+    });
+
     it('el mismo destino en otro instrumento responde 201 con warnings[]', async () => {
       const other = await createInstrument('C7 otro');
       const res = await postQuestion(other, 'open_text', 'farm.vereda');
