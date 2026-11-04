@@ -6,8 +6,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 //
 // Solo esquema: las filas existentes quedan en NULL y se completan por la
 // extracción («solo completar vacíos», spec 95).
-export class Spec97FarmerDocumentType1788600000000 implements MigrationInterface {
-  name = 'Spec97FarmerDocumentType1788600000000';
+export class Spec97FarmerDocumentType1788800000000 implements MigrationInterface {
+  name = 'Spec97FarmerDocumentType1788800000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

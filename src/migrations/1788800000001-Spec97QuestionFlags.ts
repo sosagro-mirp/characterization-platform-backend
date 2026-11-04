@@ -12,8 +12,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 // Solo esquema y backfill: `system_field` no se toca aquí. Limpiarlo es la
 // migración de datos C, que se corre después de que el dashboard lea las
 // columnas nuevas.
-export class Spec97QuestionFlags1788600000001 implements MigrationInterface {
-  name = 'Spec97QuestionFlags1788600000001';
+export class Spec97QuestionFlags1788800000001 implements MigrationInterface {
+  name = 'Spec97QuestionFlags1788800000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(

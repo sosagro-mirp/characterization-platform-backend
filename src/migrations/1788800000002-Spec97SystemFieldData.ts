@@ -19,8 +19,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 const STRATEGIC_TAG = 'Pregunta estratégica de caracterización tecnológica';
 const BACKUP_TABLE = 'questions_system_field_backup_097';
 
-export class Spec97SystemFieldData1788600000002 implements MigrationInterface {
-  name = 'Spec97SystemFieldData1788600000002';
+export class Spec97SystemFieldData1788800000002 implements MigrationInterface {
+  name = 'Spec97SystemFieldData1788800000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // «Demanda digital» quedaría vacía si se limpia el texto antes de que las
