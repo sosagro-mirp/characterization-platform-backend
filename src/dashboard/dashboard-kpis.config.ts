@@ -143,7 +143,6 @@ export const C15_KPIS: KpiDefinition[] = [
 /** Fase 4: preguntas fuente de la vista "Demanda digital" (C15), fuera del
  * catálogo de filtros de Fase 3 porque no son filtros sino agregados. */
 export const DIGITAL_DEMAND_SOURCES = {
-  strategicSystemField: 'Pregunta estratégica de caracterización tecnológica',
   sDcuInstrumentCode: 'S_DCU',
   barrierSections: {
     b1: 'Barrera de Acceso y Conectividad (B1)',

@@ -31,12 +31,21 @@ describe('convertAreaToHectares', () => {
   });
 
   it('unidad desconocida → null y señal', () => {
-    expect(convertAreaToHectares(2, 'fanegada')).toEqual({
+    expect(convertAreaToHectares(2, 'acre')).toEqual({
       hectares: null,
       converted: false,
       unitUnknown: true,
     });
   });
+
+  it.each(['fanegada', 'Fanegadas', 'cuadra', 'plaza'])(
+    'spec 97: 2 %s = 1,28 ha, convertido',
+    (unit) => {
+      const r = convertAreaToHectares(2, unit);
+      expect(r.hectares).toBeCloseTo(1.28, 4);
+      expect(r).toMatchObject({ converted: true, unitUnknown: false });
+    },
+  );
 
   it('sin unidad toma el valor como hectáreas, sin advertencia', () => {
     expect(convertAreaToHectares(4, null)).toEqual({

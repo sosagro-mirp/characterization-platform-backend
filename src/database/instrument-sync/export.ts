@@ -33,6 +33,8 @@ interface QuestionRow {
   is_required: boolean;
   is_selection_criteria: boolean;
   is_key_question: boolean;
+  is_inverted_scale: boolean;
+  is_digital_demand_item: boolean;
   order: number;
   system_field: string | null;
   condition_question_id: string | null;
@@ -126,6 +128,12 @@ export async function exportManifest(
   const questionArchivedAt = (await hasColumn(ds, 'questions', 'archived_at'))
     ? archivedAtSelect('q.archived_at')
     : 'NULL::text AS archived_at';
+  // Spec 97 — mismo criterio: producción se exporta antes de migrar las
+  // columnas nuevas; sin ellas el valor es desconocido (`null`, no `false`), para
+  // que al importar no se apaguen las marcas de un destino ya migrado.
+  const questionFlags = (await hasColumn(ds, 'questions', 'is_inverted_scale'))
+    ? 'q.is_inverted_scale, q.is_digital_demand_item'
+    : 'NULL::boolean AS is_inverted_scale, NULL::boolean AS is_digital_demand_item';
   const optionArchivedAt = (await hasColumn(
     ds,
     'options_question',
@@ -142,6 +150,7 @@ export async function exportManifest(
     ? await ds.query<QuestionRow[]>(
         `SELECT q.question_id, q.section_id, q.text, t.name AS type_name,
                 q.is_required, q.is_selection_criteria, q.is_key_question,
+                ${questionFlags},
                 q."order", q.system_field, q.condition_question_id,
                 q.condition_value, ${questionArchivedAt}
          FROM questions q
@@ -222,6 +231,8 @@ export async function exportManifest(
       isRequired: row.is_required,
       isSelectionCriteria: row.is_selection_criteria,
       isKeyQuestion: row.is_key_question,
+      isInvertedScale: row.is_inverted_scale ?? undefined,
+      isDigitalDemandItem: row.is_digital_demand_item ?? undefined,
       order: row.order,
       systemField: row.system_field,
       conditionQuestionId: row.condition_question_id,

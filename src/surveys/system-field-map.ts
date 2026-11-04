@@ -1,4 +1,8 @@
 import { Response } from 'src/responses/entities/response.entity';
+import {
+  canonicalKey,
+  resolveSystemField,
+} from '../questions/system-fields/system-field-registry';
 import { convertAreaToHectares } from './unit-conversion';
 
 export type SystemFieldValue = string | number | boolean;
@@ -16,12 +20,11 @@ export interface SystemFieldWarning {
 
 /**
  * Spec 93 (D-H2-9) — columnas de valor único (varchar 100) que el instrumento
- * puede llenar con selección múltiple: se concatenan los textos.
+ * puede llenar con selección múltiple: se concatenan los textos. Spec 97: cuáles
+ * son lo dice el registro (`multiValue`).
  */
-const MULTI_VALUE_FIELDS = new Set([
-  'farm.mainAccessType',
-  'farm.waterSourceType',
-]);
+const isMultiValueField = (key: string): boolean =>
+  resolveSystemField(key)?.multiValue === true;
 const MULTI_VALUE_SEPARATOR = '; ';
 const MULTI_VALUE_MAX_LENGTH = 100;
 
@@ -50,7 +53,10 @@ export function buildSystemFieldMapWithWarnings(responses: Response[]): {
   const multiValues = new Map<string, string[]>();
 
   for (const response of responses) {
-    const sf = response.question?.systemField;
+    // Spec 97 — el mapa se indexa por la clave canónica: un alias viejo
+    // (`farm.mainCrop`) y la clave nueva (`farm.crops`) caen en la misma entrada.
+    const raw = response.question?.systemField;
+    const sf = raw ? (canonicalKey(raw) ?? raw) : raw;
     if (!sf || sf === 'farm.town') continue;
     const value =
       response.textValue ??
@@ -59,7 +65,7 @@ export function buildSystemFieldMapWithWarnings(responses: Response[]): {
       response.option?.text;
     if (value === undefined || value === null) continue;
 
-    if (MULTI_VALUE_FIELDS.has(sf)) {
+    if (isMultiValueField(sf)) {
       const values = multiValues.get(sf) ?? [];
       const text = String(value);
       if (!values.includes(text)) values.push(text);

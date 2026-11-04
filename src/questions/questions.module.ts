@@ -10,6 +10,7 @@ import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.
 import { QuestionsController } from './questions.controller';
 import { QuestionsSearchController } from './questions-search.controller';
 import { QuestionsService } from './questions.service';
+import { SystemFieldsController } from './system-fields/system-fields.controller';
 
 @Module({
   imports: [
@@ -25,7 +26,11 @@ import { QuestionsService } from './questions.service';
     ]),
     MediaAttachmentsModule,
   ],
-  controllers: [QuestionsController, QuestionsSearchController],
+  controllers: [
+    QuestionsController,
+    QuestionsSearchController,
+    SystemFieldsController,
+  ],
   providers: [QuestionsService],
 })
 export class QuestionsModule {}

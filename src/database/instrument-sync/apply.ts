@@ -1,3 +1,4 @@
+import { canonicalKey } from '../../questions/system-fields/system-field-registry';
 import { DataSource, EntityManager } from 'typeorm';
 import { exportManifest } from './export';
 import { contentEqual, contentOf, flatten, FlatManifest } from './diff';
@@ -456,12 +457,16 @@ async function applyQuestionWrite(
   await manager.query(
     `INSERT INTO questions
        (question_id, section_id, text, type_id, is_required, is_selection_criteria,
-        is_key_question, "order", system_field, archived_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        is_key_question, "order", system_field, archived_at,
+        is_inverted_scale, is_digital_demand_item)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+             COALESCE($11::boolean, false), COALESCE($12::boolean, false))
      ON CONFLICT (question_id) DO UPDATE SET
        section_id = $2, text = $3, type_id = $4, is_required = $5,
        is_selection_criteria = $6, is_key_question = $7, "order" = $8,
-       system_field = $9, archived_at = $10`,
+       system_field = $9, archived_at = $10,
+       is_inverted_scale = COALESCE($11::boolean, questions.is_inverted_scale),
+       is_digital_demand_item = COALESCE($12::boolean, questions.is_digital_demand_item)`,
     [
       question.questionId,
       wrapper.sectionId,
@@ -471,8 +476,13 @@ async function applyQuestionWrite(
       question.isSelectionCriteria,
       question.isKeyQuestion,
       question.order,
-      question.systemField,
+      // Spec 97 — se normaliza a la clave canónica al escribir.
+      canonicalKey(question.systemField) ?? question.systemField,
       question.archivedAt,
+      // Un manifiesto exportado antes de las columnas nuevas no las trae: en ese
+      // caso se conserva el valor del destino en vez de apagar la marca.
+      question.isInvertedScale ?? null,
+      question.isDigitalDemandItem ?? null,
     ],
   );
 }

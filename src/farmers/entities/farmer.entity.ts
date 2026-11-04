@@ -46,6 +46,15 @@ export class Farmer {
   })
   documentId: string | null;
 
+  /** Spec 97 (D-H4-11) — código: CC, TI, CE, PPT, PEP, NIT u OTRO. */
+  @Column({
+    type: 'varchar',
+    name: 'document_type',
+    length: 10,
+    nullable: true,
+  })
+  documentType: string | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   email: string | null;
 

@@ -4,6 +4,7 @@ import {
   FieldToComplete,
   normalizeFarmKey,
 } from '../surveys/public-submission-plan';
+import { resolveSystemField } from '../questions/system-fields/system-field-registry';
 import type { FarmerFarmRole } from '../farmer-farms/entities/farmer-farm.entity';
 
 /**
@@ -31,42 +32,29 @@ export interface FieldChangePlan {
   discrepancies: FieldDiscrepancyCandidate[];
 }
 
-/** Propiedad → `systemField` que la alimenta. */
-const SYSTEM_FIELD_OF: Record<ExtractionEntity, Record<string, string>> = {
-  farmer: {
-    name: 'farmer.name',
-    phone: 'farmer.phone',
-    email: 'farmer.email',
-    gender: 'farmer.gender',
-    age: 'farmer.age',
-    experienceYears: 'farmer.experienceYears',
-    isMainIncome: 'farmer.isMainIncome',
-    educationLevel: 'farmer.educationLevel',
-  },
-  farm: {
-    name: 'farm.name',
-    vereda: 'farm.vereda',
-    corregimiento: 'farm.corregimiento',
-    latitude: 'farm.latitude',
-    longitude: 'farm.longitude',
-    altitude: 'farm.altitude',
-    area: 'farm.area',
-    waterAccess: 'farm.waterAccess',
-    internetAccess: 'farm.internetAccess',
-    hasElectricityAccess: 'farm.hasElectricityAccess',
-    mainAccessType: 'farm.mainAccessType',
-    electricitySourceType: 'farm.electricitySourceType',
-    waterSourceType: 'farm.waterSourceType',
-    plotCount: 'farm.plotCount',
-    townId: 'farm.town',
-  },
+/**
+ * Propiedades de cada entidad que la extracción llena (o compara), además de
+ * `name`. Spec 97: el `systemField` que alimenta cada una sale del registro; la
+ * lista decide cuáles participan (p. ej. `farmer.documentId` no se pisa).
+ */
+const EXTRACTED_PROPERTIES: Record<ExtractionEntity, readonly string[]> = {
+  farmer: ['name', ...FARMER_COMPLETABLE_FIELDS],
+  farm: ['name', ...FARM_COMPLETABLE_FIELDS],
+};
+
+/** Propiedad de la entidad cuyo nombre en el registro es otro. */
+const REGISTRY_FIELD: Record<ExtractionEntity, Record<string, string>> = {
+  farmer: {},
+  farm: { townId: 'town' },
 };
 
 export function systemFieldOf(
   entity: ExtractionEntity,
   field: string,
 ): string | null {
-  return SYSTEM_FIELD_OF[entity][field] ?? null;
+  if (!EXTRACTED_PROPERTIES[entity].includes(field)) return null;
+  const registryField = REGISTRY_FIELD[entity][field] ?? field;
+  return resolveSystemField(`${entity}.${registryField}`)?.key ?? null;
 }
 
 /** Propiedades que `PATCH /discrepancies/:id {apply}` puede sobrescribir. */
@@ -74,7 +62,7 @@ export function isApplicableField(
   entity: ExtractionEntity,
   field: string,
 ): boolean {
-  return field in SYSTEM_FIELD_OF[entity];
+  return systemFieldOf(entity, field) !== null;
 }
 
 /** Tolerancia al comparar coordenadas (≈ 11 m para grados). */
