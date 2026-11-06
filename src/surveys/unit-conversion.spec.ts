@@ -30,6 +30,18 @@ describe('convertAreaToHectares', () => {
     expect(convertAreaToHectares(1, 'KM2').hectares).toBeCloseTo(100, 9);
   });
 
+  it('ignora la abreviatura entre paréntesis (opciones de producción)', () => {
+    expect(convertAreaToHectares(3, 'hectárea (ha)')).toEqual({
+      hectares: 3,
+      converted: false,
+      unitUnknown: false,
+    });
+    const m2 = convertAreaToHectares(20_000, 'metro cuadrado (m²)');
+    expect(m2.hectares).toBeCloseTo(2, 9);
+    expect(m2).toMatchObject({ converted: true, unitUnknown: false });
+    expect(convertAreaToHectares(2, 'acre (ac)').unitUnknown).toBe(true);
+  });
+
   it('unidad desconocida → null y señal', () => {
     expect(convertAreaToHectares(2, 'acre')).toEqual({
       hectares: null,
