@@ -19,6 +19,12 @@ import {
  *   pnpm extraction:replay --dry-run     # informe; no escribe nada
  *   pnpm extraction:replay --apply       # aplica (con aprobación, sin taller)
  *
+ * Con `--include-done` (solo junto a `--survey-ids=`) reprocesa también encuestas
+ * ya extraídas (`done`, `not_applicable`). Sirve cuando una pregunta recibe un
+ * destino nuevo y hay que llevar su histórico a la entidad (spec 97, Fase 10):
+ * la extracción solo completa vacíos y no duplica discrepancias, así que repetirla
+ * es seguro.
+ *
  * Por seguridad la CLI NO usa `DATABASE_URL`: lee `EXTRACTION_REPLAY_DATABASE_URL`,
  * para que apuntar a producción sea una decisión explícita.
  */
@@ -27,6 +33,11 @@ export interface ReplayOptions {
   mode: 'dry-run' | 'apply';
   /** Acota el reprocesado a estas encuestas (imprescindible en pruebas). */
   surveyIds?: string[];
+  /**
+   * Incluye encuestas ya extraídas (`done`, `not_applicable`). Exige
+   * `surveyIds`: nunca reprocesa en bloque todo lo ya extraído.
+   */
+  includeDone?: boolean;
 }
 
 export interface ReplaySurveyReport {
@@ -56,7 +67,9 @@ const SELECT_SURVEYS = `
   SELECT s.survey_id AS "surveyId"
     FROM surveys s
    WHERE s.origin = 'field'
-     AND (s.extraction_status IS NULL OR s.extraction_status IN ('backfilled', 'error', 'no_identity', 'pending_alias'))
+     AND (s.extraction_status IS NULL
+          OR s.extraction_status IN ('backfilled', 'error', 'no_identity', 'pending_alias')
+          OR ($2::boolean AND s.extraction_status IN ('done', 'not_applicable')))
      AND EXISTS (SELECT 1 FROM responses r WHERE r.survey_id = s.survey_id)
      AND ($1::uuid[] IS NULL OR s.survey_id = ANY($1::uuid[]))
    ORDER BY s.created_at ASC, s.survey_id ASC`;
@@ -116,9 +129,16 @@ export async function runExtractionReplay(
   ds: DataSource,
   options: ReplayOptions,
 ): Promise<ReplayReport> {
+  const includeDone = options.includeDone === true;
+  if (includeDone && !options.surveyIds?.length) {
+    throw new Error(
+      'includeDone exige surveyIds: no se reprocesa en bloque lo ya extraído.',
+    );
+  }
   const service = buildService(ds);
   const ids = await ds.query<{ surveyId: string }[]>(SELECT_SURVEYS, [
     options.surveyIds?.length ? options.surveyIds : null,
+    includeDone,
   ]);
 
   const surveys: ReplaySurveyReport[] = [];
@@ -187,19 +207,12 @@ export async function runExtractionReplay(
   return report;
 }
 
-async function main(): Promise<void> {
-  dotenv.config();
-  const args = process.argv.slice(2);
+/** Lee los argumentos de la CLI y valida sus combinaciones. */
+export function parseReplayArgs(args: string[]): ReplayOptions {
   const dryRun = args.includes('--dry-run');
   const apply = args.includes('--apply');
   if (dryRun === apply) {
     throw new Error('Indique exactamente una opción: --dry-run o --apply.');
-  }
-  const url = process.env.EXTRACTION_REPLAY_DATABASE_URL;
-  if (!url) {
-    throw new Error(
-      'Falta EXTRACTION_REPLAY_DATABASE_URL: la CLI nunca usa DATABASE_URL por defecto.',
-    );
   }
   const idsArg = args.find((a) => a.startsWith('--survey-ids='));
   const surveyIds = idsArg
@@ -209,6 +222,22 @@ async function main(): Promise<void> {
         .map((id) => id.trim())
         .filter(Boolean)
     : undefined;
+  const includeDone = args.includes('--include-done');
+  if (includeDone && !surveyIds?.length) {
+    throw new Error('--include-done exige --survey-ids=<id1,id2,…>.');
+  }
+  return { mode: apply ? 'apply' : 'dry-run', surveyIds, includeDone };
+}
+
+async function main(): Promise<void> {
+  dotenv.config();
+  const options = parseReplayArgs(process.argv.slice(2));
+  const url = process.env.EXTRACTION_REPLAY_DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      'Falta EXTRACTION_REPLAY_DATABASE_URL: la CLI nunca usa DATABASE_URL por defecto.',
+    );
+  }
 
   const ds = new DataSource({
     type: 'postgres',
@@ -220,10 +249,7 @@ async function main(): Promise<void> {
   });
   await ds.initialize();
   try {
-    const report = await runExtractionReplay(ds, {
-      mode: apply ? 'apply' : 'dry-run',
-      surveyIds,
-    });
+    const report = await runExtractionReplay(ds, options);
     console.log(JSON.stringify(report, null, 2));
   } finally {
     await ds.destroy();
