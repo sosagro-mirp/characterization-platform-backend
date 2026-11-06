@@ -306,8 +306,13 @@ export function computeFarmerCoverage(
     'productor_varias_fincas' | 'cultivo_ambiguo'
   >();
   for (const s of countable) {
+    const scope = scopedById.get(s.instrumentId)?.scopeLevel;
+    // Solo los instrumentos de finca o cultivo necesitan ubicar la encuesta.
     if (s.farmId === null && s.farmerId === farmerId) {
-      if ((farmerFarmCounts[farmerId] ?? 0) > 1) {
+      if (
+        (scope === 'farm' || scope === 'farm_crop') &&
+        (farmerFarmCounts[farmerId] ?? 0) > 1
+      ) {
         unlocated.set(s.surveyId, 'productor_varias_fincas');
         continue;
       }

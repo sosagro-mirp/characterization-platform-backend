@@ -597,6 +597,17 @@ describe('Spec 100 — farmer-coverage-calculator', () => {
       expect(result.warnings).toContain('encuestas_sin_ubicar');
     });
 
+    it('instrumento farmer sin finca de un productor con varias fincas: no es una encuesta sin ubicar', () => {
+      const result = compute({
+        farms: [link('farm-1'), link('farm-2')],
+        instruments: [scoped({ scopeLevel: 'farmer' })],
+        surveys: [survey({ farmId: null })],
+      });
+      expect(instrumentOf(result).status).toBe('aplicado');
+      expect(result.unlocatedSurveys).toEqual([]);
+      expect(result.warnings).not.toContain('encuestas_sin_ubicar');
+    });
+
     it('sin cultivo en una finca con varios cultivos aplicables: cultivo_ambiguo', () => {
       const result = compute({
         farms: [
