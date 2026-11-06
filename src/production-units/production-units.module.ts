@@ -1,13 +1,18 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConsentsModule } from '../consents/consents.module';
+import { CoverageModule } from '../coverage/coverage.module';
 import { DataExportLog } from './entities/data-export-log.entity';
 import { ProductionUnitsController } from './production-units.controller';
 import { ProductionUnitsExportService } from './production-units-export.service';
 import { ProductionUnitsService } from './production-units.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([DataExportLog]), ConsentsModule],
+  imports: [
+    TypeOrmModule.forFeature([DataExportLog]),
+    ConsentsModule,
+    CoverageModule,
+  ],
   controllers: [ProductionUnitsController],
   providers: [ProductionUnitsService, ProductionUnitsExportService],
   exports: [ProductionUnitsService],
