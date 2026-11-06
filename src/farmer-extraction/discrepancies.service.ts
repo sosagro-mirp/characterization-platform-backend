@@ -218,31 +218,35 @@ export class DiscrepanciesService {
     action: 'apply' | 'dismiss',
     resolvedBy: string,
   ): Promise<DiscrepancyView> {
-    return this.repository.manager.transaction(async (manager) => {
-      const row = await manager.findOne(EntityFieldDiscrepancy, {
-        where: { discrepancyId },
-        lock: { mode: 'pessimistic_write' },
-      });
-      if (!row) throw new NotFoundException('Discrepancy not found');
-      if (row.status !== 'open') {
-        throw new ConflictException(
-          `La discrepancia ya fue resuelta (estado: ${row.status}).`,
-        );
-      }
+    const resolved = await this.repository.manager.transaction(
+      async (manager) => {
+        const row = await manager.findOne(EntityFieldDiscrepancy, {
+          where: { discrepancyId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!row) throw new NotFoundException('Discrepancy not found');
+        if (row.status !== 'open') {
+          throw new ConflictException(
+            `La discrepancia ya fue resuelta (estado: ${row.status}).`,
+          );
+        }
 
-      if (action === 'apply') {
-        await this.applyValue(manager, row);
-      }
-      row.status = action === 'apply' ? 'applied' : 'dismissed';
-      row.resolvedBy = resolvedBy;
-      row.resolvedAt = new Date();
-      await manager.update(EntityFieldDiscrepancy, discrepancyId, {
-        status: row.status,
-        resolvedBy,
-        resolvedAt: row.resolvedAt,
-      });
-      return this.toView(row, { liveValue: row.submittedValue });
-    });
+        if (action === 'apply') {
+          await this.applyValue(manager, row);
+        }
+        row.status = action === 'apply' ? 'applied' : 'dismissed';
+        row.resolvedBy = resolvedBy;
+        row.resolvedAt = new Date();
+        await manager.update(EntityFieldDiscrepancy, discrepancyId, {
+          status: row.status,
+          resolvedBy,
+          resolvedAt: row.resolvedAt,
+        });
+        return row;
+      },
+    );
+    // Valor vivo ya confirmado: en `dismiss` es el de la entidad, no el propuesto.
+    return (await this.enrich([resolved]))[0];
   }
 
   private async applyValue(

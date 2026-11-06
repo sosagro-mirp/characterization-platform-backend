@@ -71,7 +71,11 @@ export interface DiscrepancyView {
   createdAt: string;
   /** Spec 100 — valor que tiene la entidad ahora (se calcula al leer). */
   liveValue: unknown;
-  /** El valor vivo difiere del `currentValue` registrado al crear la discrepancia. */
+  /**
+   * El valor vivo difiere del `currentValue` registrado al crear la discrepancia.
+   * Solo es significativo en discrepancias abiertas: en las ya aplicadas siempre
+   * es `true`, porque la entidad quedó con el valor propuesto.
+   */
   isStale: boolean;
   /** Falso para `farmer_farm` y campos que no se pueden sobrescribir. */
   canApply: boolean;
