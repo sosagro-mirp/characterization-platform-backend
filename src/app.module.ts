@@ -49,6 +49,7 @@ import { ChangeRequestsModule } from './change-requests/change-requests.module';
 import { MediaAttachmentsModule } from './media-attachments/media-attachments.module';
 import { StorageModule } from './storage/storage.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CoverageModule } from './coverage/coverage.module';
 import { ProductionUnitsModule } from './production-units/production-units.module';
 import { UnitSelectionsModule } from './unit-selections/unit-selections.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
@@ -169,6 +170,7 @@ function autoRunMigrations(): string[] {
     MediaAttachmentsModule,
     StorageModule,
     DashboardModule,
+    CoverageModule,
     ProductionUnitsModule,
     UnitSelectionsModule,
     ApiKeysModule,
