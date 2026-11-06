@@ -42,14 +42,19 @@ const HECTARES_PER_UNIT: Record<string, number> = {
 };
 
 function normalizeUnit(unit: string): string {
-  return unit
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase()
-    .replace(/²/g, '2')
-    .replace(/\./g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return (
+    unit
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/²/g, '2')
+      .replace(/\./g, '')
+      // Las opciones de producción llevan la abreviatura entre paréntesis
+      // («hectárea (ha)», «metro cuadrado (m²)»): se descarta.
+      .replace(/\s*\([^)]*\)/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
 }
 
 /** Sin unidad (respuesta numérica simple) el valor se toma como hectáreas. */

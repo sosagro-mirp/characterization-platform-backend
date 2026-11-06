@@ -86,8 +86,22 @@ async function replayOne(
   service: FarmerExtractionService,
   manager: EntityManager,
   surveyId: string,
+  reprocessExtracted = false,
 ): Promise<ReplaySurveyReport> {
   await manager.query('SAVEPOINT replay_survey');
+  // `--include-done`: el servicio no repite una encuesta `done` (idempotencia),
+  // así que dentro del savepoint se la devuelve a `backfilled` para que pase por
+  // la extracción completa. Si falla, el ROLLBACK la deja como estaba.
+  let wasExtracted = false;
+  if (reprocessExtracted) {
+    const reset = await manager.query<{ survey_id: string }[]>(
+      `UPDATE surveys SET extraction_status = 'backfilled'
+        WHERE survey_id = $1 AND extraction_status IN ('done', 'not_applicable')
+        RETURNING survey_id`,
+      [surveyId],
+    );
+    wasExtracted = reset.length > 0;
+  }
   try {
     const result = await service.extract(manager, surveyId, {
       trigger: 'replay',
@@ -111,10 +125,13 @@ async function replayOne(
       };
     }
     const message = err instanceof Error ? err.message : String(err);
-    await manager.query(
-      `UPDATE surveys SET extraction_status = 'error', extraction_error = $2, extracted_at = NULL WHERE survey_id = $1`,
-      [surveyId, message.slice(0, 2000)],
-    );
+    // Una encuesta ya extraída que falla al reprocesarse conserva su estado.
+    if (!wasExtracted) {
+      await manager.query(
+        `UPDATE surveys SET extraction_status = 'error', extraction_error = $2, extracted_at = NULL WHERE survey_id = $1`,
+        [surveyId, message.slice(0, 2000)],
+      );
+    }
     return {
       surveyId,
       status: 'error',
@@ -151,7 +168,14 @@ export async function runExtractionReplay(
       await queryRunner.startTransaction();
       try {
         for (const { surveyId } of ids) {
-          surveys.push(await replayOne(service, queryRunner.manager, surveyId));
+          surveys.push(
+            await replayOne(
+              service,
+              queryRunner.manager,
+              surveyId,
+              includeDone,
+            ),
+          );
         }
       } finally {
         await queryRunner.rollbackTransaction();
@@ -161,7 +185,14 @@ export async function runExtractionReplay(
       for (const { surveyId } of ids) {
         await queryRunner.startTransaction();
         try {
-          surveys.push(await replayOne(service, queryRunner.manager, surveyId));
+          surveys.push(
+            await replayOne(
+              service,
+              queryRunner.manager,
+              surveyId,
+              includeDone,
+            ),
+          );
           await queryRunner.commitTransaction();
         } catch (err) {
           await queryRunner.rollbackTransaction();
