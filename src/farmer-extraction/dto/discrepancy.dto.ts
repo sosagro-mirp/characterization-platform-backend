@@ -69,4 +69,16 @@ export interface DiscrepancyView {
   resolvedBy: string | null;
   resolvedAt: string | null;
   createdAt: string;
+  /** Spec 100 — valor que tiene la entidad ahora (se calcula al leer). */
+  liveValue: unknown;
+  /** El valor vivo difiere del `currentValue` registrado al crear la discrepancia. */
+  isStale: boolean;
+  /** Falso para `farmer_farm` y campos que no se pueden sobrescribir. */
+  canApply: boolean;
+  /** Solo `townId`: nombres de municipio para mostrar. */
+  liveLabel?: string | null;
+  currentLabel?: string | null;
+  submittedLabel?: string | null;
+  /** Solo entidad `farm`: productores vinculados a la finca. */
+  farmFarmerCount?: number;
 }
