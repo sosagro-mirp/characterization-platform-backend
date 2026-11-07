@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
@@ -17,6 +19,7 @@ import { ConsentDocumentsService } from './consent-documents.service';
 import { CreateConsentRecordDto } from './dto/create-consent-record.dto';
 import { CampaignSession } from '../campaign-sessions/entities/campaign-session.entity';
 import { Farmer } from '../farmers/entities/farmer.entity';
+import { Survey } from '../surveys/entities/survey.entity';
 import { User } from '../users/entities/user.entity';
 
 /** Código Postgres de `unique_violation` — respalda la idempotencia de `create()`. */
@@ -58,7 +61,38 @@ export class ConsentRecordsService {
     @InjectRepository(ConsentRecord)
     private readonly consentRecordsRepository: Repository<ConsentRecord>,
     private readonly consentDocumentsService: ConsentDocumentsService,
+    // Spec 102 — opcionales para no romper los módulos de prueba previos
+    // (e2e-078) que solo proveen el repositorio de constancias.
+    @Optional()
+    @InjectRepository(Farmer)
+    private readonly farmersRepository?: Repository<Farmer>,
+    @Optional()
+    @InjectRepository(Survey)
+    private readonly surveysRepository?: Repository<Survey>,
   ) {}
+
+  // Spec 102 — filtro de idempotencia según el ancla. Por productor solo
+  // cuentan las constancias no revocadas y sin sesión ni encuesta (las
+  // heredadas por otras anclas no bloquean).
+  private anchorWhere(
+    dto: CreateConsentRecordDto,
+    consentDocumentId: string,
+  ): FindOptionsWhere<ConsentRecord> {
+    const consentDocument = { consentDocumentId };
+    if (dto.sessionId) {
+      return { session: { sessionId: dto.sessionId }, consentDocument };
+    }
+    if (dto.surveyId) {
+      return { survey: { surveyId: dto.surveyId }, consentDocument };
+    }
+    return {
+      farmer: { id: dto.farmerId },
+      session: IsNull(),
+      survey: IsNull(),
+      revokedAt: IsNull(),
+      consentDocument,
+    } as FindOptionsWhere<ConsentRecord>;
+  }
 
   // Criterio 12 — sin la autorización obligatoria de tratamiento de datos no
   // se persiste nada. Criterio 9 — idempotente por (sessionId,
@@ -73,6 +107,13 @@ export class ConsentRecordsService {
       );
     }
 
+    const anchors = [dto.sessionId, dto.farmerId, dto.surveyId].filter(Boolean);
+    if (anchors.length !== 1) {
+      throw new BadRequestException(
+        'Debe enviarse exactamente un ancla: sessionId, farmerId o surveyId',
+      );
+    }
+
     const document = dto.consentDocumentId
       ? await this.consentDocumentsService.findOne(dto.consentDocumentId)
       : await this.consentDocumentsService.findActive();
@@ -83,11 +124,24 @@ export class ConsentRecordsService {
       );
     }
 
+    // Spec 102 — el productor o la encuesta deben existir (404).
+    let inheritedFarmerId: string | null = null;
+    if (dto.farmerId) {
+      const farmer = await this.farmersRepository?.findOne({
+        where: { id: dto.farmerId },
+      });
+      if (!farmer) throw new NotFoundException('Farmer not found');
+    } else if (dto.surveyId) {
+      const survey = await this.surveysRepository?.findOne({
+        where: { surveyId: dto.surveyId },
+        relations: ['farmer'],
+      });
+      if (!survey) throw new NotFoundException('Survey not found');
+      inheritedFarmerId = survey.farmer?.id ?? null;
+    }
+
     const existing = await this.consentRecordsRepository.findOne({
-      where: {
-        session: { sessionId: dto.sessionId },
-        consentDocument: { consentDocumentId: document.consentDocumentId },
-      },
+      where: this.anchorWhere(dto, document.consentDocumentId),
     });
 
     if (existing) {
@@ -95,7 +149,14 @@ export class ConsentRecordsService {
     }
 
     const record = this.consentRecordsRepository.create({
-      session: { sessionId: dto.sessionId } as CampaignSession,
+      session: dto.sessionId
+        ? ({ sessionId: dto.sessionId } as CampaignSession)
+        : null,
+      survey: dto.surveyId ? ({ surveyId: dto.surveyId } as Survey) : null,
+      farmer:
+        dto.farmerId || inheritedFarmerId
+          ? ({ id: dto.farmerId ?? inheritedFarmerId } as Farmer)
+          : null,
       consentDocument: document,
       acceptedDataProcessing: dto.acceptedDataProcessing,
       acceptedPhoto: dto.acceptedPhoto ?? false,
@@ -125,12 +186,9 @@ export class ConsentRecordsService {
       // idempotencia; si dos inserciones concurrentes lo violan, la
       // perdedora simplemente devuelve la fila que la ganadora acaba de
       // crear, igual que si el check-then-insert la hubiera visto a tiempo.
-      if (isUniqueViolation(error) && dto.sessionId) {
+      if (isUniqueViolation(error)) {
         const raceWinner = await this.consentRecordsRepository.findOne({
-          where: {
-            session: { sessionId: dto.sessionId },
-            consentDocument: { consentDocumentId: document.consentDocumentId },
-          },
+          where: this.anchorWhere(dto, document.consentDocumentId),
         });
         if (raceWinner) {
           return { created: false, record: raceWinner };
