@@ -452,15 +452,15 @@ describe('Spec 100 — cobertura por productor (e2e)', () => {
         .expect(404);
     });
 
-    it('403 a POLLSTER, en el detalle y en la lista', async () => {
+    it('200 a POLLSTER, en el detalle y en la lista (spec 102)', async () => {
       await http()
         .get(`/api/farmers/${farmerA}/coverage`)
         .set(auth(pollsterToken))
-        .expect(403);
+        .expect(200);
       await http()
         .get('/api/coverage/farmers')
         .set(auth(pollsterToken))
-        .expect(403);
+        .expect(200);
     });
 
     it('el detalle trae el contrato y no expone documento ni teléfono', async () => {

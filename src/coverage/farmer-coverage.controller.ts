@@ -6,7 +6,8 @@ import { FarmerCoverageService } from './farmer-coverage.service';
 
 @ApiTags('Coverage')
 @ApiBearerAuth()
-@Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+// Spec 102 — el encuestador consulta la cobertura desde el flujo por productor.
+@Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
 @Controller()
 export class FarmerCoverageController {
   constructor(private readonly service: FarmerCoverageService) {}
