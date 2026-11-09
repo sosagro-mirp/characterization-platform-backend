@@ -10,10 +10,28 @@ import {
 } from 'class-validator';
 
 export class CreateConsentRecordDto {
-  /** Sesión de campaña sobre la que se otorga el consentimiento */
-  @ApiProperty({ format: 'uuid' })
+  /**
+   * Spec 102 — exactamente UNA de las tres anclas: `sessionId` (campaña),
+   * `farmerId` (flujo por productor) o `surveyId`. La validación de "exactamente
+   * una" vive en el servicio (400).
+   */
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Sesión de campaña sobre la que se otorga el consentimiento',
+  })
+  @IsOptional()
   @IsUUID()
-  sessionId: string;
+  sessionId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  farmerId?: string;
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  surveyId?: string;
 
   /**
    * Versión del documento aceptado. Si se omite, se resuelve la versión

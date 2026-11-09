@@ -8,6 +8,8 @@ import type {
   LoadedFarm,
 } from './coverage-data.loader';
 import type { SurveyInput } from './coverage-calculator';
+import { toCoverageSnapshot } from './coverage-snapshot.mapper';
+import type { CoverageSnapshot } from './coverage-snapshot.mapper';
 import { computeFarmerCoverage } from './farmer-coverage-calculator';
 import type {
   FarmerCoverageResult,
@@ -68,6 +70,68 @@ export class FarmerCoverageService {
 
   /** `maskPersonal` quita el documento: se usa con API keys (spec 98). */
   async getList(maskPersonal = false): Promise<FarmerCoverageList> {
+    const { columns, entries } = await this.computeAll();
+    const rows: FarmerCoverageRow[] = entries.map((e) => {
+      const statusByInstrument: Record<string, string> = {};
+      for (const i of e.result.instruments) {
+        statusByInstrument[i.instrumentId] = i.status;
+      }
+      return {
+        farmerId: e.person.id,
+        name: e.person.name,
+        documentId: maskPersonal ? null : e.person.document_id,
+        primaryFarm: e.primary
+          ? {
+              farmId: e.primary.farmId,
+              name: e.primary.farmName,
+              town: e.primary.town,
+              department: e.primary.department,
+            }
+          : null,
+        farmsCount: e.farms.length,
+        cropIds: [
+          ...new Set(e.farms.flatMap((f) => f.crops.map((c) => c.cropId))),
+        ],
+        hasPendingConsent: e.hasPendingConsent,
+        openDiscrepancies: e.openDiscrepancies,
+        summary: e.result.summary,
+        statusByInstrument,
+        warnings: e.result.warnings,
+      };
+    });
+
+    return {
+      instruments: columns,
+      rows,
+      summary: {
+        farmers: rows.length,
+        withoutFarm: rows.filter((r) => r.farmsCount === 0).length,
+        fullyCovered: rows.filter(
+          (r) =>
+            r.summary.applicable > 0 &&
+            r.summary.applied === r.summary.applicable,
+        ).length,
+      },
+    };
+  }
+
+  /** Spec 103 — foto compacta para la caché offline del móvil. */
+  async getSnapshot(maskPersonal = false): Promise<CoverageSnapshot> {
+    const { columns, entries } = await this.computeAll();
+    return toCoverageSnapshot({
+      computedAt: new Date().toISOString(),
+      columns,
+      maskPersonal,
+      farmers: entries.map((e) => ({
+        result: e.result,
+        documentId: e.person.document_id,
+        department: e.primary?.department ?? null,
+        hasPendingConsent: e.hasPendingConsent,
+      })),
+    });
+  }
+
+  private async computeAll() {
     const [data, people, openRows] = await Promise.all([
       this.loader.load(),
       this.dataSource.query<
@@ -106,7 +170,7 @@ export class FarmerCoverageService {
       add(openByFarm, r.farm_id, r.discrepancy_id);
     }
 
-    const rows: FarmerCoverageRow[] = people.map((person) => {
+    const entries = people.map((person) => {
       const farms = idx.farmsByFarmer.get(person.id) ?? [];
       const surveys = new Set<SurveyInput>();
       for (const s of idx.surveysByFarmer.get(person.id) ?? []) surveys.add(s);
@@ -125,48 +189,16 @@ export class FarmerCoverageService {
       for (const f of farms) {
         for (const id of openByFarm.get(f.farmId) ?? []) open.add(id);
       }
-      const primary = this.primaryOf(person.id, farms);
-      const statusByInstrument: Record<string, string> = {};
-      for (const i of result.instruments) {
-        statusByInstrument[i.instrumentId] = i.status;
-      }
       return {
-        farmerId: person.id,
-        name: person.name,
-        documentId: maskPersonal ? null : person.document_id,
-        primaryFarm: primary
-          ? {
-              farmId: primary.farmId,
-              name: primary.farmName,
-              town: primary.town,
-              department: primary.department,
-            }
-          : null,
-        farmsCount: farms.length,
-        cropIds: [
-          ...new Set(farms.flatMap((f) => f.crops.map((c) => c.cropId))),
-        ],
+        person,
+        farms,
+        result,
+        primary: this.primaryOf(person.id, farms),
         hasPendingConsent: consentPending.get(person.id) !== false,
         openDiscrepancies: open.size,
-        summary: result.summary,
-        statusByInstrument,
-        warnings: result.warnings,
       };
     });
-
-    return {
-      instruments: data.columns,
-      rows,
-      summary: {
-        farmers: rows.length,
-        withoutFarm: rows.filter((r) => r.farmsCount === 0).length,
-        fullyCovered: rows.filter(
-          (r) =>
-            r.summary.applicable > 0 &&
-            r.summary.applied === r.summary.applicable,
-        ).length,
-      },
-    };
+    return { columns: data.columns, entries };
   }
 
   private primaryOf(farmerId: string, farms: LoadedFarm[]) {

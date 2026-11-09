@@ -6,7 +6,8 @@ import { FarmerCoverageService } from './farmer-coverage.service';
 
 @ApiTags('Coverage')
 @ApiBearerAuth()
-@Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+// Spec 102 — el encuestador consulta la cobertura desde el flujo por productor.
+@Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
 @Controller()
 export class FarmerCoverageController {
   constructor(private readonly service: FarmerCoverageService) {}
@@ -29,5 +30,15 @@ export class FarmerCoverageController {
   })
   getList(@Req() req: { apiKey?: unknown }) {
     return this.service.getList(Boolean(req.apiKey));
+  }
+
+  @Get('coverage/farmers/snapshot')
+  @ApiOperation({
+    summary: 'Foto de cobertura para la caché offline del móvil (spec 103)',
+    description:
+      'Ficha compacta de todos los productores: fincas con rol y municipio, cultivos y cobertura por instrumento con unidades. Sin teléfono, correo ni coordenadas. Con API key, `documentId` llega en null.',
+  })
+  getSnapshot(@Req() req: { apiKey?: unknown }) {
+    return this.service.getSnapshot(Boolean(req.apiKey));
   }
 }
