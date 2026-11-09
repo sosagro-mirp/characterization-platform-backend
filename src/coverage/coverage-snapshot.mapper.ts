@@ -80,6 +80,8 @@ export function toCoverageSnapshot(
 
 function toFarmer(src: SnapshotFarmerSource, mask: boolean): SnapshotFarmer {
   const r = src.result;
+  // Departamento (`src.department`, de `primaryOf` del servicio) y municipio salen de la
+  // MISMA finca principal: `r.farms` llega ordenada con la principal primero.
   const primary = r.farms.find((f) => f.isPrimary) ?? r.farms[0];
   return {
     farmerId: r.farmerId,
