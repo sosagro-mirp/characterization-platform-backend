@@ -647,10 +647,11 @@ describe('Spec 103 — encuestador móvil por productor (e2e)', () => {
         .set(auth(pollsterToken))
         .expect(200);
       const elapsed = Date.now() - start;
-      const bytes = Buffer.byteLength(JSON.stringify(res.body), 'utf8');
+      const body = res.body as { farmers: unknown[] };
+      const bytes = Buffer.byteLength(JSON.stringify(body), 'utf8');
       // Medición de la Fase 1 (se anota en el spec).
       process.stdout.write(
-        `SNAPSHOT_METRICS ${bytes} bytes, ${elapsed} ms, ${res.body.farmers.length} farmers\n`,
+        `SNAPSHOT_METRICS ${bytes} bytes, ${elapsed} ms, ${body.farmers.length} farmers\n`,
       );
       expect(elapsed).toBeLessThan(MAX_MS);
       expect(bytes).toBeLessThan(MAX_BYTES);
