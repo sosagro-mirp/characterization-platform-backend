@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
@@ -9,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -16,15 +16,16 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { campaignsRetired } from '../campaigns-retired';
+import { LegacyCampaignUsageInterceptor } from '../legacy-campaign-usage.interceptor';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { ROLES } from '../../auth/constants';
 import { CampaignStepsService } from './campaign-steps.service';
-import { CreateCampaignStepDto } from './dto/create-campaign-step.dto';
-import { UpdateCampaignStepDto } from './dto/update-campaign-step.dto';
 
 @ApiTags('Campaign Steps')
 @ApiBearerAuth()
 @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+@UseInterceptors(LegacyCampaignUsageInterceptor)
 @Controller('campaigns/:campaignId/steps')
 export class CampaignStepsController {
   constructor(private readonly stepsService: CampaignStepsService) {}
@@ -37,36 +38,26 @@ export class CampaignStepsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Crear paso' })
+  @ApiOperation({ summary: 'Crear paso', deprecated: true })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
-  create(
-    @Param('campaignId', new ParseUUIDPipe()) campaignId: string,
-    @Body() dto: CreateCampaignStepDto,
-  ) {
-    return this.stepsService.create(campaignId, dto);
+  create() {
+    throw campaignsRetired();
   }
 
   @Patch(':stepId')
-  @ApiOperation({ summary: 'Actualizar paso' })
+  @ApiOperation({ summary: 'Actualizar paso', deprecated: true })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
   @ApiParam({ name: 'stepId', format: 'uuid' })
-  update(
-    @Param('campaignId', new ParseUUIDPipe()) campaignId: string,
-    @Param('stepId', new ParseUUIDPipe()) stepId: string,
-    @Body() dto: UpdateCampaignStepDto,
-  ) {
-    return this.stepsService.update(campaignId, stepId, dto);
+  update() {
+    throw campaignsRetired();
   }
 
   @Delete(':stepId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Eliminar paso' })
+  @ApiOperation({ summary: 'Eliminar paso', deprecated: true })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
   @ApiParam({ name: 'stepId', format: 'uuid' })
-  remove(
-    @Param('campaignId', new ParseUUIDPipe()) campaignId: string,
-    @Param('stepId', new ParseUUIDPipe()) stepId: string,
-  ) {
-    return this.stepsService.remove(campaignId, stepId);
+  remove() {
+    throw campaignsRetired();
   }
 }

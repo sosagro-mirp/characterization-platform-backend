@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
@@ -9,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -17,16 +17,15 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { campaignsRetired } from './campaigns-retired';
+import { LegacyCampaignUsageInterceptor } from './legacy-campaign-usage.interceptor';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { Public } from '../auth/decorators/public.decorator';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { CampaignsService } from './campaigns.service';
-import { CreateCampaignDto } from './dto/create-campaign.dto';
-import { UpdateCampaignDto } from './dto/update-campaign.dto';
 
 @ApiTags('Campaigns')
+@UseInterceptors(LegacyCampaignUsageInterceptor)
 @Controller('campaigns')
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
@@ -34,13 +33,10 @@ export class CampaignsController {
   @Post()
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN)
-  @ApiOperation({ summary: 'Crear campaña' })
+  @ApiOperation({ summary: 'Crear campaña', deprecated: true })
   @ApiResponse({ status: 201, description: 'Campaña creada.' })
-  create(
-    @Body() dto: CreateCampaignDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    return this.campaignsService.create(dto, user?.userId);
+  create() {
+    throw campaignsRetired();
   }
 
   @Get()
@@ -99,23 +95,22 @@ export class CampaignsController {
   @Patch(':id')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
-  @ApiOperation({ summary: 'Actualizar metadatos de campaña' })
+  @ApiOperation({
+    summary: 'Actualizar metadatos de campaña',
+    deprecated: true,
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
-  update(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateCampaignDto,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
-    return this.campaignsService.update(id, dto, user?.userId);
+  update() {
+    throw campaignsRetired();
   }
 
   @Delete(':id')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Eliminar campaña' })
+  @ApiOperation({ summary: 'Eliminar campaña', deprecated: true })
   @ApiParam({ name: 'id', format: 'uuid' })
-  remove(@Param('id', new ParseUUIDPipe()) id: string) {
-    return this.campaignsService.remove(id);
+  remove() {
+    throw campaignsRetired();
   }
 }

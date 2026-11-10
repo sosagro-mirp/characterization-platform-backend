@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -20,10 +21,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
+import { LegacyCampaignUsageInterceptor } from '../campaigns/legacy-campaign-usage.interceptor';
 import { CampaignSessionsService } from './campaign-sessions.service';
 import { CreateCampaignSessionDto } from './dto/create-campaign-session.dto';
 
 @ApiTags('Campaign Sessions')
+@UseInterceptors(LegacyCampaignUsageInterceptor)
 @ApiBearerAuth()
 @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
 @Controller('campaign-sessions')

@@ -233,11 +233,20 @@ export class SurveysService {
     if (createSurveyDto.campaignSessionId) {
       campaignSession = await this.campaignSessionsRepository.findOne({
         where: { sessionId: createSurveyDto.campaignSessionId },
-        relations: ['farmer'],
+        relations: ['farmer', 'campaign'],
       });
       if (!campaignSession) {
         throw new NotFoundException('CampaignSession not found');
       }
+      // Spec 104 — telemetría: captura heredada que aún llega por campaña.
+      this.logger.log(
+        JSON.stringify({
+          legacyCampaignUsage: true,
+          method: 'POST',
+          route: '/api/surveys',
+          userId: userId ?? null,
+        }),
+      );
     }
 
     // Spec 95 — el productor se hereda del alias provisional (si ya se resolvió)
@@ -276,6 +285,7 @@ export class SurveysService {
       vereda: createSurveyDto.vereda,
       crop: crop ?? undefined,
       campaignSession: campaignSession ?? undefined,
+      legacyCampaignName: campaignSession?.campaign?.name ?? null,
       stepOrder: createSurveyDto.stepOrder,
       clientSurveyId: createSurveyDto.clientSurveyId,
       clientFarmerId: createSurveyDto.clientFarmerId,
@@ -440,7 +450,11 @@ export class SurveysService {
       });
     }
 
-    return qb.getMany();
+    // Spec 104 — la campaña de origen sale de la columna desnormalizada.
+    const rows = await qb.getMany();
+    return rows.map((r) =>
+      Object.assign(r, { campaignName: r.legacyCampaignName ?? null }),
+    );
   }
 
   async markAsSynchronized(surveyId: string): Promise<Survey> {
@@ -919,7 +933,6 @@ export class SurveysService {
       .leftJoin('survey.farmer', 'surveyFarmer')
       .leftJoin('survey.campaignSession', 'campaignSession')
       .leftJoin('campaignSession.farmer', 'sessionFarmer')
-      .leftJoin('campaignSession.campaign', 'campaign')
       // Spec 94 — finca y cultivo a los que está anclada la encuesta.
       .leftJoin('survey.farm', 'surveyFarm')
       .leftJoin('survey.crop', 'surveyCrop')
@@ -954,7 +967,7 @@ export class SurveysService {
       .addSelect('surveyFarmer.name', 'surveyFarmerName')
       .addSelect('sessionFarmer.id', 'sessionFarmerId')
       .addSelect('sessionFarmer.name', 'sessionFarmerName')
-      .addSelect('campaign.name', 'campaignName')
+      .addSelect('survey.legacyCampaignName', 'campaignName')
       .addSelect('surveyFarm.farmId', 'farmId')
       .addSelect('surveyFarm.name', 'farmName')
       .addSelect('surveyCrop.cropId', 'cropId')

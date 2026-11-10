@@ -1,5 +1,4 @@
 import {
-  Body,
   Controller,
   Delete,
   Get,
@@ -9,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -16,15 +16,16 @@ import {
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import { campaignsRetired } from '../campaigns-retired';
+import { LegacyCampaignUsageInterceptor } from '../legacy-campaign-usage.interceptor';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { ROLES } from '../../auth/constants';
 import { StepConditionsService } from './step-conditions.service';
-import { CreateStepConditionDto } from './dto/create-step-condition.dto';
-import { UpdateStepConditionDto } from './dto/update-step-condition.dto';
 
 @ApiTags('Step Conditions')
 @ApiBearerAuth()
 @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+@UseInterceptors(LegacyCampaignUsageInterceptor)
 @Controller('campaigns/:campaignId/steps/:stepId/conditions')
 export class StepConditionsController {
   constructor(private readonly conditionsService: StepConditionsService) {}
@@ -41,42 +42,29 @@ export class StepConditionsController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Crear condición en un paso' })
+  @ApiOperation({ summary: 'Crear condición en un paso', deprecated: true })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
   @ApiParam({ name: 'stepId', format: 'uuid' })
-  create(
-    @Param('campaignId', new ParseUUIDPipe()) campaignId: string,
-    @Param('stepId', new ParseUUIDPipe()) stepId: string,
-    @Body() dto: CreateStepConditionDto,
-  ) {
-    return this.conditionsService.create(campaignId, stepId, dto);
+  create() {
+    throw campaignsRetired();
   }
 
   @Patch(':conditionId')
-  @ApiOperation({ summary: 'Actualizar condición' })
+  @ApiOperation({ summary: 'Actualizar condición', deprecated: true })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
   @ApiParam({ name: 'stepId', format: 'uuid' })
   @ApiParam({ name: 'conditionId', format: 'uuid' })
-  update(
-    @Param('campaignId', new ParseUUIDPipe()) campaignId: string,
-    @Param('stepId', new ParseUUIDPipe()) stepId: string,
-    @Param('conditionId', new ParseUUIDPipe()) conditionId: string,
-    @Body() dto: UpdateStepConditionDto,
-  ) {
-    return this.conditionsService.update(campaignId, stepId, conditionId, dto);
+  update() {
+    throw campaignsRetired();
   }
 
   @Delete(':conditionId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Eliminar condición' })
+  @ApiOperation({ summary: 'Eliminar condición', deprecated: true })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
   @ApiParam({ name: 'stepId', format: 'uuid' })
   @ApiParam({ name: 'conditionId', format: 'uuid' })
-  remove(
-    @Param('campaignId', new ParseUUIDPipe()) campaignId: string,
-    @Param('stepId', new ParseUUIDPipe()) stepId: string,
-    @Param('conditionId', new ParseUUIDPipe()) conditionId: string,
-  ) {
-    return this.conditionsService.remove(campaignId, stepId, conditionId);
+  remove() {
+    throw campaignsRetired();
   }
 }
