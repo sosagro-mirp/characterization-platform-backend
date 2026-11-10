@@ -100,6 +100,14 @@ const DENIED_SYSTEM_FIELDS = [
 /** Spec 97 — una pregunta, más las demás que alimentan el mismo destino. */
 type DestinationQuestion = Question & { destinationQuestionIds?: string[] };
 
+/** Tipo de pregunta sin agregación: la pregunta se omite, no tumba la respuesta. */
+class UnsupportedQuestionTypeError extends Error {
+  constructor(typeName: string) {
+    super(`Tipo de pregunta no soportado: ${typeName}`);
+    this.name = 'UnsupportedQuestionTypeError';
+  }
+}
+
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -406,8 +414,9 @@ export class DashboardService {
 
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
-      // Una pregunta que no se puede agregar se omite y se registra: no tumba
-      // la categoría entera con un 500 (bug `numeric_with_unit`).
+      // Una pregunta de un tipo sin agregación se omite y se registra: no
+      // tumba la categoría entera con un 500 (bug `numeric_with_unit`).
+      // Cualquier otro error (base de datos, SQL) se propaga.
       try {
         dashboardQuestions.push(
           await this.aggregateQuestion(
@@ -418,10 +427,10 @@ export class DashboardService {
           ),
         );
       } catch (error) {
-        this.logger.warn(
-          `Pregunta ${question.questionId} (${question.type?.name}) omitida del dashboard: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+        if (!(error instanceof UnsupportedQuestionTypeError)) throw error;
+        this.logger.error(
+          `Pregunta ${question.questionId} omitida del dashboard: ${error.message}`,
+          error.stack,
         );
       }
     }
@@ -1177,7 +1186,7 @@ export class DashboardService {
           responseFilters,
         );
       default:
-        throw new Error(`Tipo de pregunta no soportado: ${typeName}`);
+        throw new UnsupportedQuestionTypeError(typeName);
     }
   }
 
@@ -1399,6 +1408,9 @@ export class DashboardService {
     const ids = this.idsOf(question);
     // Spec 97: con varias preguntas por destino las unidades se agrupan por
     // texto, porque los ids de opción difieren entre preguntas.
+    // DEBT: en ese caso los grupos cuentan filas y `answeredCount` cuenta
+    // encuestas distintas, así que los porcentajes podrían pasar del 100 %.
+    // Hoy no ocurre: ningún destino con alias es `numeric_with_unit`.
     const multi = ids.length > 1;
 
     const rows = await this.buildResponseBaseQuery(
