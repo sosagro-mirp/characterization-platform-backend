@@ -552,13 +552,15 @@ describe('spec-084 — depuración de instrumentos y Registro del productor (e2e
       expect(codes).not.toContain('S_REG');
     });
 
+    // Spec 104: las escrituras de pasos de campaña responden 410, lo que
+    // cierra por completo el camino que esta guarda protegía.
     it('no se puede agregar como paso de campaña', async () => {
       const sReg = await ds.query<{ instrument_id: string }[]>(
         `SELECT instrument_id FROM instruments WHERE code = 'S_REG'`,
       );
       await auth(http().post(`/api/campaigns/${campaignId}/steps`))
         .send({ instrumentId: sReg[0].instrument_id, order: 1 })
-        .expect(400);
+        .expect(410);
     });
   });
 
