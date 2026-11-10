@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -23,7 +24,9 @@ import {
   AggregationChoicesDto,
   AggregationLikertDto,
   AggregationNumericDto,
+  AggregationNumericWithUnitDto,
   AggregationOptionDto,
+  AggregationUnitGroupDto,
   AggregationYesNoDto,
   DashboardAggregation,
   DashboardQuestionDto,
@@ -109,6 +112,8 @@ function toNumberOrNull(value: unknown): number | null {
 
 @Injectable()
 export class DashboardService {
+  private readonly logger = new Logger(DashboardService.name);
+
   constructor(
     @InjectRepository(Survey)
     private readonly surveyRepo: Repository<Survey>,
@@ -401,14 +406,24 @@ export class DashboardService {
 
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
-      dashboardQuestions.push(
-        await this.aggregateQuestion(
-          question,
-          filters,
-          responseFilters,
-          instrumentByQuestionId.get(question.questionId),
-        ),
-      );
+      // Una pregunta que no se puede agregar se omite y se registra: no tumba
+      // la categoría entera con un 500 (bug `numeric_with_unit`).
+      try {
+        dashboardQuestions.push(
+          await this.aggregateQuestion(
+            question,
+            filters,
+            responseFilters,
+            instrumentByQuestionId.get(question.questionId),
+          ),
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Pregunta ${question.questionId} (${question.type?.name}) omitida del dashboard: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
     }
 
     return { metadata, suppressed: false, questions: dashboardQuestions };
@@ -1090,6 +1105,10 @@ export class DashboardService {
 
     if (typeName === 'numeric') {
       qb.andWhere('response.numericValue IS NOT NULL');
+    } else if (typeName === 'numeric_with_unit') {
+      qb.andWhere('response.numericValue IS NOT NULL').andWhere(
+        'response.option IS NOT NULL',
+      );
     } else if (typeName === 'yes_no') {
       qb.andWhere('response.booleanValue IS NOT NULL');
     } else {
@@ -1127,6 +1146,13 @@ export class DashboardService {
         );
       case 'numeric':
         return this.aggregateNumeric(
+          question,
+          filters,
+          answeredCount,
+          responseFilters,
+        );
+      case 'numeric_with_unit':
+        return this.aggregateNumericWithUnit(
           question,
           filters,
           answeredCount,
@@ -1354,6 +1380,110 @@ export class DashboardService {
       stdDev: toNumberOrNull(stats?.stdDev),
       distribution,
     };
+  }
+
+  /**
+   * `numeric_with_unit`: el número va en `numericValue` y la unidad en la
+   * opción elegida (spec 42). Se agrupa por unidad y no se convierte entre
+   * unidades: la normalización por factor es una decisión de curaduría
+   * (spec 66). Las estadísticas y los valores crudos de un grupo solo se
+   * exponen si ese grupo alcanza el umbral de privacidad, igual que una
+   * pregunta `numeric` suelta (D7).
+   */
+  private async aggregateNumericWithUnit(
+    question: DestinationQuestion,
+    filters: DashboardFiltersDto,
+    answeredCount: number,
+    responseFilters: ResolvedResponseFilters = [],
+  ): Promise<AggregationNumericWithUnitDto> {
+    const ids = this.idsOf(question);
+    // Spec 97: con varias preguntas por destino las unidades se agrupan por
+    // texto, porque los ids de opción difieren entre preguntas.
+    const multi = ids.length > 1;
+
+    const rows = await this.buildResponseBaseQuery(
+      ids,
+      filters,
+      responseFilters,
+    )
+      .innerJoin('response.option', 'option')
+      .andWhere('response.numericValue IS NOT NULL')
+      .select(
+        multi ? 'MIN(option.optionId::text)' : 'option.optionId',
+        'optionId',
+      )
+      .addSelect('option.text', 'unit')
+      .addSelect('COUNT(response.responseId)', 'count')
+      .addSelect('AVG(response.numericValue)', 'average')
+      .addSelect(
+        'PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response.numericValue)',
+        'median',
+      )
+      .addSelect(
+        'PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY response.numericValue)',
+        'q1',
+      )
+      .addSelect(
+        'PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY response.numericValue)',
+        'q3',
+      )
+      .addSelect('MIN(response.numericValue)', 'min')
+      .addSelect('MAX(response.numericValue)', 'max')
+      .addSelect('STDDEV(response.numericValue)', 'stdDev')
+      .addSelect('ARRAY_AGG(response.numericValue)', 'values')
+      .groupBy(multi ? 'option.text' : 'option.optionId')
+      .addGroupBy('option.text')
+      .getRawMany<{
+        optionId: string;
+        unit: string;
+        count: string;
+        average: string | null;
+        median: string | null;
+        q1: string | null;
+        q3: string | null;
+        min: string | null;
+        max: string | null;
+        stdDev: string | null;
+        values: (string | number)[] | null;
+      }>();
+
+    const units: AggregationUnitGroupDto[] = rows
+      .map((row) => {
+        const count = Number(row.count);
+        const percentage = round2((count / answeredCount) * 100);
+        if (count < MIN_SAMPLE_THRESHOLD) {
+          return {
+            optionId: row.optionId,
+            unit: row.unit,
+            count,
+            percentage,
+            average: null,
+            median: null,
+            q1: null,
+            q3: null,
+            min: null,
+            max: null,
+            stdDev: null,
+          };
+        }
+        return {
+          optionId: row.optionId,
+          unit: row.unit,
+          count,
+          percentage,
+          average: toNumberOrNull(row.average),
+          median: toNumberOrNull(row.median),
+          q1: toNumberOrNull(row.q1),
+          q3: toNumberOrNull(row.q3),
+          min: toNumberOrNull(row.min),
+          max: toNumberOrNull(row.max),
+          stdDev: toNumberOrNull(row.stdDev),
+          distribution: (row.values ?? []).map((value) => Number(value)),
+        };
+      })
+      .sort((a, b) => b.count - a.count || a.unit.localeCompare(b.unit));
+
+    return { type: 'numeric_with_unit', count: answeredCount, units };
   }
 
   // ─────────────────────────── Fase 4 (spec 43) ───────────────────────────
