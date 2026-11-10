@@ -89,9 +89,34 @@ export class Question {
   })
   systemField?: string;
 
+  /**
+   * Spec 97 (D-H4-7) — la escala Likert está invertida (puntaje = 6 - valor).
+   * Antes viajaba como `system_field = 'inverted:*'`.
+   */
+  @Column({
+    name: 'is_inverted_scale',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  isInvertedScale: boolean;
+
+  /**
+   * Spec 97 (D-H4-6) — ítem de la vista «Demanda digital» del dashboard.
+   * Antes viajaba como `system_field = 'Pregunta estratégica de
+   * caracterización tecnológica'`.
+   */
+  @Column({
+    name: 'is_digital_demand_item',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  isDigitalDemandItem: boolean;
+
   @ManyToOne(() => Question, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'condition_question_id' })
-  conditionQuestion?: Question;
+  conditionQuestion?: Question | null;
 
   @Column({
     name: 'condition_value',
@@ -99,7 +124,17 @@ export class Question {
     length: 50,
     nullable: true,
   })
-  conditionValue?: string;
+  conditionValue?: string | null;
+
+  // Spec 84 — "editar en sitio + archivar": NULL = visible; con fecha, la
+  // pregunta deja de aparecer en render/formulario público/caché móvil pero
+  // sus respuestas se conservan. Nunca se borra una pregunta con respuestas.
+  @Column({
+    name: 'archived_at',
+    type: 'timestamp',
+    nullable: true,
+  })
+  archivedAt?: Date | null;
 
   @OneToMany(
     () => Response,

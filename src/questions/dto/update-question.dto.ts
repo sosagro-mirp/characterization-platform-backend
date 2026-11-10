@@ -56,9 +56,32 @@ export class UpdateQuestionDto {
   @MaxLength(50)
   conditionValue?: string | null;
 
+  /** Spec 97 — clave del catálogo `GET /system-fields`; `null` quita el destino. */
   @ApiPropertyOptional({ example: 'farmer.name', maxLength: 100 })
   @IsOptional()
   @IsString()
   @MaxLength(100)
   systemField?: string | null;
+
+  /**
+   * Spec 84 — mueve la pregunta a otra sección, siempre dentro del mismo
+   * instrumento. Al mover, la pregunta pasa al final de la sección destino
+   * (se ignora `order` de este mismo body si ambos vienen juntos).
+   */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  targetSectionId?: string;
+
+  /** Spec 97 — escala Likert invertida (puntaje = 6 - valor). */
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isInvertedScale?: boolean;
+
+  /** Spec 97 — ítem de la vista «Demanda digital» del dashboard. */
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isDigitalDemandItem?: boolean;
 }

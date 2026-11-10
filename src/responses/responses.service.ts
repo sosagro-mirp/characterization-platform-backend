@@ -14,6 +14,8 @@ import {
 } from 'src/media-attachments/entities/media-attachment.entity';
 import { CreateResponseDto } from './dto/create-response.dto';
 import { Response } from './entities/response.entity';
+import { resolveOtherAnswer } from './other-option';
+import { FarmerExtractionService } from '../farmer-extraction/farmer-extraction.service';
 
 @Injectable()
 export class ResponsesService {
@@ -28,6 +30,7 @@ export class ResponsesService {
     private readonly optionsQuestionRepository: Repository<OptionQuestion>,
     @InjectRepository(MediaAttachment)
     private readonly attachmentRepository: Repository<MediaAttachment>,
+    private readonly farmerExtraction: FarmerExtractionService,
   ) {}
 
   async create(createResponseDto: CreateResponseDto): Promise<Response> {
@@ -94,19 +97,46 @@ export class ResponsesService {
 
     const surveyId = surveyIds[0];
 
-    const existingCount = await this.responsesRepository.count({
-      where: { survey: { surveyId } },
-    });
-
-    if (existingCount > 0) {
-      return this.responsesRepository.find({
-        where: { survey: { surveyId } },
-        relations: { survey: true, question: true, option: true },
-      });
-    }
-
+    // Spec 84 (hallazgo de la ronda de pruebas, 2026-09-13) — la guarda de
+    // idempotencia era un check-then-insert fuera de transacción: dos envíos
+    // casi simultáneos del mismo lote (la app móvil lo hizo con un solo toque
+    // en "Finalizar") contaban ambos cero respuestas y ambos insertaban, así
+    // que cada respuesta quedaba duplicada. No hay índice único que lo
+    // impida: una pregunta de selección múltiple admite legítimamente varias
+    // filas con el mismo `question_id`.
+    //
+    // El lock por encuesta serializa los envíos concurrentes y la
+    // comprobación se repite dentro de la transacción, ya protegida.
     return await this.responsesRepository.manager.transaction(
       async (manager) => {
+        // Ver `SurveysService.extractFarmer`: cota a la espera del lock.
+        await manager.query("SET LOCAL lock_timeout = '10s'");
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          `responses-batch:${surveyId}`,
+        ]);
+
+        const existingCount = await manager.getRepository(Response).count({
+          where: { survey: { surveyId } },
+        });
+
+        if (existingCount > 0) {
+          // Spec 95 — un reintento también extrae si el primer intento no llegó
+          // a hacerlo (`extraction_status` NULL) o falló (`error`).
+          const sent = await manager.getRepository(Survey).findOne({
+            where: { surveyId },
+          });
+          if (
+            sent?.origin === 'field' &&
+            (sent.extractionStatus == null || sent.extractionStatus === 'error')
+          ) {
+            await this.farmerExtraction.runForBatch(manager, surveyId);
+          }
+          return manager.getRepository(Response).find({
+            where: { survey: { surveyId } },
+            relations: { survey: true, question: true, option: true },
+          });
+        }
+
         const survey = await manager.getRepository(Survey).findOne({
           where: { surveyId },
         });
@@ -157,6 +187,12 @@ export class ResponsesService {
             manager,
           );
           responses.push(response);
+        }
+
+        // Spec 95 (D-H3-C) — el backend extrae al recibir la encuesta: productor,
+        // finca y cultivos, bajo un SAVEPOINT. Nunca hace fallar el batch.
+        if (survey.origin === 'field') {
+          await this.farmerExtraction.runForBatch(manager, surveyId);
         }
 
         return responses;
@@ -223,6 +259,15 @@ export class ResponsesService {
       }
     }
 
+    // Spec 86 — "Otros": texto en la respuesta, normalización de opciones
+    // `field` de clientes viejos y validación de longitud.
+    const resolved = await resolveOtherAnswer(
+      question,
+      option,
+      textValue,
+      manager,
+    );
+
     let attachment: MediaAttachment | null = null;
 
     if (attachmentId) {
@@ -244,8 +289,8 @@ export class ResponsesService {
     const response = manager.getRepository(Response).create({
       survey,
       question,
-      option: option ?? undefined,
-      textValue,
+      option: resolved.option ?? undefined,
+      textValue: resolved.textValue,
       numericValue,
       booleanValue,
     });

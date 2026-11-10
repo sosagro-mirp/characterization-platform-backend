@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
@@ -96,4 +97,51 @@ export class CreateSurveyDto {
   @IsInt()
   @Min(1)
   stepOrder?: number;
+
+  /**
+   * Id local generado por el cliente (spec 70, Fase 9). Si se envía y ya
+   * existe una encuesta con ese id, el endpoint es idempotente: devuelve la
+   * encuesta existente en vez de crear una nueva. Pensado para que el cliente
+   * móvil reintente con seguridad tras perder la respuesta de un POST que sí
+   * llegó al servidor.
+   */
+  @ApiPropertyOptional({
+    example: 'local_survey_9c3f1b2a-8e7d-4f2e-9a1b-2c3d4e5f6a7b',
+    maxLength: 100,
+    description:
+      'Id local del cliente. Repetirlo en un reintento devuelve la encuesta ya creada en vez de duplicarla.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  clientSurveyId?: string;
+
+  /**
+   * Spec 95 — id provisional del productor (`local_farmer_<uuid>`) que el móvil
+   * usa antes de que su registro llegue al servidor. Si ya hay un alias para ese
+   * id, la encuesta hereda a ese productor; si no, queda esperando su registro.
+   */
+  @ApiPropertyOptional({
+    example: 'local_farmer_9c3f1b2a-8e7d-4f2e-9a1b-2c3d4e5f6a7b',
+    maxLength: 100,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^local_farmer_/, {
+    message: 'clientFarmerId must start with local_farmer_',
+  })
+  clientFarmerId?: string;
+
+  /** Spec 95 — finca a la que se ancla la encuesta (debe ser del productor). */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  farmId?: string;
+
+  /** Spec 95 — cultivo de finca al que se ancla la encuesta (debe ser de `farmId`). */
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID()
+  farmCropId?: string;
 }

@@ -1,8 +1,10 @@
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { Section } from 'src/sections/entities/section.entity';
 import { Survey } from 'src/surveys/entities/survey.entity';
+import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { User } from 'src/users/entities/user.entity';
 import {
+  AfterLoad,
   Column,
   CreateDateColumn,
   Entity,
@@ -14,6 +16,9 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+
+export const INSTRUMENT_SCOPE_LEVELS = ['farmer', 'farm', 'farm_crop'] as const;
+export type InstrumentScopeLevel = (typeof INSTRUMENT_SCOPE_LEVELS)[number];
 
 @Entity({ name: 'instruments' })
 export class Instrument {
@@ -49,6 +54,18 @@ export class Instrument {
   })
   isActive: boolean;
 
+  // Spec 79 — este instrumento se puede compartir por una URL pública
+  // (/encuesta/{instrumentId}) y recibir respuestas sin encuestador ni
+  // agricultor identificados. `isActive` manda: un instrumento inactivo no
+  // se sirve por el canal público aunque isPublic sea true.
+  @Column({
+    name: 'is_public',
+    type: 'boolean',
+    nullable: false,
+    default: false,
+  })
+  isPublic: boolean;
+
   @Column({
     type: 'varchar',
     length: 10,
@@ -56,6 +73,41 @@ export class Instrument {
     unique: true,
   })
   code?: string;
+
+  // Spec 98 — a quién se le aplica el instrumento. Nulo = sin declarar: el
+  // instrumento no sale en la cobertura de unidades productivas.
+  @Column({
+    name: 'scope_level',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
+  scopeLevel?: InstrumentScopeLevel | null;
+
+  // Spec 98 — los instrumentos del mismo grupo cuentan como una sola columna.
+  @Column({
+    name: 'coverage_group',
+    type: 'varchar',
+    length: 50,
+    nullable: true,
+  })
+  coverageGroup?: string | null;
+
+  // Spec 98 — solo para `farm_crop`. Vacío = todos los cultivos.
+  @ManyToMany(() => TypeOfCrop, { eager: false })
+  @JoinTable({
+    name: 'instruments_crops',
+    joinColumn: { name: 'instrument_id', referencedColumnName: 'instrumentId' },
+    inverseJoinColumn: { name: 'crop_id', referencedColumnName: 'cropId' },
+  })
+  crops?: TypeOfCrop[];
+
+  cropIds?: string[];
+
+  @AfterLoad()
+  setCropIds(): void {
+    if (this.crops) this.cropIds = this.crops.map((crop) => crop.cropId);
+  }
 
   @OneToMany(() => Section, (section) => section.instrument)
   sections: Section[];

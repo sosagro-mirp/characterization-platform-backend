@@ -305,7 +305,8 @@ export async function seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioPr
     const q_1ecaf425_1aa3_47fb_95eb_3f7fb5f4a9de = await saveQuestion(manager, {
       text: `¿Pertenece el productor a alguno de los siguientes grupos o territorios? (Puede marcar más de una opción)`,
       type: types.multiple_choice,
-      isRequired: true,
+      // Dato sensible (Ley 1581/2012): su respuesta no puede ser obligatoria. Spec 85.
+      isRequired: false,
       isKeyQuestion: true,
       order: o++,
       section: sec1,
@@ -318,6 +319,7 @@ export async function seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioPr
       { text: `Municipio en zona PDET` },
       { text: `Municipio en zona ZOMAC` },
       { text: `Ninguna de las anteriores` },
+      { text: `Prefiero no responder` },
     ]);
 
     await saveQuestion(manager, {
@@ -694,6 +696,10 @@ export async function seedInstrumentoS1aIdentificacionDelEncuestadoPropietarioPr
         metadataId: 'e6cc6c97-7e0a-4dd2-9147-773bc4d29c92',
       },
       { text: `Nóvita`, metadataId: 'ee09f273-9109-4cf1-ae6a-9e88b0e934e6' },
+      {
+        text: `Nuevo Belén de Bajirá`,
+        metadataId: 'e1a3b624-7fc2-4359-94a1-363dab767e6d',
+      },
       { text: `Nuquí`, metadataId: 'b7c5021e-326a-4cf4-846f-8c48ec151a77' },
       { text: `Quibdó`, metadataId: '2ad3de21-bbad-45b2-ac2a-5d3bd2db2ac6' },
       { text: `Río Iro`, metadataId: '0e225ace-7dfa-4a7a-bec9-7922f4718fc5' },

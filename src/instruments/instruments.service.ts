@@ -1,16 +1,30 @@
+import { resolveSystemField } from '../questions/system-fields/system-field-registry';
 import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { MediaCleanupService } from 'src/media-attachments/media-cleanup.service';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
 import { User } from 'src/users/entities/user.entity';
 import { Town } from 'src/towns/entities/town.entity';
-import { In, IsNull, Repository } from 'typeorm';
+import { Section } from 'src/sections/entities/section.entity';
+import { Question } from 'src/questions/entities/question.entity';
+import {
+  OPTION_ORIGINS,
+  OptionQuestion,
+} from 'src/options-question/entities/option-question.entity';
+import { Response } from 'src/responses/entities/response.entity';
+import { EntityManager, In, Repository } from 'typeorm';
 import { CreateInstrumentDto } from './dto/create-instrument.dto';
 import { UpdateInstrumentDto } from './dto/update-instrument.dto';
+import { DuplicateInstrumentDto } from './dto/duplicate-instrument.dto';
 import { Instrument } from './entities/instrument.entity';
+import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
+import { SYSTEM_INSTRUMENT_CODES } from './system-instrument-codes';
 
 @Injectable()
 export class InstrumentsService {
@@ -23,7 +37,28 @@ export class InstrumentsService {
     private readonly usersRepository: Repository<User>,
     @InjectRepository(Town)
     private readonly townsRepository: Repository<Town>,
+    @InjectRepository(Question)
+    private readonly questionsRepository: Repository<Question>,
+    @InjectRepository(Response)
+    private readonly responsesRepository: Repository<Response>,
+    // `@Optional()` solo para no romper la suite unitaria que arma este
+    // servicio a mano; en la aplicación siempre está inyectado (spec 85).
+    @Optional() private readonly mediaCleanup?: MediaCleanupService,
   ) {}
+
+  // Spec 79 — tipos de pregunta que exigen el flujo autenticado de
+  // media-attachments para subir el archivo. Un instrumento con alguna de
+  // estas no puede compartirse por el canal público sin autenticación.
+  // 'video' está incluido aunque el spec solo menciona imagen/audio/
+  // documento explícitamente: comparte la misma restricción (sube por
+  // media-attachments) y dejarlo fuera sería un hueco de seguridad, no una
+  // fidelidad al texto del spec.
+  private static readonly MEDIA_QUESTION_TYPES = [
+    'image',
+    'voice_recording',
+    'document',
+    'video',
+  ];
 
   async create(
     createInstrumentDto: CreateInstrumentDto,
@@ -60,10 +95,25 @@ export class InstrumentsService {
   }
 
   async findAll(excludeSystem = false): Promise<Instrument[]> {
-    return await this.instrumentsRepository.find({
-      where: excludeSystem ? { code: IsNull() } : undefined,
-      relations: { actorTypes: true },
-    });
+    const qb = this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.crops', 'crop')
+      .leftJoin('instrument.createdBy', 'createdBy')
+      .leftJoin('instrument.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName']);
+
+    if (excludeSystem) {
+      qb.where(
+        'instrument.code IS NULL OR instrument.code NOT IN (:...codes)',
+        {
+          codes: SYSTEM_INSTRUMENT_CODES,
+        },
+      );
+    }
+
+    return qb.getMany();
   }
 
   /** Fase 2 (Spec 30): catálogo público para el dashboard — solo instrumentos activos. */
@@ -88,11 +138,25 @@ export class InstrumentsService {
       .getMany();
   }
 
+  // Alias legacy → código actual (2026-08-22). `mobile/` y `frontend/`
+  // siguen pidiendo los códigos literales 'S1'/'S2' que el flujo de
+  // identificación S1/S2 tenía antes del backfill del spec 43, que renombró
+  // esos dos instrumentos a 'S1a'/'S1b' para no chocar con el código de
+  // dashboard 'S2' (un instrumento de contenido real, no relacionado).
+  // Nadie más llama a este endpoint con un código de dashboard, así que el
+  // alias es seguro: no se resuelve al instrumento equivocado para ningún
+  // otro llamador.
+  private static readonly LEGACY_CODE_ALIASES: Record<string, string> = {
+    S1: 'S1a',
+    S2: 'S1b',
+  };
+
   async findByCode(
     code: string,
   ): Promise<{ instrumentId: string; name: string }> {
+    const resolvedCode = InstrumentsService.LEGACY_CODE_ALIASES[code] ?? code;
     const instrument = await this.instrumentsRepository.findOne({
-      where: { code },
+      where: { code: resolvedCode },
       select: ['instrumentId', 'name'],
     });
     if (!instrument)
@@ -101,10 +165,16 @@ export class InstrumentsService {
   }
 
   async findOne(id: string): Promise<Instrument> {
-    const instrument = await this.instrumentsRepository.findOne({
-      where: { instrumentId: id },
-      relations: { actorTypes: true },
-    });
+    const instrument = await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.crops', 'crop')
+      .leftJoin('instrument.createdBy', 'createdBy')
+      .leftJoin('instrument.updatedBy', 'updatedBy')
+      .addSelect(['createdBy.userId', 'createdBy.name', 'createdBy.lastName'])
+      .addSelect(['updatedBy.userId', 'updatedBy.name', 'updatedBy.lastName'])
+      .where('instrument.instrumentId = :id', { id })
+      .getOne();
 
     if (!instrument) {
       throw new NotFoundException('Instrument not found');
@@ -120,16 +190,84 @@ export class InstrumentsService {
   ): Promise<Instrument> {
     const instrument = await this.instrumentsRepository.findOne({
       where: { instrumentId: id },
-      relations: { actorTypes: true },
+      relations: { actorTypes: true, crops: true },
     });
 
     if (!instrument) {
       throw new NotFoundException('Instrument not found');
     }
 
-    const { actorTypeIds, ...rest } = updateInstrumentDto;
+    const { actorTypeIds, cropIds, ...rest } = updateInstrumentDto;
 
+    // Spec 79, criterio 3 — activar el enlace público se rechaza si el
+    // instrumento tiene alguna pregunta multimedia. Solo se valida cuando
+    // isPublic pasa a true explícitamente: desactivarlo, o dejarlo sin
+    // tocar, nunca requiere esta consulta.
+    if (rest.isPublic === true && !instrument.isPublic) {
+      const mediaQuestions = await this.questionsRepository
+        .createQueryBuilder('question')
+        .innerJoin('question.section', 'section')
+        .innerJoin('section.instrument', 'instrument')
+        .innerJoin('question.type', 'type')
+        .where('instrument.instrumentId = :id', { id })
+        .andWhere('type.name IN (:...types)', {
+          types: InstrumentsService.MEDIA_QUESTION_TYPES,
+        })
+        .select(['question.questionId', 'type.name'])
+        .getMany();
+
+      if (mediaQuestions.length > 0) {
+        const types = [...new Set(mediaQuestions.map((q) => q.type.name))].join(
+          ', ',
+        );
+        throw new UnprocessableEntityException(
+          `Este instrumento no puede compartirse por enlace público: tiene preguntas de tipo ${types}, que requieren el flujo autenticado de subida de archivos.`,
+        );
+      }
+    }
+
+    if (typeof rest.coverageGroup === 'string') {
+      rest.coverageGroup = rest.coverageGroup.trim() || null;
+    }
+    // El DTO trae las propiedades ausentes como `undefined` (target ES2023) y
+    // Object.assign las copiaría sobre el valor guardado, que aquí se lee
+    // después para decidir sobre los cultivos y se devuelve en la respuesta.
+    const currentScopeLevel = instrument.scopeLevel;
+    const currentCoverageGroup = instrument.coverageGroup;
     Object.assign(instrument, rest);
+    if (rest.scopeLevel === undefined)
+      instrument.scopeLevel = currentScopeLevel;
+    if (rest.coverageGroup === undefined) {
+      instrument.coverageGroup = currentCoverageGroup;
+    }
+
+    // Spec 98 — los cultivos solo tienen sentido con alcance `farm_crop`; al
+    // cambiar a otro nivel se limpian para no dejar alcance huérfano.
+    if (cropIds !== undefined || rest.scopeLevel !== undefined) {
+      const level =
+        rest.scopeLevel !== undefined ? rest.scopeLevel : currentScopeLevel;
+      if (level !== 'farm_crop') {
+        if (cropIds && cropIds.length > 0) {
+          throw new BadRequestException(
+            'cropIds solo se admite con scopeLevel = farm_crop',
+          );
+        }
+        instrument.crops = [];
+      } else if (cropIds !== undefined) {
+        const crops = cropIds.length
+          ? await this.instrumentsRepository.manager
+              .getRepository(TypeOfCrop)
+              .find({
+                where: { cropId: In(cropIds) },
+              })
+          : [];
+        if (crops.length !== new Set(cropIds).size) {
+          throw new NotFoundException('One or more crops were not found');
+        }
+        instrument.crops = crops;
+      }
+      instrument.cropIds = (instrument.crops ?? []).map((c) => c.cropId);
+    }
 
     if (actorTypeIds !== undefined) {
       if (actorTypeIds.length > 0) {
@@ -169,7 +307,156 @@ export class InstrumentsService {
       );
     }
 
+    // Spec 85: el instrumento cae con sus secciones y preguntas, y los
+    // adjuntos de esas preguntas por ON DELETE CASCADE. Sin recolectar las
+    // claves antes, sus objetos quedarían huérfanos en R2.
+    const mediaKeys =
+      (await this.mediaCleanup?.collectByInstrument(
+        this.instrumentsRepository.manager,
+        id,
+      )) ?? [];
+
     await this.instrumentsRepository.remove(instrument);
+
+    await this.mediaCleanup?.deleteAfterCommit(mediaKeys);
+  }
+
+  /**
+   * Fase 1 (Spec 77): copia profunda y transaccional de un instrumento
+   * completo — secciones, preguntas y opciones — junto con sus actorTypes.
+   *
+   * La copia SIEMPRE nace inactiva y sin `code`: heredar `code` violaría el
+   * índice único de la columna y convertiría la copia en un instrumento del
+   * sistema (S1a, S1b) sin que nadie lo pida. `isActive=false` evita que se
+   * aplique en campo antes de revisarla.
+   *
+   * Las condiciones de visibilidad internas (`conditionQuestionId`) se
+   * remapean a las preguntas de la copia en una segunda pasada: la pregunta
+   * condición puede vivir en una sección posterior a la dependiente, así que
+   * todavía no existe en el momento de insertar esta última.
+   */
+  async duplicate(
+    id: string,
+    duplicateInstrumentDto: DuplicateInstrumentDto,
+    userId?: string,
+  ): Promise<Instrument> {
+    const source = await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.actorTypes', 'actorType')
+      .leftJoinAndSelect('instrument.crops', 'crop')
+      .leftJoinAndSelect('instrument.sections', 'section')
+      .leftJoinAndSelect('section.questions', 'question')
+      .leftJoinAndSelect('question.type', 'type')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.conditionQuestion', 'conditionQuestion')
+      .where('instrument.instrumentId = :id', { id })
+      .orderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC')
+      .getOne();
+
+    if (!source) {
+      throw new NotFoundException('Instrument not found');
+    }
+
+    const user = userId
+      ? ((await this.usersRepository.findOne({ where: { userId } })) ??
+        undefined)
+      : undefined;
+
+    const newInstrumentId =
+      await this.instrumentsRepository.manager.transaction(
+        async (manager: EntityManager) => {
+          const copy = manager.create(Instrument, {
+            name: duplicateInstrumentDto.name,
+            version: duplicateInstrumentDto.version,
+            publishDate:
+              duplicateInstrumentDto.publishDate ??
+              new Date().toISOString().slice(0, 10),
+            isActive: false,
+            code: undefined,
+            actorTypes: source.actorTypes ?? [],
+            // Spec 98 — la copia hereda el alcance.
+            scopeLevel: source.scopeLevel ?? null,
+            coverageGroup: source.coverageGroup ?? null,
+            crops: source.crops ?? [],
+            createdBy: user,
+            updatedBy: user,
+          });
+          const savedInstrument = await manager.save(Instrument, copy);
+
+          // originalQuestionId → copyQuestionId, para el remapeo de condiciones.
+          const questionIdMap = new Map<string, string>();
+          // Pendientes de remapear: copyQuestionId → { originalConditionQuestionId, conditionValue }
+          const pendingConditions: {
+            copyQuestionId: string;
+            originalConditionQuestionId: string;
+            conditionValue: string | null;
+          }[] = [];
+
+          for (const section of source.sections ?? []) {
+            const sectionCopy = manager.create(Section, {
+              name: section.name,
+              order: section.order,
+              instrument: savedInstrument,
+            });
+            const savedSection = await manager.save(Section, sectionCopy);
+
+            for (const question of section.questions ?? []) {
+              const questionCopy = manager.create(Question, {
+                section: savedSection,
+                text: question.text,
+                type: question.type,
+                isRequired: question.isRequired,
+                isSelectionCriteria: question.isSelectionCriteria,
+                isKeyQuestion: question.isKeyQuestion,
+                order: question.order,
+                systemField: question.systemField ?? undefined,
+                conditionValue: question.conditionValue ?? undefined,
+              });
+              const savedQuestion = await manager.save(Question, questionCopy);
+              questionIdMap.set(question.questionId, savedQuestion.questionId);
+
+              if (question.conditionQuestion) {
+                pendingConditions.push({
+                  copyQuestionId: savedQuestion.questionId,
+                  originalConditionQuestionId:
+                    question.conditionQuestion.questionId,
+                  conditionValue: question.conditionValue ?? null,
+                });
+              }
+
+              for (const option of question.options ?? []) {
+                // Spec 86 — las opciones creadas desde campo (origin='field')
+                // no son parte del instrumento: no se copian.
+                if (option.origin === OPTION_ORIGINS.FIELD) continue;
+                const optionCopy = manager.create(OptionQuestion, {
+                  question: savedQuestion,
+                  text: option.text,
+                  value: option.value ?? undefined,
+                  isOther: option.isOther,
+                  metadataId: option.metadataId ?? null,
+                });
+                await manager.save(OptionQuestion, optionCopy);
+              }
+            }
+          }
+
+          for (const pending of pendingConditions) {
+            const copiedConditionQuestionId = questionIdMap.get(
+              pending.originalConditionQuestionId,
+            );
+            if (!copiedConditionQuestionId) continue;
+            await manager.update(Question, pending.copyQuestionId, {
+              conditionQuestion: { questionId: copiedConditionQuestionId },
+              conditionValue: pending.conditionValue ?? undefined,
+            });
+          }
+
+          return savedInstrument.instrumentId;
+        },
+      );
+
+    return this.findOne(newInstrumentId);
   }
 
   async findOneForRender(id: string) {
@@ -216,6 +503,24 @@ export class InstrumentsService {
       }
     }
 
+    // Spec 84 — "editar en sitio + archivar": el render de campo (móvil,
+    // formulario público, MCP) nunca muestra preguntas ni opciones
+    // archivadas. Una sección que tenía preguntas y se quedó sin ninguna
+    // visible por esto también se oculta; una sección que ya nacía vacía
+    // (0 preguntas en la base) se conserva tal cual estaba.
+    const sections = (instrument.sections ?? [])
+      .map((section) => {
+        const originalCount = section.questions?.length ?? 0;
+        const visibleQuestions = (section.questions ?? []).filter(
+          (q) => !q.archivedAt,
+        );
+        return { section, originalCount, visibleQuestions };
+      })
+      .filter(
+        ({ originalCount, visibleQuestions }) =>
+          originalCount === 0 || visibleQuestions.length > 0,
+      );
+
     return {
       instrumentId: instrument.instrumentId,
       name: instrument.name,
@@ -223,11 +528,11 @@ export class InstrumentsService {
       publishDate: instrument.publishDate,
       isActive: instrument.isActive,
       code: instrument.code ?? null,
-      sections: (instrument.sections ?? []).map((section) => ({
+      sections: sections.map(({ section, visibleQuestions }) => ({
         sectionId: section.sectionId,
         name: section.name,
         order: section.order,
-        questions: (section.questions ?? []).map((question) => ({
+        questions: visibleQuestions.map((question) => ({
           questionId: question.questionId,
           text: question.text,
           isRequired: question.isRequired,
@@ -235,6 +540,11 @@ export class InstrumentsService {
           isKeyQuestion: question.isKeyQuestion,
           order: question.order,
           systemField: question.systemField ?? null,
+          // Spec 97 — etiqueta del destino y marcas que antes viajaban en `systemField`.
+          systemFieldLabel:
+            resolveSystemField(question.systemField)?.label ?? null,
+          isInvertedScale: question.isInvertedScale ?? false,
+          isDigitalDemandItem: question.isDigitalDemandItem ?? false,
           type: question.type
             ? {
                 typeId: question.type.typeId,
@@ -250,25 +560,136 @@ export class InstrumentsService {
                 (a, b) => (a.value ?? 0) - (b.value ?? 0),
               )
             : (question.options ?? [])
-          ).map((option) => {
-            let departmentId: string | null = null;
-            if (question.systemField === 'farm.department') {
-              departmentId = option.metadataId ?? null;
-            } else if (question.systemField === 'farm.town') {
-              departmentId =
-                (option.metadataId &&
-                  townToDepartment.get(option.metadataId)) ||
-                null;
-            }
-            return {
-              optionId: option.optionId,
-              text: option.text,
-              value: option.value ?? null,
-              isOther: option.isOther,
-              metadataId: option.metadataId ?? null,
-              departmentId,
-            };
-          }),
+          )
+            .filter((option) => !option.archivedAt)
+            .map((option) => {
+              let departmentId: string | null = null;
+              if (question.systemField === 'farm.department') {
+                departmentId = option.metadataId ?? null;
+              } else if (question.systemField === 'farm.town') {
+                departmentId =
+                  (option.metadataId &&
+                    townToDepartment.get(option.metadataId)) ||
+                  null;
+              }
+              return {
+                optionId: option.optionId,
+                text: option.text,
+                value: option.value ?? null,
+                isOther: option.isOther,
+                metadataId: option.metadataId ?? null,
+                departmentId,
+              };
+            }),
+          conditionQuestionId: question.conditionQuestion?.questionId ?? null,
+          conditionValue: question.conditionValue ?? null,
+        })),
+      })),
+    };
+  }
+
+  /**
+   * Spec 84 — vista para el editor admin: a diferencia de `findOneForRender`
+   * (público, oculta lo archivado), esta muestra TODO, con `archivedAt` y
+   * `responseCount` por pregunta y por opción — el dato que decide si algo
+   * se puede borrar o hay que archivarlo.
+   */
+  async getEditorStructure(id: string) {
+    const instrument = await this.instrumentsRepository
+      .createQueryBuilder('instrument')
+      .leftJoinAndSelect('instrument.sections', 'section')
+      .leftJoinAndSelect('section.questions', 'question')
+      .leftJoinAndSelect('question.type', 'type')
+      .leftJoinAndSelect('question.options', 'option')
+      .leftJoinAndSelect('question.conditionQuestion', 'conditionQuestion')
+      .where('instrument.instrumentId = :id', { id })
+      .orderBy('section.order', 'ASC')
+      .addOrderBy('question.order', 'ASC')
+      .addOrderBy('option.createdAt', 'ASC')
+      .getOne();
+
+    if (!instrument) {
+      throw new NotFoundException('Instrument not found');
+    }
+
+    const questionIds: string[] = [];
+    const optionIds: string[] = [];
+    for (const section of instrument.sections ?? []) {
+      for (const question of section.questions ?? []) {
+        questionIds.push(question.questionId);
+        for (const option of question.options ?? []) {
+          optionIds.push(option.optionId);
+        }
+      }
+    }
+
+    const questionResponseCounts = new Map<string, number>();
+    if (questionIds.length > 0) {
+      const rows = await this.responsesRepository
+        .createQueryBuilder('response')
+        .select('response.question', 'questionId')
+        .addSelect('COUNT(*)', 'count')
+        .where('response.question IN (:...questionIds)', { questionIds })
+        .groupBy('response.question')
+        .getRawMany<{ questionId: string; count: string }>();
+      for (const row of rows) {
+        questionResponseCounts.set(row.questionId, Number(row.count));
+      }
+    }
+
+    const optionResponseCounts = new Map<string, number>();
+    if (optionIds.length > 0) {
+      const rows = await this.responsesRepository
+        .createQueryBuilder('response')
+        .select('response.option', 'optionId')
+        .addSelect('COUNT(*)', 'count')
+        .where('response.option IN (:...optionIds)', { optionIds })
+        .groupBy('response.option')
+        .getRawMany<{ optionId: string; count: string }>();
+      for (const row of rows) {
+        optionResponseCounts.set(row.optionId, Number(row.count));
+      }
+    }
+
+    return {
+      instrumentId: instrument.instrumentId,
+      name: instrument.name,
+      version: instrument.version,
+      publishDate: instrument.publishDate,
+      isActive: instrument.isActive,
+      isPublic: instrument.isPublic,
+      code: instrument.code ?? null,
+      sections: (instrument.sections ?? []).map((section) => ({
+        sectionId: section.sectionId,
+        name: section.name,
+        order: section.order,
+        questions: (section.questions ?? []).map((question) => ({
+          questionId: question.questionId,
+          text: question.text,
+          isRequired: question.isRequired,
+          isSelectionCriteria: question.isSelectionCriteria,
+          isKeyQuestion: question.isKeyQuestion,
+          order: question.order,
+          systemField: question.systemField ?? null,
+          // Spec 97 — etiqueta del destino y marcas que antes viajaban en `systemField`.
+          systemFieldLabel:
+            resolveSystemField(question.systemField)?.label ?? null,
+          isInvertedScale: question.isInvertedScale ?? false,
+          isDigitalDemandItem: question.isDigitalDemandItem ?? false,
+          archivedAt: question.archivedAt ?? null,
+          responseCount: questionResponseCounts.get(question.questionId) ?? 0,
+          type: question.type
+            ? { typeId: question.type.typeId, name: question.type.name }
+            : null,
+          options: (question.options ?? []).map((option) => ({
+            optionId: option.optionId,
+            text: option.text,
+            value: option.value ?? null,
+            isOther: option.isOther,
+            metadataId: option.metadataId ?? null,
+            archivedAt: option.archivedAt ?? null,
+            responseCount: optionResponseCounts.get(option.optionId) ?? 0,
+          })),
           conditionQuestionId: question.conditionQuestion?.questionId ?? null,
           conditionValue: question.conditionValue ?? null,
         })),

@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ParseUUIDPipe } from '@nestjs/common';
 import {
@@ -22,8 +24,17 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import { CreateSurveyDto } from './dto/create-survey.dto';
 import { CheckDuplicateQueryDto } from './dto/check-duplicate-query.dto';
+import { ExtractFarmerDto } from './dto/extract-farmer.dto';
+import { ListMySurveysQueryDto } from './dto/list-my-surveys-query.dto';
+import { MySurveysPageDto } from './dto/my-surveys-page.dto';
 import { OverwriteSurveyDto } from './dto/overwrite-survey.dto';
+import { ProcessPreviewResponseDto } from './dto/process-preview-response.dto';
+import {
+  ProcessPreviewQueryDto,
+  ProcessPublicSubmissionDto,
+} from './dto/process-public-submission.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
+import { LegacyCampaignUsageInterceptor } from '../campaigns/legacy-campaign-usage.interceptor';
 import { SurveyFilters, SurveysService } from './surveys.service';
 
 @ApiTags('Surveys')
@@ -37,7 +48,10 @@ export class SurveysController {
   @ApiOperation({
     summary: 'Crear sesión de encuesta',
     description:
-      'Crea una nueva sesión de encuesta y retorna el surveyId. Acepta contexto geográfico y de actor de forma opcional.',
+      'Crea una nueva sesión de encuesta y retorna el surveyId. Acepta contexto geográfico y de actor de forma opcional. ' +
+      'Es idempotente respecto de clientSurveyId (spec 70, Fase 9): reenviar el mismo clientSurveyId devuelve la ' +
+      'encuesta ya creada en vez de duplicarla, para que un cliente pueda reintentar con seguridad tras perder la ' +
+      'respuesta de un POST que sí llegó al servidor.',
   })
   @ApiResponse({
     status: 201,
@@ -105,9 +119,26 @@ export class SurveysController {
       'Filtrar por agricultor (incluye surveys vinculados a través de campaign_sessions)',
     schema: { type: 'string', format: 'uuid' },
   })
+  @ApiQuery({
+    name: 'farmId',
+    required: false,
+    description:
+      'Spec 94 — encuestas ancladas a esta finca (`surveys.farm_id`).',
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiQuery({
+    name: 'farmCropId',
+    required: false,
+    description:
+      'Spec 94 — encuestas ancladas a este cultivo de finca (`surveys.farm_crop_id`, el id de `farmCrops[]`).',
+    schema: { type: 'string', format: 'uuid' },
+  })
   @ApiResponse({
     status: 200,
-    description: 'Lista de encuestas con sus instrumentos asociados.',
+    description:
+      'Lista de encuestas con sus instrumentos asociados. Spec 94: cada fila trae ' +
+      '`farm` ({ farmId, name } | null) y `crop` ({ cropId, name } | null), además de ' +
+      '`farmId` y `farmCropId`.',
   })
   findAll(
     @Query('actorTypeId') actorTypeId?: string,
@@ -117,6 +148,9 @@ export class SurveysController {
     @Query('cropId') cropId?: string,
     @Query('instrumentId') instrumentId?: string,
     @Query('farmerId') farmerId?: string,
+    @Query('farmId', new ParseUUIDPipe({ optional: true })) farmId?: string,
+    @Query('farmCropId', new ParseUUIDPipe({ optional: true }))
+    farmCropId?: string,
   ) {
     const filters: SurveyFilters = {
       actorTypeId,
@@ -126,10 +160,14 @@ export class SurveysController {
       cropId,
       instrumentId,
       farmerId,
+      farmId,
+      farmCropId,
     };
     return this.surveysService.findAll(filters);
   }
 
+  // Spec 104 — telemetría del uso heredado (compuerta A→B).
+  @UseInterceptors(LegacyCampaignUsageInterceptor)
   @Get('check-duplicate')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
@@ -167,16 +205,175 @@ export class SurveysController {
     );
   }
 
+  @Get('public-submissions')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Bandeja de revisión de envíos públicos',
+    description:
+      'Lista encuestas recibidas por el canal público (/api/public/surveys), sin agricultor ' +
+      'ni usuario, pendientes de convertirse en agricultor o descartarse. Solo origin="public" ' +
+      '— nunca incluye encuestas del flujo con encuestador. Spec 79.',
+  })
+  @ApiQuery({
+    name: 'instrumentId',
+    required: false,
+    schema: { type: 'string', format: 'uuid' },
+  })
+  @ApiQuery({
+    name: 'reviewStatus',
+    required: false,
+    schema: { enum: ['pending', 'processed', 'discarded'] },
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Array de { surveyId, instrumentId, instrumentName, createdAt, responseCount, reviewStatus, ' +
+      'farmerName, farmerDocumentId } (nombre y documento declarados en el envío, o null).',
+  })
+  findPublicSubmissions(
+    @Query('instrumentId') instrumentId?: string,
+    @Query('reviewStatus') reviewStatus?: 'pending' | 'processed' | 'discarded',
+  ) {
+    return this.surveysService.findPublicSubmissions({
+      instrumentId,
+      reviewStatus,
+    });
+  }
+
+  @Get(':id/process-preview')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Vista previa del procesado de un envío público',
+    description:
+      'Solo lectura: anticipa lo que hará process-public sin escribir nada (ni la fila de colisión). ' +
+      'Devuelve la identidad extraída (documento normalizado), el estado del documento ' +
+      '(new | same_person_match | collision, con candidatos), la acción sobre la finca y las fincas ' +
+      'candidatas a compartida, los cultivos resueltos y no mapeados, los campos vacíos que se ' +
+      'completarían y las advertencias. `townId` simula el municipio que el administrador asignaría. ' +
+      'Expone nombre, documento y teléfono: solo administradores e investigadores. Spec 93.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    description: 'ID de la encuesta pública',
+  })
+  @ApiResponse({ status: 200, type: ProcessPreviewResponseDto })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta o municipio no encontrado.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'La encuesta no es de origen público o ya fue revisada.',
+  })
+  previewPublicSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ProcessPreviewQueryDto,
+  ) {
+    return this.surveysService.previewPublicSubmission(id, query);
+  }
+
+  @Post(':id/process-public')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Procesar un envío público: crear/vincular agricultor',
+    description:
+      'En una sola transacción (con el lock de la encuesta): aplica la detección de colisiones del ' +
+      'spec 68, crea o reutiliza el agricultor, actúa sobre la finca, suma los cultivos a la finca ' +
+      '(sin sesión de campaña), reancla la constancia de consentimiento y marca el envío ' +
+      'reviewStatus="processed". Con un productor existente completa solo columnas vacías y no ' +
+      'crea una segunda finca. Cuerpo opcional: `resolution` (colisión), `farm` ' +
+      '{ mode: create | link, farmId } y `townId` (municipio cuando el envío no lo trae). Ante ' +
+      'colisión de documentId sin resolución, responde 409 y el envío queda pending. Specs 79 y 93.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    description: 'ID de la encuesta pública',
+  })
+  @ApiResponse({ status: 201, description: '{ farmer, existed: boolean }' })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta, municipio o finca no encontrados.',
+  })
+  @ApiResponse({
+    status: 409,
+    description:
+      'La encuesta no es de origen público, ya fue revisada, o hay colisión de documentId sin resolver.',
+  })
+  processPublicSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ProcessPublicSubmissionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.processPublicSubmission(id, dto, user.userId);
+  }
+
+  @Post(':id/discard-public')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @ApiOperation({
+    summary: 'Descartar un envío público',
+    description:
+      'Marca el envío como reviewStatus="discarded" — no borra la encuesta ni sus respuestas. ' +
+      'Idempotente: descartar un envío ya descartado no falla. Spec 79.',
+  })
+  @ApiParam({
+    name: 'id',
+    format: 'uuid',
+    description: 'ID de la encuesta pública',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '{ surveyId, reviewStatus: "discarded" }',
+  })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description: 'La encuesta no es de origen público o ya fue procesada.',
+  })
+  discardPublicSubmission(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.discardPublicSubmission(id, user.userId);
+  }
+
+  @Get('orphans')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Auditar encuestas vacías huérfanas',
+    description:
+      'Lista encuestas sin respuestas que tienen una encuesta hermana en la misma sesión y ' +
+      'el mismo stepOrder que SÍ tiene respuestas — ese es el discriminador que la distingue ' +
+      'de un marcador de paso saltado (POST /api/surveys/skip-step), que siempre es la única ' +
+      'encuesta de su paso y por eso nunca aparece en esta lista. Solo lectura. Spec 70.',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Array de { surveyId, createdAt, stepOrder, siblingSurveyId } — candidatas a borrado.',
+  })
+  findOrphanSurveys() {
+    return this.surveysService.findOrphanSurveys();
+  }
+
   @Post('overwrite')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({
-    summary: 'Sobrescribir survey anterior y crear uno nuevo vacío',
+    summary: 'Descartar un survey duplicado',
     description:
-      'Elimina el survey duplicado (y sus respuestas en cascada), crea un survey nuevo vacío ' +
-      'con el mismo instrumento y stepOrder en la sesión activa. Retorna { surveyId } del nuevo survey.',
+      'Elimina el survey duplicado (y sus respuestas en cascada). No crea ningún survey de ' +
+      'reemplazo — el cliente inicia el nuevo con POST /api/surveys recién cuando exista al ' +
+      'menos una respuesta (spec 70: evita dejar una fila vacía huérfana si el encuestador ' +
+      'abandona después de sobrescribir). Retorna { discardedSurveyId } del survey eliminado.',
   })
-  @ApiResponse({ status: 201, description: '{ surveyId: string }' })
+  @ApiResponse({ status: 201, description: '{ discardedSurveyId: string }' })
   @ApiResponse({
     status: 400,
     description: 'El survey no pertenece a la misma campaña que la sesión.',
@@ -189,6 +386,8 @@ export class SurveysController {
     return this.surveysService.overwriteSurvey(dto);
   }
 
+  // Spec 104 — telemetría del uso heredado (compuerta B→C).
+  @UseInterceptors(LegacyCampaignUsageInterceptor)
   @Post('skip-step')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
@@ -196,7 +395,9 @@ export class SurveysController {
     summary: 'Marcar un paso como completado sin registrar respuestas',
     description:
       'Crea un survey vacío con el stepOrder indicado, actuando como marcador para que ' +
-      'getNextStep no vuelva a sugerir ese paso.',
+      'getNextStep no vuelva a sugerir ese paso. Idempotente por (sessionId, stepOrder) ' +
+      '(spec 70, Fase 10): si ya existe cualquier encuesta para ese paso —un marcador previo ' +
+      'o una completada de verdad— devuelve esa en vez de crear una segunda.',
   })
   @ApiResponse({ status: 201, description: '{ surveyId: string }' })
   @ApiResponse({
@@ -207,23 +408,169 @@ export class SurveysController {
     return this.surveysService.skipStep(dto);
   }
 
+  @Delete(':id')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Borrar una encuesta huérfana candidata',
+    description:
+      'Borrado acotado: solo acepta encuestas que aparecerían en GET /api/surveys/orphans ' +
+      '— sin respuestas propias y con una hermana con respuestas en la misma sesión y ' +
+      'stepOrder. Rechaza con 409 cualquier encuesta con respuestas o que sea la única de su ' +
+      'paso (incluye marcadores de paso saltado). Nunca borra en cascada datos de campo. Spec 70.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta' })
+  @ApiResponse({ status: 200, description: '{ deletedSurveyId: string }' })
+  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description:
+      'La encuesta tiene respuestas, o no tiene una hermana con respuestas en el mismo paso.',
+  })
+  deleteOrphanSurvey(@Param('id', ParseUUIDPipe) id: string) {
+    return this.surveysService.deleteOrphanSurvey(id);
+  }
+
+  @Get('mine')
+  @ApiBearerAuth()
+  @Roles(ROLES.POLLSTER, ROLES.RESEARCHER, ROLES.ADMIN)
+  @ApiOperation({
+    summary: 'Listar mis encuestas realizadas',
+    description:
+      'Encuestas de campo (origin="field") del usuario autenticado que ya tienen al menos una ' +
+      'respuesta, paginadas. Una API key queda acotada a su dueño. Spec 92.',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    schema: { type: 'integer', minimum: 1, default: 1 },
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+  })
+  @ApiQuery({
+    name: 'search',
+    required: false,
+    description: 'Nombre o documento del productor (máximo 100 caracteres).',
+  })
+  @ApiResponse({ status: 200, type: MySurveysPageDto })
+  @ApiResponse({
+    status: 400,
+    description: 'page < 1, o limit fuera del rango 1..50.',
+  })
+  findMine(
+    @Query() query: ListMySurveysQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.findMine(user.userId, query);
+  }
+
   @Get(':id/responses')
   @ApiBearerAuth()
-  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
   @ApiOperation({
     summary: 'Obtener respuestas de una encuesta',
     description:
-      'Devuelve todas las respuestas de la encuesta indicada, con el texto de cada pregunta, tipo, sección y valor formateado.',
+      'Devuelve todas las respuestas de la encuesta indicada, con el texto de cada pregunta, tipo, sección y valor formateado. ' +
+      'Un POLLSTER solo puede ver sus propias encuestas (404 si es ajena) y recibe una lista blanca de campos sin datos de descarga (spec 92, D2).',
   })
   @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta' })
   @ApiResponse({
     status: 200,
     description:
       'Respuestas de la encuesta con detalle de preguntas y opciones.',
+    schema: {
+      type: 'object',
+      properties: {
+        surveyId: { type: 'string', format: 'uuid' },
+        instrumentName: { type: 'string', nullable: true },
+        farm: {
+          type: 'object',
+          nullable: true,
+          description: 'Spec 94 — finca a la que está anclada la encuesta.',
+          properties: {
+            farmId: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+          },
+        },
+        crop: {
+          type: 'object',
+          nullable: true,
+          description:
+            'Spec 94 — cultivo de la encuesta (derivado del cultivo de finca).',
+          properties: {
+            cropId: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+          },
+        },
+        syncedAt: { type: 'string', format: 'date-time' },
+        responses: { type: 'array', items: { type: 'object' } },
+      },
+    },
   })
-  @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
-  getSurveyResponses(@Param('id', ParseUUIDPipe) id: string) {
-    return this.surveysService.findSurveyResponses(id);
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta no encontrada, o ajena si el requester es POLLSTER.',
+  })
+  getSurveyResponses(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.findSurveyResponses(id, user);
+  }
+
+  @Get(':id/extraction')
+  @ApiBearerAuth()
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
+  @ApiOperation({
+    summary: 'Estado de la extracción de una encuesta',
+    description:
+      'Spec 95: resultado de la extracción unificada del productor, la finca y los cultivos de la encuesta. ' +
+      '`status`: done | collision | no_identity | pending_alias | not_applicable | awaiting_review | error | backfilled | null. ' +
+      'Con una colisión de documento pendiente trae su detalle en `collision`. ' +
+      'Un POLLSTER solo ve sus propias encuestas (404 si es ajena, como en spec 92).',
+  })
+  @ApiParam({ name: 'id', format: 'uuid', description: 'ID de la encuesta' })
+  @ApiResponse({
+    status: 200,
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', nullable: true },
+        farmerId: { type: 'string', format: 'uuid', nullable: true },
+        farmerName: { type: 'string', nullable: true },
+        existed: { type: 'boolean', nullable: true },
+        clientFarmerId: { type: 'string', nullable: true },
+        farm: {
+          type: 'object',
+          nullable: true,
+          properties: {
+            farmId: { type: 'string', format: 'uuid' },
+            name: { type: 'string' },
+          },
+        },
+        farmCropId: { type: 'string', format: 'uuid', nullable: true },
+        crops: { type: 'array', items: { type: 'object' } },
+        collision: {
+          type: 'object',
+          description: 'Solo con una colisión de documento pendiente.',
+        },
+        openDiscrepancies: { type: 'integer' },
+        extractedAt: { type: 'string', format: 'date-time', nullable: true },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Encuesta no encontrada, o ajena si el requester es POLLSTER.',
+  })
+  getExtraction(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.getExtraction(id, user);
   }
 
   @Patch(':id/sync')
@@ -251,7 +598,9 @@ export class SurveysController {
     summary: 'Extraer cultivos desde respuestas S2',
     description:
       'Lee las respuestas con systemField crop.* y valor true, identifica los TypeOfCrop ' +
-      'correspondientes y los asigna a la CampaignSession.',
+      'correspondientes y los asigna a la CampaignSession. Spec 94: además SUMA los cultivos a la ' +
+      'finca del productor (nunca quita ninguno; reactiva los archivados) y ancla la encuesta a su ' +
+      'finca y cultivo de finca (`farm_id`, `farm_crop_id`, `crop_id` derivado).',
   })
   @ApiParam({
     name: 'id',
@@ -271,7 +620,13 @@ export class SurveysController {
     summary: 'Extraer agricultor desde respuestas S1',
     description:
       'Lee las respuestas de la encuesta que tienen systemField asignado (prefijo farmer.* / farm.*), ' +
-      'crea o reutiliza un Farmer y lo vincula a la CampaignSession.',
+      'crea o reutiliza un Farmer y lo vincula a la CampaignSession. Spec 94: la finca nueva queda como ' +
+      'vínculo principal del productor (`farmer_farms`) y la encuesta se ancla a su finca principal; el ' +
+      '`farmer` de la respuesta trae `farm` (la principal) y `farms[]`. Si el documentId coincide con un ' +
+      'Farmer existente cuyo nombre no corresponde (spec 68), responde 409 sin mutar nada — a menos ' +
+      "que el body incluya `resolution` ('same_person' | 'separate_person'). Si el body incluye " +
+      '`correctedDocumentId`, se actualiza primero la respuesta de documento de la encuesta con ese ' +
+      'valor y la extracción se re-evalúa con el documento nuevo (spec 68, Fase 8).',
   })
   @ApiParam({
     name: 'id',
@@ -281,10 +636,22 @@ export class SurveysController {
   @ApiResponse({ status: 201, description: '{ farmer, existed: boolean }' })
   @ApiResponse({ status: 404, description: 'Encuesta no encontrada.' })
   @ApiResponse({
-    status: 422,
-    description: 'Falta farmer.name en las respuestas.',
+    status: 409,
+    description:
+      'Colisión de documentId: el documento ya pertenece a otra persona (spec 68). ' +
+      '{ documentId, submittedName, existingFarmer: { farmerId, name } }',
   })
-  extractFarmer(@Param('id', ParseUUIDPipe) id: string) {
-    return this.surveysService.extractFarmer(id);
+  @ApiResponse({
+    status: 422,
+    description:
+      'Falta farmer.name en las respuestas, o se envió correctedDocumentId y la encuesta no tiene ' +
+      'ninguna respuesta de documento que corregir, o la encuesta ya tiene agricultor.',
+  })
+  extractFarmer(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ExtractFarmerDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.surveysService.extractFarmer(id, dto, user);
   }
 }

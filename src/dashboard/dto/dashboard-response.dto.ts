@@ -129,7 +129,7 @@ export class AggregationLikertDto {
 
   @ApiProperty({
     description:
-      'true si el ítem tiene systemField que empieza por "inverted:" y su puntaje ya fue recalculado como 6 - value.',
+      'true si la pregunta está marcada como escala invertida (`isInvertedScale`) y su puntaje ya fue recalculado como 6 - value.',
   })
   isInverted: boolean;
 }
@@ -163,11 +163,73 @@ export class AggregationNumericDto {
   distribution?: number[];
 }
 
+export class AggregationUnitGroupDto {
+  @ApiProperty({ description: 'Opción de unidad elegida en la respuesta.' })
+  optionId: string;
+  @ApiProperty({ description: 'Texto de la unidad (p. ej. «hectáreas»).' })
+  unit: string;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      'null si suppressed=true (spec 66, D2): el grupo tiene menos de MIN_CELL_SIZE respuestas.',
+  })
+  count: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      'Porcentaje de este grupo sobre las respuestas con valor; null si suppressed=true.',
+  })
+  percentage: number | null;
+  @ApiProperty({
+    description:
+      'true si el grupo tiene menos de MIN_CELL_SIZE respuestas (spec 66, D2): conteo, ' +
+      'porcentaje y estadísticas vienen en null. El grupo no se omite del listado.',
+  })
+  suppressed: boolean;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'Estadísticas del grupo: null si suppressed=true.',
+  })
+  average: number | null;
+  @ApiProperty({ nullable: true, type: Number }) median: number | null;
+  @ApiProperty({ nullable: true, type: Number }) q1: number | null;
+  @ApiProperty({ nullable: true, type: Number }) q3: number | null;
+  @ApiProperty({ nullable: true, type: Number }) min: number | null;
+  @ApiProperty({ nullable: true, type: Number }) max: number | null;
+  @ApiProperty({ nullable: true, type: Number }) stdDev: number | null;
+  @ApiProperty({
+    required: false,
+    type: [Number],
+    description:
+      'Valores crudos del grupo. Solo presente si el grupo alcanza el umbral de privacidad.',
+  })
+  distribution?: number[];
+}
+
+/**
+ * `numeric_with_unit`: un grupo por unidad, sin convertir entre unidades.
+ * La normalización por factor se decide pregunta a pregunta en la curaduría
+ * del dashboard (spec 66).
+ */
+export class AggregationNumericWithUnitDto {
+  @ApiProperty({ enum: ['numeric_with_unit'] }) type: 'numeric_with_unit';
+  @ApiProperty() count: number;
+  @ApiProperty({
+    type: [AggregationUnitGroupDto],
+    description: 'Grupos ordenados de mayor a menor número de respuestas.',
+  })
+  units: AggregationUnitGroupDto[];
+}
+
 export type DashboardAggregation =
   | AggregationYesNoDto
   | AggregationChoicesDto
   | AggregationLikertDto
-  | AggregationNumericDto;
+  | AggregationNumericDto
+  | AggregationNumericWithUnitDto;
 
 export class DashboardQuestionDto {
   @ApiProperty() questionId: string;
@@ -200,7 +262,7 @@ export class DashboardQuestionDto {
 
   @ApiProperty({
     description:
-      'true si systemField empieza por "inverted:" (escala likert invertida).',
+      'true si la pregunta está marcada como escala invertida (`isInvertedScale`).',
   })
   isInverted: boolean;
 

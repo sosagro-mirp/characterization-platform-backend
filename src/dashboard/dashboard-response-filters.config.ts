@@ -3,7 +3,7 @@
  * (dashboard.md §1). Cada entrada localiza su pregunta fuente por
  * `systemField` cuando existe (gender, ageRange, educationLevel — D3) o, en
  * su defecto, por texto exacto dentro de un instrumento conocido
- * (connectivity, populationGroup, profile, tenure, chainStage). Verificado
+ * (connectivity, profile, tenure, chainStage). Verificado
  * contra las semillas (`src/database/seeds/instrumento-*.seed.ts`) que cada
  * combinación instrumentCode+questionText identifica una única pregunta —
  * son fuentes deterministas, aunque no tengan systemField dedicado.
@@ -28,7 +28,6 @@ export type ResponseFilterKey =
   | 'ageRange'
   | 'educationLevel'
   | 'connectivity'
-  | 'populationGroup'
   | 'profile'
   | 'tenure'
   | 'chainStage';
@@ -79,14 +78,6 @@ export const RESPONSE_FILTER_SOURCES: ResponseFilterSource[] = [
     instrumentCode: 'S8E',
     questionText: '¿Cómo describiría la calidad de la señal móvil en la finca?',
     matchType: 'option',
-  },
-  {
-    key: 'populationGroup',
-    locate: 'instrumentAndText',
-    instrumentCode: 'S1a',
-    questionText:
-      '¿Pertenece el productor a alguno de los siguientes grupos o territorios? (Puede marcar más de una opción)',
-    matchType: 'multiOption',
   },
   {
     key: 'profile',

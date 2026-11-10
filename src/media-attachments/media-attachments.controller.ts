@@ -7,14 +7,23 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
 import type { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtOnly } from '../auth/decorators/jwt-only.decorator';
 import { ConfirmUploadDto } from './dto/confirm-upload.dto';
 import { CreatePresignedUrlDto } from './dto/create-presigned-url.dto';
+import { DownloadUrlResponseDto } from './dto/download-url-response.dto';
+import { MediaAttachmentResponseDto } from './dto/media-attachment-response.dto';
 import { MediaAttachmentsService } from './media-attachments.service';
+import { MediaCleanupService } from './media-cleanup.service';
 
 @ApiTags('Media Attachments')
 @ApiBearerAuth()
@@ -22,6 +31,7 @@ import { MediaAttachmentsService } from './media-attachments.service';
 export class MediaAttachmentsController {
   constructor(
     private readonly mediaAttachmentsService: MediaAttachmentsService,
+    private readonly mediaCleanupService: MediaCleanupService,
   ) {}
 
   @Post('media-attachments/presigned-url')
@@ -48,9 +58,44 @@ export class MediaAttachmentsController {
     return this.mediaAttachmentsService.confirmUpload(attachmentId, dto);
   }
 
+  @Post('media-attachments/purge-pending')
+  @Roles(ROLES.ADMIN)
+  @JwtOnly()
+  @ApiOperation({
+    summary:
+      'Reprocesar la cola de objetos de R2 cuyo borrado falló (sin cron: se invoca a mano)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '{ deleted, failed, remaining }',
+  })
+  purgePending() {
+    return this.mediaCleanupService.purgePending();
+  }
+
+  @Get('media-attachments/:attachmentId/download-url')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+  // Solo JWT: el MCP autentica con API key y la evidencia debe ser visible
+  // pero no descargable para un agente (spec 85, Evaluación MCP).
+  @JwtOnly()
+  @ApiOperation({
+    summary:
+      'Emitir una URL firmada de lectura (vida corta) para un archivo multimedia',
+  })
+  @ApiResponse({ status: 200, type: DownloadUrlResponseDto })
+  @ApiResponse({ status: 404, description: 'El adjunto no existe' })
+  @ApiResponse({ status: 409, description: 'El adjunto aún no fue subido' })
+  getDownloadUrl(
+    @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.mediaAttachmentsService.getDownloadUrl(attachmentId, user);
+  }
+
   @Get('surveys/:surveyId/media-attachments')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({ summary: 'Listar archivos multimedia de un survey' })
+  @ApiResponse({ status: 200, type: [MediaAttachmentResponseDto] })
   findBySurvey(@Param('surveyId', ParseUUIDPipe) surveyId: string) {
     return this.mediaAttachmentsService.findBySurvey(surveyId);
   }

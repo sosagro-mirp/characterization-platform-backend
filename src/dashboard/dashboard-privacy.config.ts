@@ -20,6 +20,8 @@
  * `dashboard-response-filters.config.ts`).
  */
 
+import { keysFor } from '../questions/system-fields/system-field-registry';
+
 /** Locator estable de una pregunta sin depender de su UUID (distinto por
  * entorno) — mismo patrón que `ByInstrumentAndText` en
  * `dashboard-response-filters.config.ts`. */
@@ -49,13 +51,16 @@ export const EXCLUDED_QUESTION_TYPES = [
  * patrón `farm.*`/`farmer.*` amplio (D6, spec 43): permite que campos no
  * identificantes del mismo namespace (`farm.area`, `farmer.gender`) sigan
  * siendo agregables.
+ *
+ * Spec 97 — la denylist se expresa en claves canónicas y se expande con sus
+ * alias, para que una pregunta con la clave vieja siga bloqueada.
  */
 export const DENIED_SYSTEM_FIELDS = [
   'farm.latitude',
   'farm.longitude',
   'farm.name',
   'farm.vereda',
-];
+].flatMap((key) => keysFor(key));
 
 /**
  * Denylist explícita de preguntas identificantes por locator (D2, spec 66).

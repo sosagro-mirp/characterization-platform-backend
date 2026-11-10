@@ -5,6 +5,7 @@ import { CampaignSession } from 'src/campaign-sessions/entities/campaign-session
 import { Department } from 'src/departments/entities/department.entity';
 import { Farm } from 'src/farms/entities/farm.entity';
 import { Farmer } from 'src/farmers/entities/farmer.entity';
+import { FarmerDocumentCollision } from 'src/farmers/entities/farmer-document-collision.entity';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Response } from 'src/responses/entities/response.entity';
 import { Town } from 'src/towns/entities/town.entity';
@@ -13,6 +14,9 @@ import { User } from 'src/users/entities/user.entity';
 import { SurveysController } from './surveys.controller';
 import { Survey } from './entities/survey.entity';
 import { SurveysService } from './surveys.service';
+import { ConsentsModule } from '../consents/consents.module';
+import { FarmerExtractionModule } from '../farmer-extraction/farmer-extraction.module';
+import { MediaAttachmentsModule } from 'src/media-attachments/media-attachments.module';
 
 @Module({
   imports: [
@@ -20,6 +24,7 @@ import { SurveysService } from './surveys.service';
       Survey,
       Instrument,
       Farmer,
+      FarmerDocumentCollision,
       Farm,
       User,
       ActorType,
@@ -29,6 +34,9 @@ import { SurveysService } from './surveys.service';
       CampaignSession,
       Response,
     ]),
+    ConsentsModule,
+    FarmerExtractionModule,
+    MediaAttachmentsModule,
   ],
   controllers: [SurveysController],
   providers: [SurveysService],

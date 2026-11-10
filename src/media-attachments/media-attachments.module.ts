@@ -6,13 +6,16 @@ import { Survey } from 'src/surveys/entities/survey.entity';
 import { User } from 'src/users/entities/user.entity';
 import { StorageModule } from 'src/storage/storage.module';
 import { MediaAttachment } from './entities/media-attachment.entity';
+import { MediaDeletionQueue } from './entities/media-deletion-queue.entity';
 import { MediaAttachmentsController } from './media-attachments.controller';
 import { MediaAttachmentsService } from './media-attachments.service';
+import { MediaCleanupService } from './media-cleanup.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([
       MediaAttachment,
+      MediaDeletionQueue,
       Survey,
       Question,
       Response,
@@ -21,7 +24,7 @@ import { MediaAttachmentsService } from './media-attachments.service';
     StorageModule,
   ],
   controllers: [MediaAttachmentsController],
-  providers: [MediaAttachmentsService],
-  exports: [MediaAttachmentsService],
+  providers: [MediaAttachmentsService, MediaCleanupService],
+  exports: [MediaAttachmentsService, MediaCleanupService],
 })
 export class MediaAttachmentsModule {}

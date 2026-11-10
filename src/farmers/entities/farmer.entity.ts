@@ -1,4 +1,6 @@
 import { Farm } from 'src/farms/entities/farm.entity';
+import { FarmerFarm } from 'src/farmer-farms/entities/farmer-farm.entity';
+import type { FarmerFarmView } from 'src/farmer-farms/farm-views';
 import { Cooperative } from 'src/cooperatives/entities/cooperative.entity';
 import { DigitalFuncionality } from 'src/digital-funcionality/entities/digital-funcionality.entity';
 import { FarmerConnection } from 'src/farmers-connections/entities/farmer-connection.entity';
@@ -44,6 +46,15 @@ export class Farmer {
   })
   documentId: string | null;
 
+  /** Spec 97 (D-H4-11) — código: CC, TI, CE, PPT, PEP, NIT u OTRO. */
+  @Column({
+    type: 'varchar',
+    name: 'document_type',
+    length: 10,
+    nullable: true,
+  })
+  documentType: string | null;
+
   @Column({ type: 'varchar', length: 255, nullable: true })
   email: string | null;
 
@@ -76,6 +87,11 @@ export class Farmer {
   @Column('boolean', { name: 'participation_in_training', nullable: true })
   participationInTraining: boolean | null;
 
+  /**
+   * @deprecated Spec 94 — ESPEJO de la finca principal (`farmer_farms` con
+   * `is_primary`). El código nuevo lee `farmLinks` / `farms`; este campo se
+   * mantiene (escritura espejo) para el móvil 1.0.0 y se retira en H8.
+   */
   @ManyToOne(() => Farm, (farm) => farm.farmers, {
     nullable: true,
     onDelete: 'SET NULL', // Si la granja se elimina, el campo farm_id se establece en NULL
@@ -85,6 +101,16 @@ export class Farmer {
     referencedColumnName: 'farmId',
   })
   farm?: Farm;
+
+  /** Spec 94 — vínculos con todas sus fincas (rol y principal). */
+  @OneToMany(() => FarmerFarm, (link) => link.farmer)
+  farmLinks: FarmerFarm[];
+
+  /**
+   * Spec 94 — NO es columna: `farms[]` ya serializado (fincas con rol,
+   * principal y cultivos activos), derivado de `farmLinks` al responder.
+   */
+  farms?: FarmerFarmView[];
 
   @ManyToOne(() => Cooperative, (cooperative) => cooperative.farmers, {
     nullable: true,

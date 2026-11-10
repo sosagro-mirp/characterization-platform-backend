@@ -1,3 +1,5 @@
+import { existsSync, readdirSync } from 'fs';
+import { join } from 'path';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { SentryModule, SentryGlobalFilter } from '@sentry/nestjs/setup';
@@ -12,6 +14,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { FarmersModule } from './farmers/farmers.module';
+import { FarmerFarmsModule } from './farmer-farms/farmer-farms.module';
+import { FarmPlotsModule } from './farm-plots/farm-plots.module';
 import { FarmsModule } from './farms/farms.module';
 import { CooperativesModule } from './cooperatives/cooperatives.module';
 import { TownsModule } from './towns/towns.module';
@@ -45,7 +49,25 @@ import { ChangeRequestsModule } from './change-requests/change-requests.module';
 import { MediaAttachmentsModule } from './media-attachments/media-attachments.module';
 import { StorageModule } from './storage/storage.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { CoverageModule } from './coverage/coverage.module';
+import { ProductionUnitsModule } from './production-units/production-units.module';
+import { UnitSelectionsModule } from './unit-selections/unit-selections.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
+import { ConsentsModule } from './consents/consents.module';
+import { PublicSurveysModule } from './public-surveys/public-surveys.module';
+
+/**
+ * Spec 97 (D-H4-13): las migraciones de datos (`*Data.js`) no corren solas al
+ * arrancar; se aplican a mano con `pnpm migration:run`. Sin `dist/migrations`
+ * (p. ej. pruebas sin compilar) no hay nada que correr.
+ */
+function autoRunMigrations(): string[] {
+  const dir = join(process.cwd(), 'dist', 'migrations');
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((file) => file.endsWith('.js') && !file.endsWith('Data.js'))
+    .map((file) => join(dir, file));
+}
 
 @Module({
   imports: [
@@ -105,12 +127,16 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
           autoLoadEntities: true,
           synchronize: configService.get<string>('DB_SYNC') === 'true',
           migrationsRun: nodeEnv === 'production',
-          migrations: ['dist/migrations/*.js'],
+          // Spec 97 (D-H4-13): las migraciones de datos (`*Data.js`) no corren
+          // solas al arrancar; se aplican a mano con `pnpm migration:run`.
+          migrations: autoRunMigrations(),
           logging: nodeEnv !== 'production',
         };
       },
     }),
     FarmersModule,
+    FarmerFarmsModule,
+    FarmPlotsModule,
     FarmsModule,
     CooperativesModule,
     TownsModule,
@@ -144,7 +170,12 @@ import { ApiKeysModule } from './api-keys/api-keys.module';
     MediaAttachmentsModule,
     StorageModule,
     DashboardModule,
+    CoverageModule,
+    ProductionUnitsModule,
+    UnitSelectionsModule,
     ApiKeysModule,
+    ConsentsModule,
+    PublicSurveysModule,
   ],
   controllers: [AppController],
   providers: [
