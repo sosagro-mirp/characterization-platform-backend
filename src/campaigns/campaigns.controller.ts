@@ -42,7 +42,10 @@ export class CampaignsController {
   @Get()
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
-  @ApiOperation({ summary: 'Listar todas las campañas (administración)' })
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Listar todas las campañas (administración)',
+  })
   findAll() {
     return this.campaignsService.findAll();
   }
@@ -50,6 +53,7 @@ export class CampaignsController {
   @Public()
   @Get('active')
   @ApiOperation({
+    deprecated: true,
     summary: 'Listar campañas activas',
     description: 'Endpoint público consumido por la PWA del encuestador.',
   })
@@ -60,6 +64,7 @@ export class CampaignsController {
   @Public()
   @Get(':id/render')
   @ApiOperation({
+    deprecated: true,
     summary: 'Estructura completa de la campaña',
     description:
       'Retorna la campaña con sus pasos (orden, condición, instrumento ' +
@@ -74,6 +79,7 @@ export class CampaignsController {
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN)
   @ApiOperation({
+    deprecated: true,
     summary: 'Resumen de sesiones de una campaña',
     description:
       'Retorna el número de sesiones asociadas. Usar antes de eliminar para mostrar advertencia al usuario.',
@@ -86,7 +92,7 @@ export class CampaignsController {
   @Get(':id')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
-  @ApiOperation({ summary: 'Detalle de campaña con pasos' })
+  @ApiOperation({ deprecated: true, summary: 'Detalle de campaña con pasos' })
   @ApiParam({ name: 'id', format: 'uuid' })
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.campaignsService.findOne(id);

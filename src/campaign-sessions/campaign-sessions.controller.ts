@@ -34,7 +34,7 @@ export class CampaignSessionsController {
   constructor(private readonly sessionsService: CampaignSessionsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Iniciar sesión de campaña' })
+  @ApiOperation({ deprecated: true, summary: 'Iniciar sesión de campaña' })
   @ApiResponse({ status: 201, description: 'Sesión creada.' })
   create(
     @Body() dto: CreateCampaignSessionDto,
@@ -45,6 +45,7 @@ export class CampaignSessionsController {
 
   @Get('last-farmer')
   @ApiOperation({
+    deprecated: true,
     summary: 'Último agricultor encuestado por el usuario autenticado',
     description:
       'Retorna el farmer vinculado a la sesión más reciente del usuario que tenga farmer asignado, o null si no existe.',
@@ -55,7 +56,10 @@ export class CampaignSessionsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalle de sesión con surveys aplicados' })
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Detalle de sesión con surveys aplicados',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.sessionsService.findOne(id);
@@ -63,6 +67,7 @@ export class CampaignSessionsController {
 
   @Get(':id/next-step')
   @ApiOperation({
+    deprecated: true,
     summary: 'Calcular próximo paso de la campaña',
     description:
       'Evalúa condiciones contra respuestas previas y retorna el paso ' +
@@ -75,7 +80,10 @@ export class CampaignSessionsController {
   }
 
   @Patch(':id/sync')
-  @ApiOperation({ summary: 'Marcar sesión como sincronizada' })
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Marcar sesión como sincronizada',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   markAsSynchronized(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.sessionsService.markAsSynchronized(id);
@@ -85,6 +93,7 @@ export class CampaignSessionsController {
   @Roles(ROLES.ADMIN)
   @HttpCode(204)
   @ApiOperation({
+    deprecated: true,
     summary: 'Eliminar sesión de campaña sin encuestas asociadas',
     description:
       'Acotado a sesiones sin surveys: existe para poder limpiar sesiones ' +

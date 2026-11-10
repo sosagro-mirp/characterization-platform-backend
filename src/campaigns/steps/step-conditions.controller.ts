@@ -31,7 +31,7 @@ export class StepConditionsController {
   constructor(private readonly conditionsService: StepConditionsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar condiciones de un paso' })
+  @ApiOperation({ deprecated: true, summary: 'Listar condiciones de un paso' })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
   @ApiParam({ name: 'stepId', format: 'uuid' })
   findAll(

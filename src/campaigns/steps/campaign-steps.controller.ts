@@ -31,7 +31,7 @@ export class CampaignStepsController {
   constructor(private readonly stepsService: CampaignStepsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar pasos de una campaña' })
+  @ApiOperation({ deprecated: true, summary: 'Listar pasos de una campaña' })
   @ApiParam({ name: 'campaignId', format: 'uuid' })
   findAll(@Param('campaignId', new ParseUUIDPipe()) campaignId: string) {
     return this.stepsService.findAll(campaignId);
