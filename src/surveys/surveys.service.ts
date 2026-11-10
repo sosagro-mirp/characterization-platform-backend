@@ -1,3 +1,4 @@
+import { legacyCampaignUsageEntry } from '../campaigns/legacy-campaign-usage.interceptor';
 import { resolveDocumentType } from '../farmers/document-type';
 import {
   BadRequestException,
@@ -240,11 +241,10 @@ export class SurveysService {
       }
       // Spec 104 — telemetría: captura heredada que aún llega por campaña.
       this.logger.log(
-        JSON.stringify({
-          legacyCampaignUsage: true,
+        legacyCampaignUsageEntry({
           method: 'POST',
           route: '/api/surveys',
-          userId: userId ?? null,
+          userId,
         }),
       );
     }

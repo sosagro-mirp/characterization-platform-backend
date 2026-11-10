@@ -1,6 +1,11 @@
 import { CallHandler, ExecutionContext, Logger } from '@nestjs/common';
 import { of } from 'rxjs';
-import { LegacyCampaignUsageInterceptor } from './legacy-campaign-usage.interceptor';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import {
+  LegacyCampaignUsageInterceptor,
+  legacyCampaignUsageEntry,
+} from './legacy-campaign-usage.interceptor';
 import { SurveysController } from '../surveys/surveys.controller';
 
 // Spec 104 — telemetría del uso heredado de campañas (compuertas A→B y B→C).
@@ -50,4 +55,29 @@ describe('LegacyCampaignUsageInterceptor', () => {
       expect(interceptors).toContain(LegacyCampaignUsageInterceptor);
     },
   );
+
+  it('POST /surveys con campaignSessionId registra el uso heredado', () => {
+    expect(
+      JSON.parse(
+        legacyCampaignUsageEntry({
+          method: 'POST',
+          route: '/api/surveys',
+          userId: 'u-2',
+        }),
+      ),
+    ).toEqual({
+      legacyCampaignUsage: true,
+      method: 'POST',
+      route: '/api/surveys',
+      userId: 'u-2',
+    });
+    const service = readFileSync(
+      resolve(__dirname, '../surveys/surveys.service.ts'),
+      'utf8',
+    );
+    const start = service.indexOf('if (createSurveyDto.campaignSessionId)');
+    expect(service.slice(start, start + 1200)).toContain(
+      'legacyCampaignUsageEntry(',
+    );
+  });
 });

@@ -27,6 +27,8 @@ function dropForeignKey(fromTable: string, toTable: string): string {
         JOIN pg_class r ON r.oid = c.confrelid
         WHERE t.relname = '${fromTable}'
           AND r.relname = '${toTable}'
+          AND t.relnamespace = 'public'::regnamespace
+          AND r.relnamespace = 'public'::regnamespace
           AND c.contype = 'f'
       LOOP
         EXECUTE format('ALTER TABLE ${fromTable} DROP CONSTRAINT %I', v_name);
