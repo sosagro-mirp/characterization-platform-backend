@@ -61,6 +61,11 @@ import {
   LikertRankingItemDto,
 } from './dto/dashboard-digital-demand.dto';
 import {
+  attachExternalIds,
+  collapseMergeGroups,
+} from './dashboard-question-merge';
+import { mergeGroupsForCategory } from './dashboard-question-merge.config';
+import {
   DENIED_SYSTEM_FIELDS,
   EXCLUDED_QUESTION_TYPES,
   MIN_SAMPLE_THRESHOLD,
@@ -416,6 +421,16 @@ export class DashboardService {
         ),
     );
 
+    // D15 (spec 66): preguntas equivalentes de varios instrumentos se juntan
+    // en una sola gráfica (ver dashboard-question-merge.config.ts).
+    if (category) {
+      questions = await this.applyQuestionMerges(
+        category.id,
+        questions,
+        instrumentByQuestionId,
+      );
+    }
+
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
       // Una pregunta de un tipo sin agregación se omite y se registra: no
@@ -662,6 +677,92 @@ export class DashboardService {
       .andWhere('question.isDigitalDemandItem = true')
       .orderBy('question.order', 'ASC')
       .getMany();
+  }
+
+  /**
+   * D15 (spec 66, Fase 3): colapsa los grupos de preguntas equivalentes de la
+   * categoría y suma los miembros `external` (de otra categoría) al
+   * representante. Un grupo sin representante en la categoría no se muestra.
+   */
+  private async applyQuestionMerges(
+    categoryId: string,
+    questions: Question[],
+    instrumentByQuestionId: Map<string, Instrument>,
+  ): Promise<Question[]> {
+    const groups = mergeGroupsForCategory(categoryId);
+    if (groups.length === 0) return questions;
+    const { questions: merged, externalToFetch } = collapseMergeGroups(
+      groups,
+      questions,
+      (q) => instrumentByQuestionId.get(q.questionId)?.code,
+    );
+    for (const { member, representative } of externalToFetch) {
+      const external = await this.findEligibleQuestionByInstrumentAndText(
+        member.instrumentCode,
+        member.questionText,
+      );
+      if (!external) continue;
+      this.warnIfOptionsDiffer(representative, external);
+      attachExternalIds(representative, external.questionId);
+    }
+    for (const question of merged) {
+      const ids = (question as DestinationQuestion).destinationQuestionIds;
+      if (!ids || ids.length < 2) continue;
+      for (const other of questions) {
+        if (other === question || !ids.includes(other.questionId)) continue;
+        this.warnIfOptionsDiffer(question, other);
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Como `findQuestionByInstrumentAndText`, pero con las mismas barreras de
+   * privacidad que `getEligibleQuestions` (tipos y `systemField` bloqueados) y
+   * prefiriendo la versión no archivada. Para miembros `external` de una
+   * fusión (D15), que no pasan por la lista de su categoría.
+   */
+  private async findEligibleQuestionByInstrumentAndText(
+    instrumentCode: string,
+    text: string,
+  ): Promise<Question | null> {
+    return this.questionRepo
+      .createQueryBuilder('question')
+      .innerJoin('question.section', 'section')
+      .innerJoin(
+        'section.instrument',
+        'instrument',
+        'instrument.code = :instrumentCode',
+        { instrumentCode },
+      )
+      .innerJoinAndSelect('question.type', 'type')
+      .leftJoinAndSelect('question.options', 'options')
+      .where('question.text = :text', { text })
+      .andWhere('type.name NOT IN (:...excludedTypes)', {
+        excludedTypes: EXCLUDED_QUESTION_TYPES,
+      })
+      .andWhere(
+        '(question.systemField IS NULL OR question.systemField NOT IN (:...deniedFields))',
+        { deniedFields: DENIED_SYSTEM_FIELDS },
+      )
+      .orderBy('question.archivedAt', 'ASC', 'NULLS FIRST')
+      .getOne();
+  }
+
+  /** D15 exige las mismas opciones en todos los miembros; si difieren, se avisa. */
+  private warnIfOptionsDiffer(a: Question, b: Question): void {
+    const texts = (q: Question) =>
+      new Set((q.options ?? []).map((option) => option.text));
+    const ta = texts(a);
+    const tb = texts(b);
+    const diff = [...ta]
+      .filter((t) => !tb.has(t))
+      .concat([...tb].filter((t) => !ta.has(t)));
+    if (diff.length > 0) {
+      this.logger.warn(
+        `Fusión de preguntas con opciones distintas ("${a.text}" / "${b.text}"): ${diff.join(', ')}`,
+      );
+    }
   }
 
   /** Ids de las preguntas a leer para una pregunta resuelta por destino. */
@@ -1275,15 +1376,19 @@ export class DashboardService {
     )
       .innerJoin('response.option', 'option')
       .select(
-        multi ? 'MIN(option.optionId::text)' : 'option.optionId',
+        multi ? 'MIN("option"."option_id"::text)' : 'option.optionId',
         'optionId',
       )
       .addSelect('option.text', 'text')
-      .addSelect('option.value', 'value')
+      // Con varias preguntas por destino (incluida la fusión D15) las opciones
+      // se agrupan SOLO por texto: si el `value` entrara en el agrupamiento,
+      // una opción con el mismo texto y distinto `value` saldría como dos
+      // barras y la supresión de celda se aplicaría a cada parte.
+      .addSelect(multi ? 'MIN(option.value)' : 'option.value', 'value')
       .addSelect(countExpression, 'count')
       .groupBy(multi ? 'option.text' : 'option.optionId')
       .addGroupBy('option.text')
-      .addGroupBy('option.value')
+      .addGroupBy(multi ? 'option.text' : 'option.value')
       .getRawMany<{
         optionId: string;
         text: string;
@@ -1470,7 +1575,7 @@ export class DashboardService {
       .innerJoin('response.option', 'option')
       .andWhere('response.numericValue IS NOT NULL')
       .select(
-        multi ? 'MIN(option.optionId::text)' : 'option.optionId',
+        multi ? 'MIN("option"."option_id"::text)' : 'option.optionId',
         'optionId',
       )
       .addSelect('option.text', 'unit')

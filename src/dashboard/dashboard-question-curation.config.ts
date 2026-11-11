@@ -350,6 +350,187 @@ export const QUESTION_CURATION: QuestionCurationEntry[] = [
       'C3 · Cultivos y variedades, Bloque Café (spec 66, Fase 5, ' +
       '2026-08-11): misma razón que la cosecha principal de café.',
   },
+  {
+    instrumentCode: 'S_REG',
+    questionText: 'Género del productor(a)',
+    chartHint: 'donut',
+    note:
+      'C1 · Perfil del productor (spec 66, Fase 3, 2026-11-11): torta, igual ' +
+      'que en S1a (3 opciones: Hombre/Mujer/Prefiere no responder) — ' +
+      'decisión del usuario. Las decisiones de S1a no se heredan: se ' +
+      'confirmó pregunta por pregunta.',
+  },
+  {
+    instrumentCode: 'S_REG',
+    questionText:
+      '¿Pertenece el productor a alguno de los siguientes grupos o territorios? (Puede marcar más de una opción)',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor (spec 66, Fase 3, 2026-11-11): fuera del ' +
+      'dashboard público por ser cuasi-identificante sensible (pertenencia a ' +
+      'comunidades NARP, LGBTIQ+, ZOMAC...), que combinada con municipio ' +
+      'puede singularizar a una persona. Candidata a mostrarse en el ' +
+      'dashboard privado de investigadores (D14) con su propio umbral de celda.',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: 'Área total del predio',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'las áreas del predio no se muestran al público (cuasi-identificante junto con el municipio y con unidades mezcladas). Decisión del usuario: oculta en el público y ' +
+      'disponible como barras en el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: 'Área cultivada con las cadenas del proyecto',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'las áreas del predio no se muestran al público (cuasi-identificante junto con el municipio y con unidades mezcladas). Decisión del usuario: oculta en el público y ' +
+      'disponible como barras en el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: '¿Cuántos lotes tiene la finca?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'el número de lotes no se muestra al público. Decisión del usuario: oculta en el público y ' +
+      'disponible como barras en el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: 'Tipo de relieve predominante de la finca',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'el relieve no se muestra al público. Decisión del usuario: oculta en el público y ' +
+      'disponible como barras en el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: '¿Hay vivienda(s) en la unidad productiva?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'la vivienda no se muestra al público (igual que en S1b). Decisión del usuario: oculta en el público y ' +
+      'disponible como barras en el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: '¿Cuántas personas habitan la unidad productiva?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'el tamaño del hogar no se muestra al público. Decisión del usuario: oculta en el público y ' +
+      'disponible como barras en el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText:
+      '¿Cuántas de esas personas participan en las actividades de la unidad productiva?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'la participación del hogar no se muestra al público. Decisión del usuario: oculta en el público y ' +
+      'disponible como barras en el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: '¿Por cuánto tiempo está arrendada?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'solo aplica a arrendatarios (muestra pequeña) y mezcla unidades ' +
+      '(meses/años/días). Propuesta confirmada por defecto; candidata al ' +
+      'dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText: '¿Cultiva también Cáñamo?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'redundante: repite la opción «Cáñamo» de «otros cultivos» y de «Cultivo principal». Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText:
+      '¿Cultiva también alguno de estos otros cultivos, además del principal?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'opciones sucias y distintas entre TALLER y TALLER-TAB (Café/Cafe, Cítricos/Citricos, variantes de plátano); se muestra cuando se homologuen. Además su systemField farm.mainCrop puede pisar el cultivo principal al extraer (ver spec/backlog.md). Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText: '¿Cuál es el tamaño total aproximado del predio?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'las áreas del predio no se muestran al público, igual que en S_FINCA. Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText: '¿Cuál es el área del predio que está actualmente cultivada?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'las áreas del predio no se muestran al público, igual que en S_FINCA. Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText: '¿Cultiva también Cáñamo?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'redundante: repite la opción «Cáñamo» de «otros cultivos» y de «Cultivo principal». Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText:
+      '¿Cultiva también alguno de estos otros cultivos, además del principal?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'opciones sucias y distintas entre TALLER y TALLER-TAB (Café/Cafe, Cítricos/Citricos, variantes de plátano); se muestra cuando se homologuen. Además su systemField farm.mainCrop puede pisar el cultivo principal al extraer (ver spec/backlog.md). Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText: '¿Cuál es el tamaño total aproximado del predio?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'las áreas del predio no se muestran al público, igual que en S_FINCA. Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText: '¿Cuál es el área del predio que está actualmente cultivada?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-11): ' +
+      'las áreas del predio no se muestran al público, igual que en S_FINCA. Decisión del usuario: fuera del público y ' +
+      'disponible para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_AGRI',
+    questionText:
+      '¿En qué etapas de la cadena productiva participa? (Marque todas las que apliquen)',
+    hidden: true,
+    note:
+      'C12 · Comercialización (spec 66, Fase 3, D15, 2026-11-11): la misma ' +
+      'pregunta, con las mismas 7 opciones, vive fusionada en C1 junto con ' +
+      'talleres y S1b (dashboard-question-merge.config.ts); se oculta aquí ' +
+      'para no mostrarla dos veces. El filtro chainStage no cambia.',
+  },
 ];
 
 function findEntry(

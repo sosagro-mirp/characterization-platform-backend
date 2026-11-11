@@ -67,9 +67,9 @@ export type ResponseFilterSource = QuestionLocator & {
 
 const SIGNAL_TEXT =
   '¿Cómo describiría la calidad de la señal móvil en la finca?';
-const CHAIN_STAGE_TEXT =
+export const CHAIN_STAGE_TEXT =
   '¿En qué etapas de la cadena productiva participa? (Marque todas las que apliquen)';
-const CHAIN_STAGE_TALLER_TEXT =
+export const CHAIN_STAGE_TALLER_TEXT =
   '¿En qué etapas de la cadena productiva participa? (puede marcar más de una opción)';
 
 /** Calidad de la señal móvil: vigente en `S_FINCA` y talleres, histórica en `S8E`.
