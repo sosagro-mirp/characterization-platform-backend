@@ -1,4 +1,7 @@
-import { QuestionLocator } from './dashboard-response-filters.config';
+import {
+  CONNECTIVITY_SOURCE,
+  QuestionLocator,
+} from './dashboard-response-filters.config';
 
 /**
  * Spec 43 (Fase 4, D5): catálogo de KPIs curados. Cada entrada declara su
@@ -83,6 +86,9 @@ export const OVERVIEW_KPIS: KpiDefinition[] = [
 
 export const DIGITAL_DEMAND_KPIS: KpiDefinition[] = [
   ACCEPTANCE_INDEX,
+  // DEBT: spec 66 (D12) — «¿Tiene y usa un smartphone…?» no existe en ningún
+  // instrumento de producción: el KPI sale vacío. Decidir en la Fase 18 si se
+  // reemplaza (p. ej. por «¿Qué dispositivos utiliza actualmente?») o se quita.
   {
     key: 'hasSmartphone',
     label: 'Con smartphone',
@@ -162,17 +168,54 @@ export const DIGITAL_DEMAND_SOURCES = {
     questionText:
       '¿Cuáles son las principales barreras para adoptar tecnologías digitales?',
   } satisfies QuestionLocator,
+  // Spec 66 (D13): vigente en `S_AGRI` (y talleres), histórica en `S11-DB`.
   digitalSkills: {
-    locate: 'instrumentAndText',
-    instrumentCode: 'S11-DB',
-    questionText:
-      '¿Cuáles de las siguientes habilidades digitales puede realizar?',
+    locate: 'anyOf',
+    sources: [
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S_AGRI',
+        questionText:
+          '¿Cuáles de las siguientes habilidades digitales puede realizar?',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S11-DB',
+        questionText:
+          '¿Cuáles de las siguientes habilidades digitales puede realizar?',
+      },
+    ],
   } satisfies QuestionLocator,
   platforms: {
-    locate: 'instrumentAndText',
-    instrumentCode: 'S11-DB',
-    questionText: '¿Cuáles plataformas o aplicaciones usa actualmente?',
+    locate: 'anyOf',
+    sources: [
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S_AGRI',
+        questionText: '¿Cuáles plataformas o aplicaciones usa actualmente?',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'TALLER',
+        questionText:
+          '¿Cuáles plataformas o aplicaciones usa actualmente? (puede marcar más de una opción)',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'TALLER-TAB',
+        questionText:
+          '¿Cuáles plataformas o aplicaciones usa actualmente? (puede marcar más de una opción)',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S11-DB',
+        questionText: '¿Cuáles plataformas o aplicaciones usa actualmente?',
+      },
+    ],
   } satisfies QuestionLocator,
+  // DEBT: spec 66 (D12) — esta pregunta no existe en ningún instrumento de
+  // producción (`S11-RES` ya no existe): el corte sale vacío. Decidir en la
+  // Fase 18 si se reemplaza o se quita.
   preferredChannel: {
     locate: 'instrumentAndText',
     instrumentCode: 'S11-RES',
@@ -188,11 +231,6 @@ export const DIGITAL_DEMAND_SOURCES = {
       locate: 'systemField',
       systemField: 'farmer.educationLevel',
     } satisfies QuestionLocator,
-    connectivity: {
-      locate: 'instrumentAndText',
-      instrumentCode: 'S8E',
-      questionText:
-        '¿Cómo describiría la calidad de la señal móvil en la finca?',
-    } satisfies QuestionLocator,
+    connectivity: CONNECTIVITY_SOURCE,
   },
 };

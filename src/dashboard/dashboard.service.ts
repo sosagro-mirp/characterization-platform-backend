@@ -729,6 +729,37 @@ export class DashboardService {
         destinationQuestionIds: all.map((q) => q.questionId),
       });
     }
+    if (locator.locate === 'anyOf') {
+      // Spec 66 (D13): la misma pregunta en varias fuentes (vigente primero,
+      // luego la histórica). La primera que resuelva es la representante; si se
+      // piden opciones, se le suman las de las demás por texto, para que los
+      // cortes no pierdan una opción que solo existe en otra fuente.
+      const found = (
+        await Promise.all(
+          locator.sources.map((source) =>
+            this.findQuestionByInstrumentAndText(
+              source.instrumentCode,
+              source.questionText,
+              opts,
+            ),
+          ),
+        )
+      ).filter((q): q is Question => q !== null);
+      if (found.length === 0) return null;
+      const [representative, ...rest] = found;
+      if (opts.withOptions) {
+        const texts = new Set(representative.options.map((o) => o.text));
+        for (const option of rest.flatMap((q) => q.options)) {
+          if (!texts.has(option.text)) {
+            texts.add(option.text);
+            representative.options.push(option);
+          }
+        }
+      }
+      return Object.assign(representative, {
+        destinationQuestionIds: found.map((q) => q.questionId),
+      });
+    }
     return this.findQuestionByInstrumentAndText(
       locator.instrumentCode,
       locator.questionText,

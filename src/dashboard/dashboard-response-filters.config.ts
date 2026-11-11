@@ -45,12 +45,59 @@ export interface ByInstrumentAndText {
   questionText: string;
 }
 
-export type QuestionLocator = BySystemField | ByInstrumentAndText;
+/**
+ * Spec 66 (D13): la misma pregunta vive en varias fuentes tras el spec 84 (la
+ * vigente en `S_FINCA`/`S_AGRI`/talleres y la archivada en el instrumento
+ * histórico). Se suman todas; la primera que resuelva aporta tipo y opciones,
+ * así que la fuente vigente va primero. Las opciones se agrupan por texto,
+ * como en los destinos con varias preguntas del spec 97.
+ */
+export interface ByAnyOf {
+  locate: 'anyOf';
+  sources: ByInstrumentAndText[];
+}
+
+export type QuestionLocator = BySystemField | ByInstrumentAndText | ByAnyOf;
 
 export type ResponseFilterSource = QuestionLocator & {
   key: ResponseFilterKey;
   /** 'range' = numérico por bucket; 'option' = un solo valor; 'multiOption' = lista OR. */
   matchType: 'range' | 'option' | 'multiOption';
+};
+
+const SIGNAL_TEXT =
+  '¿Cómo describiría la calidad de la señal móvil en la finca?';
+const CHAIN_STAGE_TEXT =
+  '¿En qué etapas de la cadena productiva participa? (Marque todas las que apliquen)';
+const CHAIN_STAGE_TALLER_TEXT =
+  '¿En qué etapas de la cadena productiva participa? (puede marcar más de una opción)';
+
+/** Calidad de la señal móvil: vigente en `S_FINCA` y talleres, histórica en `S8E`.
+ * Compartida con los cortes de la vista de demanda digital (`dashboard-kpis.config.ts`). */
+export const CONNECTIVITY_SOURCE: ByAnyOf = {
+  locate: 'anyOf',
+  sources: [
+    {
+      locate: 'instrumentAndText',
+      instrumentCode: 'S_FINCA',
+      questionText: SIGNAL_TEXT,
+    },
+    {
+      locate: 'instrumentAndText',
+      instrumentCode: 'TALLER',
+      questionText: SIGNAL_TEXT,
+    },
+    {
+      locate: 'instrumentAndText',
+      instrumentCode: 'TALLER-TAB',
+      questionText: SIGNAL_TEXT,
+    },
+    {
+      locate: 'instrumentAndText',
+      instrumentCode: 'S8E',
+      questionText: SIGNAL_TEXT,
+    },
+  ],
 };
 
 export const RESPONSE_FILTER_SOURCES: ResponseFilterSource[] = [
@@ -74,31 +121,62 @@ export const RESPONSE_FILTER_SOURCES: ResponseFilterSource[] = [
   },
   {
     key: 'connectivity',
-    locate: 'instrumentAndText',
-    instrumentCode: 'S8E',
-    questionText: '¿Cómo describiría la calidad de la señal móvil en la finca?',
+    ...CONNECTIVITY_SOURCE,
     matchType: 'option',
   },
   {
+    // Spec 66 (D13): `S_REG · Perfil` es la vigente. La de talleres («Perfil
+    // del productor (puede marcar más de una opción)») y la archivada de S1a
+    // usan otro vocabulario de opciones y no se suman.
+    // DEBT: spec 66 — decidir en la Fase 3 (C1) si se homologan las opciones.
     key: 'profile',
     locate: 'instrumentAndText',
-    instrumentCode: 'S1a',
-    questionText: 'Perfil del productor',
+    instrumentCode: 'S_REG',
+    questionText: 'Perfil',
     matchType: 'option',
   },
   {
     key: 'tenure',
-    locate: 'instrumentAndText',
-    instrumentCode: 'S1b',
-    questionText: 'La unidad productiva es:',
+    locate: 'anyOf',
+    sources: [
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S_FINCA',
+        questionText: 'La unidad productiva es:',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S1b',
+        questionText: 'La unidad productiva es:',
+      },
+    ],
     matchType: 'option',
   },
   {
     key: 'chainStage',
-    locate: 'instrumentAndText',
-    instrumentCode: 'S1b',
-    questionText:
-      '¿En qué etapas de la cadena productiva participa? (Marque todas las que apliquen)',
+    locate: 'anyOf',
+    sources: [
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S_AGRI',
+        questionText: CHAIN_STAGE_TEXT,
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'TALLER',
+        questionText: CHAIN_STAGE_TALLER_TEXT,
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'TALLER-TAB',
+        questionText: CHAIN_STAGE_TALLER_TEXT,
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S1b',
+        questionText: CHAIN_STAGE_TEXT,
+      },
+    ],
     matchType: 'multiOption',
   },
 ];

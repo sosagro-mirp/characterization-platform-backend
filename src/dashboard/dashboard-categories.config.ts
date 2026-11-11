@@ -37,38 +37,42 @@ export interface DashboardCategoryConfig {
  * `BackfillInstrumentCodes1782568700000` (antes solo 3 de 40 instrumentos
  * tenían `code` poblado).
  *
- * Nota S11: `dashboard.md §2` lista "S11 (×3)" para C15, pero la base tiene 4
- * instrumentos con nombre "S11: Adopción Tecnológica — …"; el diseño no
- * documentó "Productores y Propietarios Residentes" en su §4. Se incluyen
- * los 4 aquí porque los cuatro son instrumentos de adopción tecnológica —
- * excluir uno por omisión del documento de diseño sería más arbitrario que
- * incluirlo.
+ * Spec 66 — remapeo por sección (D12/D13, aprobado por el usuario el
+ * 2026-11-11). Tras el spec 84 la mayoría de las respuestas vive en los
+ * instrumentos nuevos (`S_REG`, `S_FINCA`, `S_AGRI`, `S_CULT`, `S6-GEN`,
+ * `S7-GEN`) y en los dos de talleres de co-creación (`TALLER`, `TALLER-TAB`),
+ * que se reparten por sección entre las categorías. Los instrumentos
+ * inactivos con respuestas entran como fuente histórica. `S2`, `S3.4.1` y
+ * `S11-RES` salieron del mapa: ya no existen en producción.
  */
 export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
   {
     id: 'C1',
     code: 'C1',
-    // Spec 66 (Fase 3, D7, 2026-08-10): fusión de "Perfil del productor"
-    // (antes C1) y "La finca" (antes C3) en una sola categoría, a pedido
-    // del usuario — ver D7 para la justificación y la renumeración en
-    // cascada de las categorías siguientes (C4→C3 … C15→C14).
     name: 'Perfil del productor y la finca',
     instruments: [
+      {
+        instrumentCode: 'S_REG',
+        sectionNames: ['Identificación', 'Finca y cultivo'],
+      },
+      {
+        instrumentCode: 'S_FINCA',
+        sectionNames: ['Tenencia', 'Tamaño y vivienda'],
+      },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: ['Identificación del encuestado', 'La unidad productiva'],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: ['Identificación del encuestado', 'La unidad productiva'],
+      },
       {
         instrumentCode: 'S1a',
         sectionNames: ['Identificación del encuestado/propietario/productor'],
         historic: true,
       },
-      // Spec 66 (D7): S1b entra completo por la fusión con «La finca». Desde
-      // el spec 84 está inactivo, así que va como fuente histórica.
       { instrumentCode: 'S1b', historic: true },
-      // Spec 84 — instrumento de Registro (S_REG), Fase 8: nace con una
-      // sección llamada exactamente "Identificación" para esta categoría.
-      { instrumentCode: 'S_REG', sectionNames: ['Identificación'] },
-      // Spec 84 — Fase 8: sección "Finca y cultivo" del Registro (nombre de
-      // la finca y cultivo principal), que antes iba en «La finca» (C3).
-      // DEBT: spec 66 — revalidar esta fuente en la Fase 1 (inventario).
-      { instrumentCode: 'S_REG', sectionNames: ['Finca y cultivo'] },
     ],
   },
   {
@@ -76,15 +80,25 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
     code: 'C2',
     name: 'Ubicación y acceso',
     instruments: [
+      { instrumentCode: 'S_REG', sectionNames: ['Ubicación'] },
+      {
+        instrumentCode: 'S_FINCA',
+        sectionNames: ['Acceso desde el casco urbano'],
+      },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: ['Ubicación y acceso a la finca'],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: ['Ubicación y acceso a la finca'],
+      },
+      { instrumentCode: 'S13' },
       {
         instrumentCode: 'S1a',
         sectionNames: ['Ubicación', 'Acceso desde el Casco Urbano'],
         historic: true,
       },
-      { instrumentCode: 'S13' },
-      // Spec 84 — Fase 8: sección "Ubicación" del Registro (departamento,
-      // municipio, vereda, corregimiento).
-      { instrumentCode: 'S_REG', sectionNames: ['Ubicación'] },
     ],
   },
   {
@@ -92,25 +106,48 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
     code: 'C3',
     name: 'Cultivos y variedades',
     instruments: [
-      { instrumentCode: 'S2' },
       { instrumentCode: 'S2.4' },
       { instrumentCode: 'S2.5' },
       { instrumentCode: 'S2.6' },
       { instrumentCode: 'S2.7' },
       { instrumentCode: 'S3B' },
+      {
+        instrumentCode: 'S_CULT',
+        sectionNames: ['Sombra y cultivos asociados', 'Entorno del cultivo'],
+      },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: ['Cultivo — específico por cultivo'],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: ['Cultivo — específico por cultivo'],
+      },
     ],
   },
   {
     id: 'C4',
     code: 'C4',
     name: 'Suelo, clima y fertilización',
-    instruments: [{ instrumentCode: 'S3' }],
+    instruments: [
+      { instrumentCode: 'S_FINCA', sectionNames: ['Suelo', 'Entorno y clima'] },
+      { instrumentCode: 'S_CULT', sectionNames: ['Registros y fertilización'] },
+      { instrumentCode: 'TALLER', sectionNames: ['Suelos y fertilización'] },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: ['Suelos y fertilización'],
+      },
+      { instrumentCode: 'S3', historic: true },
+    ],
   },
   {
     id: 'C5',
     code: 'C5',
     name: 'Sanidad vegetal',
-    instruments: [{ instrumentCode: 'S3.4.1' }, { instrumentCode: 'S12' }],
+    instruments: [
+      { instrumentCode: 'S_CULT', sectionNames: ['Sanidad'] },
+      { instrumentCode: 'S12', historic: true },
+    ],
   },
   {
     id: 'C6',
@@ -122,13 +159,19 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
       { instrumentCode: 'S4.3' },
       { instrumentCode: 'S4.4' },
       { instrumentCode: 'S5' },
+      { instrumentCode: 'S_FINCA', sectionNames: ['Certificaciones y normas'] },
+      { instrumentCode: 'TALLER', sectionNames: ['Poscosecha y calidad'] },
+      { instrumentCode: 'TALLER-TAB', sectionNames: ['Poscosecha y calidad'] },
     ],
   },
   {
     id: 'C7',
     code: 'C7',
     name: 'Energía y equipos',
-    instruments: [{ instrumentCode: 'S4.5' }],
+    instruments: [
+      { instrumentCode: 'S_FINCA', sectionNames: ['Equipos y tecnología'] },
+      { instrumentCode: 'S4.5', historic: true },
+    ],
   },
   {
     id: 'C8',
@@ -139,6 +182,21 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
       { instrumentCode: 'S6B' },
       { instrumentCode: 'S6C' },
       { instrumentCode: 'S6D' },
+      { instrumentCode: 'S6-GEN' },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: [
+          'Generación y manejo de residuos',
+          'Interés en valorización de residuos',
+        ],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: [
+          'Generación y manejo de residuos',
+          'Interés en valorización de residuos',
+        ],
+      },
     ],
   },
   {
@@ -149,6 +207,9 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
       { instrumentCode: 'S7A' },
       { instrumentCode: 'S7B' },
       { instrumentCode: 'S7C' },
+      { instrumentCode: 'S7-GEN' },
+      { instrumentCode: 'TALLER', sectionNames: ['Uso y manejo del agua'] },
+      { instrumentCode: 'TALLER-TAB', sectionNames: ['Uso y manejo del agua'] },
     ],
   },
   {
@@ -166,19 +227,67 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
     id: 'C11',
     code: 'C11',
     name: 'Servicios y conectividad',
-    instruments: [{ instrumentCode: 'S8E' }],
+    instruments: [
+      { instrumentCode: 'S_FINCA', sectionNames: ['Servicios'] },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: [
+          'Servicios: energía y agua',
+          'Conectividad y habilidades digitales',
+        ],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: [
+          'Servicios: energía y agua',
+          'Conectividad y habilidades digitales',
+        ],
+      },
+      { instrumentCode: 'S8E', historic: true },
+    ],
   },
   {
     id: 'C12',
     code: 'C12',
     name: 'Comercialización y asociatividad',
-    instruments: [{ instrumentCode: 'S9' }],
+    instruments: [
+      {
+        instrumentCode: 'S_AGRI',
+        sectionNames: [
+          'Participación en la cadena y comercialización',
+          'Organizaciones y asistencia técnica',
+        ],
+      },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: ['Cadena productiva y asociatividad'],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: ['Cadena productiva y asociatividad'],
+      },
+      { instrumentCode: 'S9', historic: true },
+    ],
   },
   {
     id: 'C13',
     code: 'C13',
     name: 'Participación en el proyecto',
-    instruments: [{ instrumentCode: 'S10' }],
+    instruments: [
+      {
+        instrumentCode: 'S_REG',
+        sectionNames: ['Participación en el proyecto'],
+      },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: ['Interés y compromiso con el proyecto'],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: ['Interés y compromiso con el proyecto'],
+      },
+      { instrumentCode: 'S10', historic: true },
+    ],
   },
   {
     id: 'C14',
@@ -186,11 +295,19 @@ export const DASHBOARD_CATEGORIES: DashboardCategoryConfig[] = [
     name: 'Adopción tecnológica e interés digital',
     tag: 'digital-demand',
     instruments: [
-      { instrumentCode: 'S11-DB' },
-      { instrumentCode: 'S11-INV' },
       { instrumentCode: 'S11-EXT' },
-      { instrumentCode: 'S11-RES' },
-      { instrumentCode: 'S_DCU' },
+      { instrumentCode: 'S_AGRI', sectionNames: ['Educación y uso digital'] },
+      {
+        instrumentCode: 'TALLER',
+        sectionNames: ['Preguntas para extensionistas y técnicos'],
+      },
+      {
+        instrumentCode: 'TALLER-TAB',
+        sectionNames: ['Preguntas para extensionistas y técnicos'],
+      },
+      { instrumentCode: 'S11-DB', historic: true },
+      { instrumentCode: 'S11-INV', historic: true },
+      { instrumentCode: 'S_DCU', historic: true },
     ],
   },
 ];
