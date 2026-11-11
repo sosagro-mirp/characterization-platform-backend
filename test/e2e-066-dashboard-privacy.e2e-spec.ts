@@ -143,6 +143,15 @@ describe('e2e-066 — Privacidad del dashboard público', () => {
           'farm.longitude',
           'farm.name',
           'farm.vereda',
+          'farm.corregimiento',
+          'farmer.name',
+          'farmer.documentId',
+          'farmer.phone',
+          'farmer.email',
+          'farmer.producerName',
+          'farmer.producerDocumentId',
+          'farmer.producerPhone',
+          'farmer.producerEmail',
         ]),
       );
     });

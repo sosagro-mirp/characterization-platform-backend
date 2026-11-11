@@ -60,13 +60,26 @@ export const DENIED_SYSTEM_FIELDS = [
   'farm.longitude',
   'farm.name',
   'farm.vereda',
+  'farm.corregimiento',
+  // Spec 66, Fase 3 (2026-11-11): identificantes directos del productor y del
+  // propietario. Antes solo los bloqueaba el tipo `open_text`; los talleres
+  // los capturan como numéricos (documento, celular) y llegaban al público.
+  'farmer.name',
+  'farmer.documentId',
+  'farmer.phone',
+  'farmer.email',
+  'farmer.producerName',
+  'farmer.producerDocumentId',
+  'farmer.producerPhone',
+  'farmer.producerEmail',
 ].flatMap((key) => keysFor(key));
 
 /**
- * Denylist explícita de preguntas identificantes por locator (D2, spec 66).
- * Todas están ya bloqueadas hoy por `EXCLUDED_QUESTION_TYPES` o
- * `DENIED_SYSTEM_FIELDS` — este registro documenta la auditoría, no
- * introduce una restricción nueva sobre el comportamiento actual.
+ * Registro de auditoría de preguntas identificantes por locator (D2, spec 66).
+ * **No es una barrera**: el endpoint no lo consulta; lo leen el e2e de
+ * privacidad y el inventario. Lo que bloquea de verdad son
+ * `EXCLUDED_QUESTION_TYPES` y `DENIED_SYSTEM_FIELDS`. Hacerlo efectivo está en
+ * `spec/backlog.md`.
  */
 export const PII_QUESTION_DENYLIST: PiiQuestionEntry[] = [
   {
@@ -138,6 +151,18 @@ export const PII_QUESTION_DENYLIST: PiiQuestionEntry[] = [
     questionText: 'Nombre de la finca / unidad productiva',
     reason:
       'Identifica directamente la unidad productiva. systemField farm.name.',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText: 'Documento de identidad',
+    reason:
+      'Documento de identidad capturado como numérico con unidad. systemField farmer.documentId.',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText: 'Número de celular',
+    reason:
+      'Dato de contacto directo capturado como numérico. systemField farmer.phone.',
   },
   {
     instrumentCode: 'S13',
