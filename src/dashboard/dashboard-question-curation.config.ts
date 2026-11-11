@@ -531,6 +531,28 @@ export const QUESTION_CURATION: QuestionCurationEntry[] = [
       'talleres y S1b (dashboard-question-merge.config.ts); se oculta aquí ' +
       'para no mostrarla dos veces. El filtro chainStage no cambia.',
   },
+  {
+    instrumentCode: 'S1a',
+    questionText:
+      '¿Pertenece el productor a alguno de los siguientes grupos o territorios? (Puede marcar más de una opción)',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor (spec 66, Fase 3, 2026-11-11): fuera del ' +
+      'dashboard público por ser cuasi-identificante sensible (pertenencia a ' +
+      'comunidades NARP, LGBTIQ+, ZOMAC...). Misma decisión que S_REG; revierte ' +
+      'la de agosto para S1a. Candidata al dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText:
+      '¿Pertenece el productor a alguno de los siguientes grupos o territorios? (puede marcar más de una opción)',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor (spec 66, Fase 3, 2026-11-11): fuera del ' +
+      'dashboard público por ser cuasi-identificante sensible (pertenencia a ' +
+      'comunidades NARP, LGBTIQ+, ZOMAC...). Misma decisión que S_REG; revierte ' +
+      'la de agosto para S1a. Candidata al dashboard privado (D14).',
+  },
 ];
 
 function findEntry(
