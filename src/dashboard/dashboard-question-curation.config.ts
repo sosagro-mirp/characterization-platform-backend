@@ -102,7 +102,7 @@ export const QUESTION_CURATION: QuestionCurationEntry[] = [
   },
   {
     instrumentCode: 'S1b',
-    questionText: 'Hectáreas totales del predio (ha)',
+    questionText: 'Hectáreas totales del predio',
     hidden: true,
     note:
       'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-08-10): ' +
