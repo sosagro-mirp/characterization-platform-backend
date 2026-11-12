@@ -88,6 +88,51 @@ export const QUESTION_MERGE_GROUPS: QuestionMergeGroup[] = [
       'talleres, S1b y S_AGRI. La copia de S_AGRI (C12) se oculta en la ' +
       'curaduría y se trae aquí.',
   },
+  {
+    categoryId: 'C1',
+    key: 'gender',
+    members: [
+      {
+        instrumentCode: 'S_REG',
+        questionText: 'Género del productor(a)',
+        representative: true,
+      },
+      { instrumentCode: 'S1a', questionText: 'Género del productor(a)' },
+    ],
+    note:
+      'C1 (spec 66, Fase 3, D13.6/D15, 2026-11-12): misma pregunta y ' +
+      'opciones en el registro vigente y en S1a (histórico).',
+  },
+  {
+    categoryId: 'C1',
+    key: 'age',
+    members: [
+      {
+        instrumentCode: 'S_REG',
+        questionText: 'Edad del productor(a)',
+        representative: true,
+      },
+      { instrumentCode: 'S1a', questionText: 'Edad del productor(a)' },
+    ],
+    note:
+      'C1 (spec 66, Fase 3, D13.6/D15, 2026-11-12): misma pregunta numérica ' +
+      'en el registro vigente y en S1a (histórico).',
+  },
+  {
+    categoryId: 'C1',
+    key: 'tenure',
+    members: [
+      {
+        instrumentCode: 'S_FINCA',
+        questionText: 'La unidad productiva es:',
+        representative: true,
+      },
+      { instrumentCode: 'S1b', questionText: 'La unidad productiva es:' },
+    ],
+    note:
+      'C1 (spec 66, Fase 3, D13.6/D15, 2026-11-12): tenencia de la tierra en ' +
+      'la finca vigente y en S1b (histórico).',
+  },
 ];
 
 export function mergeGroupsForCategory(
