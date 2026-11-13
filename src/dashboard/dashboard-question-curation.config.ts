@@ -553,6 +553,50 @@ export const QUESTION_CURATION: QuestionCurationEntry[] = [
       'comunidades NARP, LGBTIQ+, ZOMAC...). Misma decisión que S_REG; revierte ' +
       'la de agosto para S1a. Candidata al dashboard privado (D14).',
   },
+  {
+    instrumentCode: 'S1b',
+    questionText: '¿Cultiva actualmente Cacao?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-13): ' +
+      'S1b es histórico (3 respuestas en producción) y su tarjeta combinada ' +
+      'repetía «Cultivo principal» (S_REG y talleres). Decisión del usuario: ' +
+      'una sola tarjeta; las 4 preguntas Sí/No quedan para el dashboard ' +
+      'privado (D14).',
+  },
+  {
+    instrumentCode: 'S1b',
+    questionText: '¿Cultiva actualmente Café?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-13): ' +
+      'S1b es histórico (3 respuestas en producción) y su tarjeta combinada ' +
+      'repetía «Cultivo principal» (S_REG y talleres). Decisión del usuario: ' +
+      'una sola tarjeta; las 4 preguntas Sí/No quedan para el dashboard ' +
+      'privado (D14).',
+  },
+  {
+    instrumentCode: 'S1b',
+    questionText: '¿Cultiva actualmente Cannabis?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-13): ' +
+      'S1b es histórico (3 respuestas en producción) y su tarjeta combinada ' +
+      'repetía «Cultivo principal» (S_REG y talleres). Decisión del usuario: ' +
+      'una sola tarjeta; las 4 preguntas Sí/No quedan para el dashboard ' +
+      'privado (D14).',
+  },
+  {
+    instrumentCode: 'S1b',
+    questionText: '¿Cultiva actualmente Cáñamo?',
+    hidden: true,
+    note:
+      'C1 · Perfil del productor y la finca (spec 66, Fase 3, 2026-11-13): ' +
+      'S1b es histórico (3 respuestas en producción) y su tarjeta combinada ' +
+      'repetía «Cultivo principal» (S_REG y talleres). Decisión del usuario: ' +
+      'una sola tarjeta; las 4 preguntas Sí/No quedan para el dashboard ' +
+      'privado (D14).',
+  },
 ];
 
 function findEntry(
