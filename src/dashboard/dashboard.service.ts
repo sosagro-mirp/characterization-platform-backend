@@ -95,6 +95,19 @@ const DENIED_SYSTEM_FIELDS = [
   'farm.longitude',
   'farm.name',
   'farm.vereda',
+  'farm.corregimiento',
+  // Identificantes directos del productor y del propietario. Antes solo los
+  // bloqueaba el tipo `open_text`, pero los talleres capturan documento y
+  // celular como `numeric_with_unit` y `numeric`, y el endpoint público
+  // devolvía sus valores crudos en `distribution`.
+  'farmer.name',
+  'farmer.documentId',
+  'farmer.phone',
+  'farmer.email',
+  'farmer.producerName',
+  'farmer.producerDocumentId',
+  'farmer.producerPhone',
+  'farmer.producerEmail',
 ].flatMap((key) => keysFor(key));
 
 /** Spec 97 — una pregunta, más las demás que alimentan el mismo destino. */
