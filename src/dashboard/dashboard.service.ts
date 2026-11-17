@@ -1159,7 +1159,7 @@ export class DashboardService {
     const qb = this.questionRepo
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.instrumentId = :instrumentId',
@@ -1183,18 +1183,9 @@ export class DashboardService {
       .orderBy('section.order', 'ASC')
       .addOrderBy('question.order', 'ASC')
       .getMany();
-    // Spec 107 (P18-a): barrera única (denylist por locator y texto).
-    const instrumentCode = (
-      await this.instrumentRepo.findOne({ where: { instrumentId } })
-    )?.code;
-    return questions.filter((question) =>
-      isQuestionEligible({
-        text: question.text,
-        systemField: question.systemField,
-        typeName: question.type?.name,
-        instrumentCode,
-      }),
-    );
+    // Spec 107 (P18-a): barrera única (denylist por locator y texto). El código
+    // del instrumento viene en la misma consulta: sin viaje extra a la base.
+    return questions.filter((question) => this.passesBarrier(question));
   }
 
   /**
