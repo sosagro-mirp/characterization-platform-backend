@@ -230,7 +230,7 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
     expect(aggregation.units.map((u) => u.unit)).toEqual(['hectáreas', 'm²']);
   });
 
-  it('expone estadísticas solo en los grupos que alcanzan el umbral', async () => {
+  it('suprime ambos grupos cuando solo uno alcanza el umbral (supresión complementaria, P18-e)', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/dashboard/analytics')
       .query({ instrumentId })
@@ -241,25 +241,19 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
     const units = body.questions.find((q) => q.questionId === questionId)!
       .aggregation!.units;
 
-    const hectares = units.find((u) => u.optionId === optHectares)!;
-    expect(hectares.count).toBe(HECTARES.length);
-    expect(hectares.percentage).toBe(75);
-    expect(hectares.average).toBe(3.5);
-    // P24: con 6 respuestas (< 2 × umbral) no hay mediana.
-    expect(hectares.median).toBeNull();
-    expect(hectares).not.toHaveProperty('min');
-    expect(hectares).not.toHaveProperty('max');
-    expect(hectares).not.toHaveProperty('distribution');
-    expect(hectares.bins.length).toBeGreaterThan(0);
-    expect(hectares.bins[0].from).toBeNull();
-    expect(hectares.bins[hectares.bins.length - 1].to).toBeNull();
-
-    const squareMeters = units.find((u) => u.optionId === optSquareMeters)!;
-    expect(hectares.suppressed).toBe(false);
-    expect(squareMeters.suppressed).toBe(true);
-    expect(squareMeters.count).toBeNull();
-    expect(squareMeters.percentage).toBeNull();
-    expect(squareMeters.average).toBeNull();
-    expect(squareMeters.bins).toEqual([]);
+    // 6 hectáreas (visible por sí sola) y 2 m² (bajo el umbral): con el total
+    // visible, restar revelaría el grupo oculto, así que se suprimen los dos.
+    for (const optionId of [optHectares, optSquareMeters]) {
+      const group = units.find((u) => u.optionId === optionId)!;
+      expect(group.suppressed).toBe(true);
+      expect(group.count).toBeNull();
+      expect(group.percentage).toBeNull();
+      expect(group.average).toBeNull();
+      expect(group.median).toBeNull();
+      expect(group.bins).toEqual([]);
+      expect(group).not.toHaveProperty('min');
+      expect(group).not.toHaveProperty('max');
+      expect(group).not.toHaveProperty('distribution');
+    }
   });
 });

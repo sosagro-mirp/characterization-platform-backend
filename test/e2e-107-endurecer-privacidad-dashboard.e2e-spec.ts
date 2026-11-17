@@ -154,6 +154,9 @@ const CONTROL_VALUES = [
   ...Array<boolean>(CONTROL_NO).fill(false),
 ];
 
+// Criterio 15: índice de la opción elegida por cada encuesta (6 / 5 / 1).
+const CHOICE_PICKS = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2];
+
 // Identificantes (6 respuestas cada uno): valores reconocibles en el cuerpo.
 const DENYLISTED_VALUES = [
   7771001, 7771002, 7771003, 7771004, 7771005, 7771006,
@@ -371,6 +374,7 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
   let yesNoQuestionId: string;
   let complementQuestionId: string;
   let controlYesNoQuestionId: string;
+  let choiceQuestionId: string;
   let denylistedQuestionId: string;
   let textPiiQuestionId: string;
   let documentQuestionId: string;
@@ -619,6 +623,13 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
       null,
       order++,
     );
+    choiceQuestionId = await insertQuestion(
+      sectionId,
+      'single_choice',
+      'Fuente de agua (e2e 107)',
+      null,
+      order++,
+    );
     denylistedQuestionId = await insertQuestion(
       sectionId,
       'numeric',
@@ -666,6 +677,14 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
     hectaresOptionId = await insertOption(unitQuestionId, 'hectáreas');
     const documentUnitOptionId = await insertOption(documentQuestionId, 'CC');
 
+    // Criterio 15: 12 respuestas, 6 / 5 / 1. La celda de 1 se suprime y arrastra
+    // a la siguiente más pequeña visible (la de 5).
+    const choiceOptionIds = [
+      await insertOption(choiceQuestionId, 'Río'),
+      await insertOption(choiceQuestionId, 'Pozo'),
+      await insertOption(choiceQuestionId, 'Lluvia'),
+    ];
+
     for (let i = 0; i < SURVEY_COUNT; i++) {
       const [survey] = await ds.query<{ survey_id: string }[]>(
         `INSERT INTO surveys (survey_id, sincronized) VALUES (gen_random_uuid(), true)
@@ -705,6 +724,14 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
           [surveyIds[i], questionId, values[i]],
         );
       }
+    }
+
+    for (let i = 0; i < CHOICE_PICKS.length; i++) {
+      await ds.query(
+        `INSERT INTO responses (response_id, survey_id, question_id, option_id)
+         VALUES (gen_random_uuid(), $1, $2, $3)`,
+        [surveyIds[i], choiceQuestionId, choiceOptionIds[CHOICE_PICKS[i]]],
+      );
     }
 
     // Respuestas compartidas por varios criterios. La consulta por
@@ -1120,5 +1147,22 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
         name,
       );
     }
+  });
+
+  it('criterio 15 — en single_choice, si una sola celda se suprime, la siguiente más pequeña también', () => {
+    const question = served(choiceQuestionId);
+    expect(question).toBeDefined();
+    const options = (
+      question!.aggregation as unknown as {
+        options: { text: string; count: number | null; suppressed: boolean }[];
+      }
+    ).options;
+    const by = (text: string) => options.find((o) => o.text === text)!;
+    expect(by('Río').suppressed).toBe(false);
+    expect(by('Río').count).toBe(6);
+    expect(by('Lluvia').suppressed).toBe(true);
+    expect(by('Lluvia').count).toBeNull();
+    expect(by('Pozo').suppressed).toBe(true);
+    expect(by('Pozo').count).toBeNull();
   });
 });

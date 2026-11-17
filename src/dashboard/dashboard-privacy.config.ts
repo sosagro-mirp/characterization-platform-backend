@@ -205,6 +205,11 @@ export function isIdentifyingQuestionText(questionText: string): boolean {
   );
 }
 
+/** Compara textos sin importar mayúsculas ni espacios repetidos. */
+function normalizeText(text: string): string {
+  return text.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
 /** Datos mínimos de una pregunta para decidir si el dashboard puede servirla. */
 export interface EligibilityCandidate {
   text: string;
@@ -222,8 +227,9 @@ export interface EligibilityCandidate {
  * identificante.
  */
 export function isQuestionEligible(question: EligibilityCandidate): boolean {
+  // Sin tipo cargado no se puede verificar la barrera de tipo: se rechaza.
   if (
-    question.typeName &&
+    !question.typeName ||
     EXCLUDED_QUESTION_TYPES.includes(question.typeName)
   ) {
     return false;
@@ -239,7 +245,7 @@ export function isQuestionEligible(question: EligibilityCandidate): boolean {
     PII_QUESTION_DENYLIST.some(
       (entry) =>
         entry.instrumentCode === question.instrumentCode &&
-        entry.questionText === question.text,
+        normalizeText(entry.questionText) === normalizeText(question.text),
     )
   ) {
     return false;

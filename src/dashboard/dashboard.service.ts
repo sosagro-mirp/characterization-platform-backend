@@ -1617,7 +1617,8 @@ export class DashboardService {
       median: positional ? toNumberOrNull(stats?.median) : null,
       q1: positional ? toNumberOrNull(stats?.q1) : null,
       q3: positional ? toNumberOrNull(stats?.q3) : null,
-      stdDev: toNumberOrNull(stats?.stdDev),
+      // P24: la desviación estándar sigue el umbral de la mediana y los cuartiles.
+      stdDev: positional ? toNumberOrNull(stats?.stdDev) : null,
       bins,
     };
   }
@@ -1689,7 +1690,7 @@ export class DashboardService {
     // D2 (spec 66): un grupo con menos de MIN_CELL_SIZE respuestas no expone
     // ni su conteo; el orden se decide sobre el conteo real (`_rawCount`, que
     // no viaja al DTO), igual que en `aggregateChoices`.
-    const units: AggregationUnitGroupDto[] = rows
+    const units = rows
       .map((row) => {
         const rawCount = Number(row.count);
         const cell = suppressCell(
@@ -1720,7 +1721,7 @@ export class DashboardService {
           median: positional ? toNumberOrNull(row.median) : null,
           q1: positional ? toNumberOrNull(row.q1) : null,
           q3: positional ? toNumberOrNull(row.q3) : null,
-          stdDev: toNumberOrNull(row.stdDev),
+          stdDev: positional ? toNumberOrNull(row.stdDev) : null,
           // Los intervalos se calculan en el servidor; los valores no salen.
           bins: buildBins(
             (row.values ?? []).map((value) => Number(value)),
@@ -1728,10 +1729,36 @@ export class DashboardService {
           ),
         };
       })
-      .sort((a, b) => b._rawCount - a._rawCount || a.unit.localeCompare(b.unit))
-      .map(({ _rawCount: _discard, ...unitGroup }) => unitGroup);
+      .sort(
+        (a, b) => b._rawCount - a._rawCount || a.unit.localeCompare(b.unit),
+      );
 
-    return { type: 'numeric_with_unit', count: answeredCount, units };
+    // P18-e: los grupos suman `answeredCount`; con un único grupo suprimido,
+    // total − visibles revelaría cuántas respuestas usaron esa unidad.
+    const hiddenGroups = complementaryHidden(units.map((u) => u._rawCount));
+    const publicUnits: AggregationUnitGroupDto[] = units.map(
+      ({ _rawCount: _discard, ...unitGroup }, index) =>
+        hiddenGroups[index] && !unitGroup.suppressed
+          ? {
+              ...unitGroup,
+              count: null,
+              percentage: null,
+              suppressed: true,
+              average: null,
+              median: null,
+              q1: null,
+              q3: null,
+              stdDev: null,
+              bins: [],
+            }
+          : unitGroup,
+    );
+
+    return {
+      type: 'numeric_with_unit',
+      count: answeredCount,
+      units: publicUnits,
+    };
   }
 
   // ─────────────────────────── Fase 4 (spec 43) ───────────────────────────
