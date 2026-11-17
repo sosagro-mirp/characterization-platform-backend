@@ -1626,7 +1626,7 @@ export class DashboardService {
    * `numeric_with_unit`: el número va en `numericValue` y la unidad en la
    * opción elegida (spec 42). Se agrupa por unidad y no se convierte entre
    * unidades: la normalización por factor es una decisión de curaduría
-   * (spec 66). Las estadísticas y los valores crudos de un grupo solo se
+   * (spec 66). Las estadísticas y los intervalos de un grupo solo se
    * exponen si ese grupo alcanza el umbral de privacidad, igual que una
    * pregunta `numeric` suelta (D7).
    */
@@ -2250,17 +2250,19 @@ export class DashboardService {
   ): Promise<number | null> {
     const questions = await this.questionRepo
       .createQueryBuilder('question')
-      .innerJoin('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect('question.section', 'section')
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.code = :instrumentCode',
         { instrumentCode: DIGITAL_DEMAND_SOURCES.sDcuInstrumentCode },
       )
-      .innerJoin('question.type', 'type')
+      .innerJoinAndSelect('question.type', 'type')
       .where('type.name = :typeName', { typeName: 'likert' })
       .andWhere('section.name = :sectionName', { sectionName })
-      .getMany();
+      .getMany()
+      // Spec 107 (P18-a): también la demanda digital pasa por la barrera.
+      .then((found) => found.filter((q) => this.passesBarrier(q)));
 
     const means: number[] = [];
     for (const question of questions) {
@@ -2294,18 +2296,20 @@ export class DashboardService {
   ): Promise<InstitutionTrustItemDto[]> {
     const questions = await this.questionRepo
       .createQueryBuilder('question')
-      .innerJoin('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect('question.section', 'section')
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.code = :instrumentCode',
         { instrumentCode: DIGITAL_DEMAND_SOURCES.sDcuInstrumentCode },
       )
+      .leftJoinAndSelect('question.type', 'type')
       .where('section.name = :sectionName', {
         sectionName: DIGITAL_DEMAND_SOURCES.institutionTrustSection,
       })
       .orderBy('question.order', 'ASC')
-      .getMany();
+      .getMany()
+      .then((found) => found.filter((q) => this.passesBarrier(q)));
 
     const items: InstitutionTrustItemDto[] = [];
     for (const question of questions) {
