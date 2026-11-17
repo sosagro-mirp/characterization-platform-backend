@@ -597,6 +597,131 @@ export const QUESTION_CURATION: QuestionCurationEntry[] = [
       'una sola tarjeta; las 4 preguntas Sí/No quedan para el dashboard ' +
       'privado (D14).',
   },
+  {
+    instrumentCode: 'S1a',
+    questionText: 'Distancia desde el casco urbano hasta la finca (km)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S1a',
+    questionText:
+      'Tiempo de desplazamiento hasta la finca desde el casco urbano',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S1a',
+    questionText: 'Medio de acceso principal',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S1a',
+    questionText:
+      '¿Existen restricciones de acceso? (permiso por orden público)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: 'Distancia desde el casco urbano hasta la finca (km)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText:
+      'Tiempo de desplazamiento hasta la finca desde el casco urbano',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText: 'Medio de acceso principal',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText:
+      '¿Es accesible la vía durante todo el año (incluyendo épocas de lluvia)?',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_FINCA',
+    questionText:
+      '¿Existen restricciones de acceso? (permiso por orden público)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText:
+      'Tiempo de desplazamiento hasta la finca desde el casco urbano',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText: 'Medio de acceso principal (puede marcar más de una opción)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText:
+      '¿Es accesible la vía durante todo el año (incluyendo épocas de lluvia)?',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText:
+      '¿Existen restricciones de acceso? (permiso por orden público)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText:
+      'Tiempo de desplazamiento hasta la finca desde el casco urbano',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText: 'Medio de acceso principal (puede marcar más de una opción)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText:
+      '¿Es accesible la vía durante todo el año (incluyendo épocas de lluvia)?',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'TALLER-TAB',
+    questionText:
+      '¿Existen restricciones de acceso? (permiso por orden público)',
+    hidden: true,
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): decisión del usuario — el acceso a la finca no va en el dashboard público; queda para el dashboard privado (D14).',
+  },
+  {
+    instrumentCode: 'S_REG',
+    questionText: 'Departamento',
+    chartHint: 'map',
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): mapa de Colombia, fusionada con S1a (D6/D15).',
+  },
+  {
+    instrumentCode: 'TALLER',
+    questionText: 'Departamento',
+    chartHint: 'map',
+    note: 'C2 · Ubicación y acceso (spec 66, Fase 4, 2026-11-17): mapa de Colombia, fusionada con S1a (D6/D15).',
+  },
 ];
 
 function findEntry(

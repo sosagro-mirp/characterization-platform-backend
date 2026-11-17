@@ -133,6 +133,34 @@ export const QUESTION_MERGE_GROUPS: QuestionMergeGroup[] = [
       'C1 (spec 66, Fase 3, D13.6/D15, 2026-11-12): tenencia de la tierra en ' +
       'la finca vigente y en S1b (histórico).',
   },
+  {
+    categoryId: 'C2',
+    key: 'department',
+    members: [
+      {
+        instrumentCode: 'S_REG',
+        questionText: 'Departamento',
+        representative: true,
+      },
+      { instrumentCode: 'TALLER', questionText: 'Departamento' },
+      { instrumentCode: 'S1a', questionText: 'Departamento' },
+    ],
+    note: 'C2 (spec 66, Fase 4, 2026-11-17): misma pregunta y opciones en el registro, los talleres y S1a (histórico).',
+  },
+  {
+    categoryId: 'C2',
+    key: 'municipality',
+    members: [
+      {
+        instrumentCode: 'S_REG',
+        questionText: 'Municipio',
+        representative: true,
+      },
+      { instrumentCode: 'TALLER', questionText: 'Municipio' },
+      { instrumentCode: 'S1a', questionText: 'Municipio' },
+    ],
+    note: 'C2 (spec 66, Fase 4, 2026-11-17): misma pregunta en el registro, los talleres y S1a (histórico).',
+  },
 ];
 
 export function mergeGroupsForCategory(
