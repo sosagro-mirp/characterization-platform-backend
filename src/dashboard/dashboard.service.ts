@@ -68,9 +68,15 @@ import { mergeGroupsForCategory } from './dashboard-question-merge.config';
 import {
   DENIED_SYSTEM_FIELDS,
   EXCLUDED_QUESTION_TYPES,
+  isQuestionEligible,
   MIN_SAMPLE_THRESHOLD,
   suppressCell,
 } from './dashboard-privacy.config';
+import {
+  buildBins,
+  complementaryHidden,
+  positionStatsAllowed,
+} from './dashboard-binning';
 import {
   isQuestionHidden,
   resolveCuratedChartHint,
@@ -672,11 +678,13 @@ export class DashboardService {
     return this.questionRepo
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.section', 'section')
-      .innerJoin('question.type', 'type')
+      .leftJoinAndSelect('section.instrument', 'instrument')
+      .innerJoinAndSelect('question.type', 'type')
       .where('type.name = :typeName', { typeName: 'likert' })
       .andWhere('question.isDigitalDemandItem = true')
       .orderBy('question.order', 'ASC')
-      .getMany();
+      .getMany()
+      .then((questions) => questions.filter((q) => this.passesBarrier(q)));
   }
 
   /**
@@ -746,7 +754,18 @@ export class DashboardService {
         { deniedFields: DENIED_SYSTEM_FIELDS },
       )
       .orderBy('question.archivedAt', 'ASC', 'NULLS FIRST')
-      .getOne();
+      .getOne()
+      .then((question) =>
+        question &&
+        isQuestionEligible({
+          text: question.text,
+          systemField: question.systemField,
+          typeName: question.type?.name,
+          instrumentCode,
+        })
+          ? question
+          : null,
+      );
   }
 
   /** D15 exige las mismas opciones en todos los miembros; si difieren, se avisa. */
@@ -790,8 +809,8 @@ export class DashboardService {
   ): Promise<Question | null> {
     const qb = this.questionRepo
       .createQueryBuilder('question')
-      .innerJoin('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect('question.section', 'section')
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.code = :instrumentCode',
@@ -821,10 +840,12 @@ export class DashboardService {
       // Spec 97 (D-H4-12): el destino puede estar en varias preguntas (alias,
       // otros instrumentos, archivadas). La representante —la vigente primero—
       // aporta tipo y opciones; las agregaciones leen todas con `idsOf`.
-      const all = await this.findQuestionsBySystemField(
-        locator.systemField,
-        opts,
-      );
+      const all = (
+        await this.findQuestionsBySystemField(locator.systemField, {
+          ...opts,
+          withType: true,
+        })
+      ).filter((q) => this.passesBarrier(q));
       if (all.length === 0) return null;
       return Object.assign(all[0], {
         destinationQuestionIds: all.map((q) => q.questionId),
@@ -841,11 +862,13 @@ export class DashboardService {
             this.findQuestionByInstrumentAndText(
               source.instrumentCode,
               source.questionText,
-              opts,
+              { ...opts, withType: true },
             ),
           ),
         )
-      ).filter((q): q is Question => q !== null);
+      )
+        .filter((q): q is Question => q !== null)
+        .filter((q) => this.passesBarrier(q));
       if (found.length === 0) return null;
       const [representative, ...rest] = found;
       if (opts.withOptions) {
@@ -861,11 +884,23 @@ export class DashboardService {
         destinationQuestionIds: found.map((q) => q.questionId),
       });
     }
-    return this.findQuestionByInstrumentAndText(
+    const byText = await this.findQuestionByInstrumentAndText(
       locator.instrumentCode,
       locator.questionText,
-      opts,
+      { ...opts, withType: true },
     );
+    return byText && this.passesBarrier(byText) ? byText : null;
+  }
+
+  /** Spec 107 (P18-a): barrera de elegibilidad para preguntas ya cargadas
+   * (necesita `section.instrument` para la denylist por locator). */
+  private passesBarrier(question: Question): boolean {
+    return isQuestionEligible({
+      text: question.text,
+      systemField: question.systemField,
+      typeName: question.type?.name,
+      instrumentCode: question.section?.instrument?.code,
+    });
   }
 
   /**
@@ -1144,10 +1179,22 @@ export class DashboardService {
       qb.andWhere('section.name IN (:...sectionNames)', { sectionNames });
     }
 
-    return qb
+    const questions = await qb
       .orderBy('section.order', 'ASC')
       .addOrderBy('question.order', 'ASC')
       .getMany();
+    // Spec 107 (P18-a): barrera única (denylist por locator y texto).
+    const instrumentCode = (
+      await this.instrumentRepo.findOne({ where: { instrumentId } })
+    )?.code;
+    return questions.filter((question) =>
+      isQuestionEligible({
+        text: question.text,
+        systemField: question.systemField,
+        typeName: question.type?.name,
+        instrumentCode,
+      }),
+    );
   }
 
   /**
@@ -1345,12 +1392,24 @@ export class DashboardService {
     );
     const noCount = answeredCount - yesCount;
 
+    // P18-b/d: celda mínima; si una celda se suprime, la otra también (con el
+    // total visible, restar revelaría la oculta).
+    const [yesHidden, noHidden] = complementaryHidden([yesCount, noCount]);
+    const yesCell = yesHidden
+      ? { count: null, percentage: null, suppressed: true }
+      : suppressCell(yesCount, round2((yesCount / answeredCount) * 100));
+    const noCell = noHidden
+      ? { count: null, percentage: null, suppressed: true }
+      : suppressCell(noCount, round2((noCount / answeredCount) * 100));
+
     return {
       type: 'yes_no',
-      yesCount,
-      noCount,
-      yesPercentage: round2((yesCount / answeredCount) * 100),
-      noPercentage: round2((noCount / answeredCount) * 100),
+      yesCount: yesCell.count,
+      noCount: noCell.count,
+      yesPercentage: yesCell.percentage,
+      noPercentage: noCell.percentage,
+      yesSuppressed: yesCell.suppressed,
+      noSuppressed: noCell.suppressed,
     };
   }
 
@@ -1411,12 +1470,30 @@ export class DashboardService {
           ...suppressCell(rawCount, rawPercentage),
         };
       })
-      .sort((a, b) => b._rawCount - a._rawCount)
-      .map(({ _rawCount: _discard, ...option }) => option);
+      .sort((a, b) => b._rawCount - a._rawCount);
+
+    // Auditoría 95 (hallazgo 2): en single_choice y compliance las celdas
+    // suman `answeredCount`; con una sola suprimida se deduciría restando.
+    if (typeName === 'single_choice' || typeName === 'compliance') {
+      const hidden = complementaryHidden(options.map((o) => o._rawCount));
+      options.forEach((option, index) => {
+        if (hidden[index] && !option.suppressed) {
+          Object.assign(option, {
+            count: null,
+            percentage: null,
+            suppressed: true,
+          });
+        }
+      });
+    }
+
+    const publicOptions = options.map(
+      ({ _rawCount: _discard, ...option }) => option,
+    );
 
     return {
       type: typeName as 'single_choice' | 'multiple_choice' | 'compliance',
-      options,
+      options: publicOptions,
     };
   }
 
@@ -1511,37 +1588,37 @@ export class DashboardService {
         'PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY response.numericValue)',
         'q3',
       )
-      .addSelect('MIN(response.numericValue)', 'min')
-      .addSelect('MAX(response.numericValue)', 'max')
       .addSelect('STDDEV(response.numericValue)', 'stdDev')
       .getRawOne<Record<string, string | null>>();
 
-    let distribution: number[] | undefined;
-
-    // D7: el array de valores crudos solo se expone si la muestra supera el umbral de privacidad.
-    if (answeredCount >= MIN_SAMPLE_THRESHOLD) {
-      const valueRows = await this.buildResponseBaseQuery(
-        this.idsOf(question),
-        filters,
-        responseFilters,
-      )
-        .andWhere('response.numericValue IS NOT NULL')
-        .select('response.numericValue', 'value')
-        .getRawMany<{ value: string }>();
-      distribution = valueRows.map((row) => Number(row.value));
-    }
+    // P18-c/P24: los valores se leen solo para agruparlos en intervalos; nunca
+    // salen del servidor (ni la lista cruda ni el mínimo/máximo).
+    const valueRows = await this.buildResponseBaseQuery(
+      this.idsOf(question),
+      filters,
+      responseFilters,
+    )
+      .andWhere('response.numericValue IS NOT NULL')
+      .select('response.numericValue', 'value')
+      .getRawMany<{ value: string }>();
+    const bins = buildBins(
+      valueRows.map((row) => Number(row.value)),
+      answeredCount,
+    );
+    const positional = positionStatsAllowed(
+      answeredCount,
+      MIN_SAMPLE_THRESHOLD,
+    );
 
     return {
       type: 'numeric',
       count: answeredCount,
       average: toNumberOrNull(stats?.average),
-      median: toNumberOrNull(stats?.median),
-      q1: toNumberOrNull(stats?.q1),
-      q3: toNumberOrNull(stats?.q3),
-      min: toNumberOrNull(stats?.min),
-      max: toNumberOrNull(stats?.max),
+      median: positional ? toNumberOrNull(stats?.median) : null,
+      q1: positional ? toNumberOrNull(stats?.q1) : null,
+      q3: positional ? toNumberOrNull(stats?.q3) : null,
       stdDev: toNumberOrNull(stats?.stdDev),
-      distribution,
+      bins,
     };
   }
 
@@ -1593,8 +1670,6 @@ export class DashboardService {
         'PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY response.numericValue)',
         'q3',
       )
-      .addSelect('MIN(response.numericValue)', 'min')
-      .addSelect('MAX(response.numericValue)', 'max')
       .addSelect('STDDEV(response.numericValue)', 'stdDev')
       .addSelect('ARRAY_AGG(response.numericValue)', 'values')
       .groupBy(multi ? 'option.text' : 'option.optionId')
@@ -1607,8 +1682,6 @@ export class DashboardService {
         median: string | null;
         q1: string | null;
         q3: string | null;
-        min: string | null;
-        max: string | null;
         stdDev: string | null;
         values: (string | number)[] | null;
       }>();
@@ -1633,24 +1706,26 @@ export class DashboardService {
             median: null,
             q1: null,
             q3: null,
-            min: null,
-            max: null,
             stdDev: null,
+            bins: [],
           };
         }
+        const positional = positionStatsAllowed(rawCount, MIN_SAMPLE_THRESHOLD);
         return {
           optionId: row.optionId,
           unit: row.unit,
           _rawCount: rawCount,
           ...cell,
           average: toNumberOrNull(row.average),
-          median: toNumberOrNull(row.median),
-          q1: toNumberOrNull(row.q1),
-          q3: toNumberOrNull(row.q3),
-          min: toNumberOrNull(row.min),
-          max: toNumberOrNull(row.max),
+          median: positional ? toNumberOrNull(row.median) : null,
+          q1: positional ? toNumberOrNull(row.q1) : null,
+          q3: positional ? toNumberOrNull(row.q3) : null,
           stdDev: toNumberOrNull(row.stdDev),
-          distribution: (row.values ?? []).map((value) => Number(value)),
+          // Los intervalos se calculan en el servidor; los valores no salen.
+          bins: buildBins(
+            (row.values ?? []).map((value) => Number(value)),
+            rawCount,
+          ),
         };
       })
       .sort((a, b) => b._rawCount - a._rawCount || a.unit.localeCompare(b.unit))
@@ -1747,6 +1822,9 @@ export class DashboardService {
           answeredCount,
           responseFilters,
         );
+        if (aggregation.yesPercentage === null) {
+          return { ...base, value: null, suppressed: true };
+        }
         return { ...base, value: aggregation.yesPercentage, suppressed: false };
       }
 
