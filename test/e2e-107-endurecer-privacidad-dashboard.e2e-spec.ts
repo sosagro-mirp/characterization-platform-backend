@@ -375,6 +375,7 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
   let complementQuestionId: string;
   let controlYesNoQuestionId: string;
   let choiceQuestionId: string;
+  let complianceQuestionId: string;
   let denylistedQuestionId: string;
   let textPiiQuestionId: string;
   let documentQuestionId: string;
@@ -630,6 +631,13 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
       null,
       order++,
     );
+    complianceQuestionId = await insertQuestion(
+      sectionId,
+      'compliance',
+      'Cumple la norma de calidad (e2e 107)',
+      null,
+      order++,
+    );
     denylistedQuestionId = await insertQuestion(
       sectionId,
       'numeric',
@@ -685,6 +693,12 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
       await insertOption(choiceQuestionId, 'Lluvia'),
     ];
 
+    const complianceOptionIds = [
+      await insertOption(complianceQuestionId, 'Cumple'),
+      await insertOption(complianceQuestionId, 'Cumple parcialmente'),
+      await insertOption(complianceQuestionId, 'No cumple'),
+    ];
+
     for (let i = 0; i < SURVEY_COUNT; i++) {
       const [survey] = await ds.query<{ survey_id: string }[]>(
         `INSERT INTO surveys (survey_id, sincronized) VALUES (gen_random_uuid(), true)
@@ -731,6 +745,18 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
         `INSERT INTO responses (response_id, survey_id, question_id, option_id)
          VALUES (gen_random_uuid(), $1, $2, $3)`,
         [surveyIds[i], choiceQuestionId, choiceOptionIds[CHOICE_PICKS[i]]],
+      );
+    }
+
+    for (let i = 0; i < CHOICE_PICKS.length; i++) {
+      await ds.query(
+        `INSERT INTO responses (response_id, survey_id, question_id, option_id)
+         VALUES (gen_random_uuid(), $1, $2, $3)`,
+        [
+          surveyIds[i],
+          complianceQuestionId,
+          complianceOptionIds[CHOICE_PICKS[i]],
+        ],
       );
     }
 
@@ -1164,5 +1190,22 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
     expect(by('Lluvia').count).toBeNull();
     expect(by('Pozo').suppressed).toBe(true);
     expect(by('Pozo').count).toBeNull();
+  });
+
+  it('criterio 15 — lo mismo en compliance: la celda suprimida arrastra a la siguiente más pequeña', () => {
+    const question = served(complianceQuestionId);
+    expect(question).toBeDefined();
+    const options = (
+      question!.aggregation as unknown as {
+        options: { text: string; count: number | null; suppressed: boolean }[];
+      }
+    ).options;
+    const by = (text: string) => options.find((o) => o.text === text)!;
+    expect(by('Cumple').suppressed).toBe(false);
+    expect(by('Cumple').count).toBe(6);
+    expect(by('No cumple').suppressed).toBe(true);
+    expect(by('No cumple').count).toBeNull();
+    expect(by('Cumple parcialmente').suppressed).toBe(true);
+    expect(by('Cumple parcialmente').count).toBeNull();
   });
 });
