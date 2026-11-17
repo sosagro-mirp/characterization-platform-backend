@@ -11,6 +11,8 @@
  *   - cada grupo trae su conteo y su porcentaje sobre las respuestas;
  *   - las estadísticas y los valores crudos de un grupo solo se exponen si ese
  *     grupo alcanza el umbral de privacidad (5); si no, van en `null`.
+ *   - Spec 66 (D2, celda mínima): un grupo bajo el umbral tampoco expone su
+ *     conteo ni su porcentaje (`suppressed: true`), igual que una opción.
  */
 
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -23,8 +25,9 @@ import { AppModule } from '../src/app.module';
 interface UnitGroup {
   optionId: string;
   unit: string;
-  count: number;
-  percentage: number;
+  count: number | null;
+  percentage: number | null;
+  suppressed: boolean;
   average: number | null;
   median: number | null;
   min: number | null;
@@ -220,8 +223,10 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
     );
 
     const squareMeters = units.find((u) => u.optionId === optSquareMeters)!;
-    expect(squareMeters.count).toBe(SQUARE_METERS.length);
-    expect(squareMeters.percentage).toBe(25);
+    expect(hectares.suppressed).toBe(false);
+    expect(squareMeters.suppressed).toBe(true);
+    expect(squareMeters.count).toBeNull();
+    expect(squareMeters.percentage).toBeNull();
     expect(squareMeters.average).toBeNull();
     expect(squareMeters.min).toBeNull();
     expect(squareMeters.max).toBeNull();

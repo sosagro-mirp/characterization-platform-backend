@@ -65,9 +65,32 @@ export class DashboardMetadataDto {
 export class AggregationOptionDto {
   @ApiProperty() optionId: string;
   @ApiProperty() text: string;
-  @ApiProperty() count: number;
-  @ApiProperty() percentage: number;
+
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      'null si suppressed=true (spec 66, D2): la celda tiene menos de MIN_CELL_SIZE ' +
+      'respondientes y no se expone, aunque la muestra total supere el umbral global.',
+  })
+  count: number | null;
+
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null si suppressed=true, mismo criterio que count.',
+  })
+  percentage: number | null;
+
   @ApiProperty({ nullable: true, type: Number }) value: number | null;
+
+  @ApiProperty({
+    description:
+      'true si esta opción tiene menos de MIN_CELL_SIZE respondientes (spec 66, D2) ' +
+      'y por lo tanto count/percentage vienen en null. Nunca se representa como 0 ' +
+      'ni se omite del listado en silencio.',
+  })
+  suppressed: boolean;
 }
 
 export class AggregationYesNoDto {
@@ -145,16 +168,30 @@ export class AggregationUnitGroupDto {
   optionId: string;
   @ApiProperty({ description: 'Texto de la unidad (p. ej. «hectáreas»).' })
   unit: string;
-  @ApiProperty() count: number;
-  @ApiProperty({
-    description: 'Porcentaje de este grupo sobre las respuestas con valor.',
-  })
-  percentage: number;
   @ApiProperty({
     nullable: true,
     type: Number,
     description:
-      'Estadísticas del grupo: null si el grupo no alcanza el umbral de privacidad.',
+      'null si suppressed=true (spec 66, D2): el grupo tiene menos de MIN_CELL_SIZE respuestas.',
+  })
+  count: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      'Porcentaje de este grupo sobre las respuestas con valor; null si suppressed=true.',
+  })
+  percentage: number | null;
+  @ApiProperty({
+    description:
+      'true si el grupo tiene menos de MIN_CELL_SIZE respuestas (spec 66, D2): conteo, ' +
+      'porcentaje y estadísticas vienen en null. El grupo no se omite del listado.',
+  })
+  suppressed: boolean;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'Estadísticas del grupo: null si suppressed=true.',
   })
   average: number | null;
   @ApiProperty({ nullable: true, type: Number }) median: number | null;
@@ -212,6 +249,16 @@ export class DashboardQuestionDto {
 
   @ApiProperty({ required: false, nullable: true })
   systemField: string | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Gráfica curada explícitamente para esta pregunta (spec 66, D3), ' +
+      'p. ej. "harvest-calendar". Null si no se curó ninguna — el frontend ' +
+      'cae al comportamiento por tipo de pregunta.',
+  })
+  chartHint: string | null;
 
   @ApiProperty({
     description:
