@@ -214,7 +214,8 @@ function normalizeText(text: string): string {
 export interface EligibilityCandidate {
   text: string;
   systemField?: string | null;
-  typeName?: string | null;
+  /** Obligatorio: sin tipo cargado la pregunta se rechaza. */
+  typeName: string | null | undefined;
   instrumentCode?: string | null;
 }
 
