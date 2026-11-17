@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Query,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ParseUUIDPipe } from '@nestjs/common';
 import {
@@ -33,6 +34,7 @@ import {
   ProcessPublicSubmissionDto,
 } from './dto/process-public-submission.dto';
 import { SkipStepDto } from './dto/skip-step.dto';
+import { LegacyCampaignUsageInterceptor } from '../campaigns/legacy-campaign-usage.interceptor';
 import { SurveyFilters, SurveysService } from './surveys.service';
 
 @ApiTags('Surveys')
@@ -164,6 +166,8 @@ export class SurveysController {
     return this.surveysService.findAll(filters);
   }
 
+  // Spec 104 — telemetría del uso heredado (compuerta A→B).
+  @UseInterceptors(LegacyCampaignUsageInterceptor)
   @Get('check-duplicate')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)
@@ -382,6 +386,8 @@ export class SurveysController {
     return this.surveysService.overwriteSurvey(dto);
   }
 
+  // Spec 104 — telemetría del uso heredado (compuerta B→C).
+  @UseInterceptors(LegacyCampaignUsageInterceptor)
   @Post('skip-step')
   @ApiBearerAuth()
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER, ROLES.POLLSTER)

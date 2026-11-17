@@ -148,13 +148,22 @@ export class Survey {
 
   @ManyToOne(() => CampaignSession, (session) => session.surveys, {
     nullable: true,
-    onDelete: 'CASCADE',
+    onDelete: 'RESTRICT',
   })
   @JoinColumn({
     name: 'campaign_session_id',
     referencedColumnName: 'sessionId',
   })
   campaignSession?: CampaignSession;
+
+  // Spec 104 — nombre de la campaña de origen, desnormalizado (histórico).
+  @Column({
+    name: 'legacy_campaign_name',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  legacyCampaignName?: string | null;
 
   @Column({ name: 'step_order', type: 'integer', nullable: true })
   stepOrder?: number;

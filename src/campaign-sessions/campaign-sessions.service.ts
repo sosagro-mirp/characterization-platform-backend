@@ -280,9 +280,10 @@ export class CampaignSessionsService {
 
   /**
    * Borrado acotado a sesiones sin encuestas asociadas (spec 50). La guarda
-   * de encuestas NO es opcional: `surveys.campaign_session_id` es CASCADE, y
-   * `responses.survey_id` también, así que sin ella un DELETE de sesión
-   * borraría encuestas y respuestas de campo en silencio.
+   * de encuestas NO es opcional: `surveys.campaign_session_id` es RESTRICT desde
+   * el spec 104 (antes CASCADE) y `responses.survey_id` es CASCADE, así que la
+   * guarda evita un error de FK y, si alguna vez se revierte la migración, el
+   * borrado silencioso de encuestas y respuestas de campo.
    */
   async remove(sessionId: string): Promise<void> {
     await this.sessionsRepository.manager.transaction(async (manager) => {
@@ -290,8 +291,8 @@ export class CampaignSessionsService {
       // cualquier INSERT concurrente en `surveys` que la referencie (la FK
       // toma un lock KEY SHARE sobre el padre, incompatible con FOR UPDATE).
       // Sin este lock, una encuesta podría crearse entre el count() y el
-      // remove() de abajo, y el CASCADE de surveys/responses la borraría en
-      // silencio — justo lo que esta guarda existe para impedir.
+      // remove() de abajo, y el CASCADE de responses (o el de surveys, si se revierte el spec 104) la
+      // borraría en silencio — justo lo que esta guarda existe para impedir.
       const session = await manager
         .createQueryBuilder(CampaignSession, 'session')
         .setLock('pessimistic_write')

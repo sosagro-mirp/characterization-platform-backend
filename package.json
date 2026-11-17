@@ -41,6 +41,7 @@
     "public-submissions:apply": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts apply",
     "public-submissions:revert": "ts-node -r tsconfig-paths/register src/database/public-submissions/cli.ts revert",
     "spec94:verify": "ts-node -r tsconfig-paths/register src/database/spec94/verify.ts",
+    "spec104:verify": "ts-node -r tsconfig-paths/register src/database/spec104/verify.ts",
     "extraction:replay": "ts-node -r tsconfig-paths/register src/database/spec95/replay.ts"
   },
   "dependencies": {

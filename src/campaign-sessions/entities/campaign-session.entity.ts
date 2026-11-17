@@ -24,7 +24,7 @@ export class CampaignSession {
   @PrimaryGeneratedColumn('uuid', { name: 'session_id' })
   sessionId: string;
 
-  @ManyToOne(() => Campaign, { nullable: false, onDelete: 'CASCADE' })
+  @ManyToOne(() => Campaign, { nullable: false, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'campaign_id', referencedColumnName: 'campaignId' })
   campaign: Campaign;
 

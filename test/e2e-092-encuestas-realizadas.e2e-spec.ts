@@ -143,8 +143,9 @@ describe('spec-092 — encuestas realizadas del encuestador (e2e)', () => {
     createdAt?: string;
   }): Promise<string> {
     const rows = await ds.query<{ survey_id: string }[]>(
-      `INSERT INTO surveys (survey_id, sincronized, user_id, farmer_id, campaign_session_id, step_order, origin, client_survey_id, created_at)
-       VALUES (gen_random_uuid(), true, $1, $2, $3, 1, $4, $5, COALESCE($6::timestamp, CURRENT_TIMESTAMP))
+      `INSERT INTO surveys (survey_id, sincronized, user_id, farmer_id, campaign_session_id, step_order, origin, client_survey_id, created_at, legacy_campaign_name)
+       VALUES (gen_random_uuid(), true, $1, $2, $3, 1, $4, $5, COALESCE($6::timestamp, CURRENT_TIMESTAMP),
+               CASE WHEN $3::uuid IS NULL THEN NULL ELSE $7 END)
        RETURNING survey_id`,
       [
         opts.userId,
@@ -153,6 +154,7 @@ describe('spec-092 — encuestas realizadas del encuestador (e2e)', () => {
         opts.origin ?? 'field',
         opts.clientSurveyId ?? null,
         opts.createdAt ?? null,
+        CAMPAIGN_NAME,
       ],
     );
     const surveyId = rows[0].survey_id;
