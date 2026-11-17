@@ -75,11 +75,10 @@ export const DENIED_SYSTEM_FIELDS = [
 ].flatMap((key) => keysFor(key));
 
 /**
- * Registro de auditoría de preguntas identificantes por locator (D2, spec 66).
- * **No es una barrera**: el endpoint no lo consulta; lo leen el e2e de
- * privacidad y el inventario. Lo que bloquea de verdad son
- * `EXCLUDED_QUESTION_TYPES` y `DENIED_SYSTEM_FIELDS`. Hacerlo efectivo está en
- * `spec/backlog.md`.
+ * Preguntas identificantes por locator (D2, spec 66). Desde el spec 107
+ * (P18-a) es una **barrera**: `isQuestionEligible` la consulta al servir,
+ * junto con `EXCLUDED_QUESTION_TYPES`, `DENIED_SYSTEM_FIELDS` y
+ * `isIdentifyingQuestionText`.
  */
 export const PII_QUESTION_DENYLIST: PiiQuestionEntry[] = [
   {
@@ -204,6 +203,55 @@ export function isIdentifyingQuestionText(questionText: string): boolean {
   return IDENTIFYING_TEXT_PATTERNS.some((pattern) =>
     pattern.test(questionText),
   );
+}
+
+/** Compara textos sin importar mayúsculas ni espacios repetidos. */
+function normalizeText(text: string): string {
+  return text.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** Datos mínimos de una pregunta para decidir si el dashboard puede servirla. */
+export interface EligibilityCandidate {
+  text: string;
+  systemField?: string | null;
+  /** Obligatorio: sin tipo cargado la pregunta se rechaza. */
+  typeName: string | null | undefined;
+  instrumentCode?: string | null;
+}
+
+/**
+ * Spec 107 (P18-a): función única de elegibilidad. Toda selección de
+ * preguntas del dashboard (por instrumento, por categoría, locators de KPIs,
+ * filtros y demanda digital) pasa por aquí. Una pregunta NO es elegible si su
+ * tipo está excluido, su `systemField` está denegado (con alias), está en
+ * `PII_QUESTION_DENYLIST` (instrumento + texto exacto) o su texto es
+ * identificante.
+ */
+export function isQuestionEligible(question: EligibilityCandidate): boolean {
+  // Sin tipo cargado no se puede verificar la barrera de tipo: se rechaza.
+  if (
+    !question.typeName ||
+    EXCLUDED_QUESTION_TYPES.includes(question.typeName)
+  ) {
+    return false;
+  }
+  if (
+    question.systemField &&
+    DENIED_SYSTEM_FIELDS.includes(question.systemField)
+  ) {
+    return false;
+  }
+  if (
+    question.instrumentCode &&
+    PII_QUESTION_DENYLIST.some(
+      (entry) =>
+        entry.instrumentCode === question.instrumentCode &&
+        normalizeText(entry.questionText) === normalizeText(question.text),
+    )
+  ) {
+    return false;
+  }
+  return !isIdentifyingQuestionText(question.text);
 }
 
 /**

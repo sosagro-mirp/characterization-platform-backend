@@ -9,7 +9,7 @@ import type { Request } from 'express';
 import { API_KEY_SCOPES } from '../../api-keys/constants';
 import type { ApiKey } from '../../api-keys/entities/api-key.entity';
 import { IS_JWT_ONLY_KEY } from '../decorators/jwt-only.decorator';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { isPublicRequest } from '../decorators/public.decorator';
 
 interface RequestWithApiKey extends Request {
   apiKey?: ApiKey;
@@ -37,10 +37,7 @@ export class ApiKeyScopeGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const isPublic = isPublicRequest(this.reflector, context);
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<RequestWithApiKey>();

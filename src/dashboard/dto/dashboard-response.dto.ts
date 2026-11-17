@@ -95,10 +95,35 @@ export class AggregationOptionDto {
 
 export class AggregationYesNoDto {
   @ApiProperty({ enum: ['yes_no'] }) type: 'yes_no';
-  @ApiProperty() yesCount: number;
-  @ApiProperty() noCount: number;
-  @ApiProperty() yesPercentage: number;
-  @ApiProperty() noPercentage: number;
+  @ApiProperty({ nullable: true, type: Number }) yesCount: number | null;
+  @ApiProperty({ nullable: true, type: Number }) noCount: number | null;
+  @ApiProperty({ nullable: true, type: Number }) yesPercentage: number | null;
+  @ApiProperty({ nullable: true, type: Number }) noPercentage: number | null;
+  @ApiProperty({
+    description:
+      'true si «Sí» tiene menos de MIN_CELL_SIZE respuestas o si «No» se suprimió (supresión complementaria, spec 107 P18-d).',
+  })
+  yesSuppressed: boolean;
+  @ApiProperty({ description: 'Igual que yesSuppressed, para «No».' })
+  noSuppressed: boolean;
+}
+
+export class AggregationBinDto {
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null = extremo abierto inferior («menos de `to`»).',
+  })
+  from: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null = extremo abierto superior («`from` o más»).',
+  })
+  to: number | null;
+  @ApiProperty({ nullable: true, type: Number }) count: number | null;
+  @ApiProperty({ nullable: true, type: Number }) percentage: number | null;
+  @ApiProperty() suppressed: boolean;
 }
 
 export class AggregationChoicesDto {
@@ -138,29 +163,31 @@ export class AggregationNumericDto {
   @ApiProperty({ enum: ['numeric'] }) type: 'numeric';
   @ApiProperty() count: number;
   @ApiProperty({ nullable: true, type: Number }) average: number | null;
-  @ApiProperty({ nullable: true, type: Number }) median: number | null;
-  @ApiProperty({ nullable: true, type: Number }) min: number | null;
-  @ApiProperty({ nullable: true, type: Number }) max: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null con menos de 2 × MIN_SAMPLE_THRESHOLD respuestas.',
+  })
+  median: number | null;
   @ApiProperty({ nullable: true, type: Number }) stdDev: number | null;
   @ApiProperty({
     nullable: true,
     type: Number,
-    description: 'Primer cuartil (Q1), para box plot.',
+    description: 'Primer cuartil (Q1); mismo umbral que la mediana.',
   })
   q1: number | null;
   @ApiProperty({
     nullable: true,
     type: Number,
-    description: 'Tercer cuartil (Q3), para box plot.',
+    description: 'Tercer cuartil (Q3); mismo umbral que la mediana.',
   })
   q3: number | null;
   @ApiProperty({
-    required: false,
-    type: [Number],
+    type: [AggregationBinDto],
     description:
-      'Valores crudos sin identificador personal. Solo presente si count >= umbral de privacidad.',
+      'Histograma agrupado en el servidor (spec 107, P24): extremos abiertos y celda mínima por intervalo. Reemplaza a distribution/min/max.',
   })
-  distribution?: number[];
+  bins: AggregationBinDto[];
 }
 
 export class AggregationUnitGroupDto {
@@ -197,16 +224,12 @@ export class AggregationUnitGroupDto {
   @ApiProperty({ nullable: true, type: Number }) median: number | null;
   @ApiProperty({ nullable: true, type: Number }) q1: number | null;
   @ApiProperty({ nullable: true, type: Number }) q3: number | null;
-  @ApiProperty({ nullable: true, type: Number }) min: number | null;
-  @ApiProperty({ nullable: true, type: Number }) max: number | null;
   @ApiProperty({ nullable: true, type: Number }) stdDev: number | null;
   @ApiProperty({
-    required: false,
-    type: [Number],
-    description:
-      'Valores crudos del grupo. Solo presente si el grupo alcanza el umbral de privacidad.',
+    type: [AggregationBinDto],
+    description: 'Intervalos del grupo; vacío si el grupo está suprimido.',
   })
-  distribution?: number[];
+  bins: AggregationBinDto[];
 }
 
 /**

@@ -8,7 +8,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { ApiKeysService } from '../../api-keys/api-keys.service';
 import type { AuthenticatedUser } from '../decorators/current-user.decorator';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { isPublicRequest } from '../decorators/public.decorator';
 import type { ApiKey } from '../../api-keys/entities/api-key.entity';
 
 export const API_KEY_HEADER = 'x-api-key';
@@ -33,10 +33,7 @@ export class ApiKeyAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const isPublic = isPublicRequest(this.reflector, context);
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<RequestWithAuth>();

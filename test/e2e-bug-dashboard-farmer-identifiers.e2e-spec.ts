@@ -18,6 +18,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { AppModule } from '../src/app.module';
 
 interface AnalyticsBody {
@@ -43,6 +44,28 @@ describe('bug — identificantes del productor en el dashboard público (e2e)', 
   let controlQuestionId: string;
   let documentUnitOptionId: string;
   const surveyIds: string[] = [];
+
+  // Spec 107 (P20): la consulta por instrumento exige ADMIN o RESEARCHER.
+  const ADMIN_EMAIL = 'e2e-bug-farmer-ids-admin@test.local';
+  const ADMIN_PASSWORD = 'E2eTest1234!';
+  let adminToken: string;
+
+  async function createAdminToken(): Promise<string> {
+    const roles = await ds.query<{ role_id: string }[]>(
+      `SELECT role_id FROM roles WHERE name = 'admin'`,
+    );
+    await ds.query(`DELETE FROM users WHERE email = $1`, [ADMIN_EMAIL]);
+    await ds.query(
+      `INSERT INTO users (user_id, name, last_name, email, password, role_id, must_change_password)
+       VALUES (gen_random_uuid(), 'E2E', 'Bug', $1, $2, $3, false)`,
+      [ADMIN_EMAIL, await bcrypt.hash(ADMIN_PASSWORD, 10), roles[0].role_id],
+    );
+    const login = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
+      .expect(200);
+    return (login.body as { accessToken: string }).accessToken;
+  }
 
   async function insertQuestion(
     sectionId: string,
@@ -80,6 +103,7 @@ describe('bug — identificantes del productor en el dashboard público (e2e)', 
     );
     await app.init();
     ds = moduleFixture.get(DataSource);
+    adminToken = await createAdminToken();
 
     const instrumentRows = await ds.query<{ instrument_id: string }[]>(
       `INSERT INTO instruments (instrument_id, name, version, publish_date, is_active)
@@ -157,6 +181,7 @@ describe('bug — identificantes del productor en el dashboard público (e2e)', 
   });
 
   afterAll(async () => {
+    await ds.query(`DELETE FROM users WHERE email = $1`, [ADMIN_EMAIL]);
     if (surveyIds.length) {
       await ds.query(
         `DELETE FROM responses WHERE survey_id = ANY($1::uuid[])`,
@@ -197,6 +222,7 @@ describe('bug — identificantes del productor en el dashboard público (e2e)', 
     const res = await request(app.getHttpServer())
       .get('/api/dashboard/analytics')
       .query({ instrumentId })
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     const ids = (res.body as AnalyticsBody).questions.map((q) => q.questionId);
@@ -209,6 +235,7 @@ describe('bug — identificantes del productor en el dashboard público (e2e)', 
     const res = await request(app.getHttpServer())
       .get('/api/dashboard/analytics')
       .query({ instrumentId })
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     const raw = JSON.stringify(res.body);
