@@ -5,8 +5,16 @@ import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Question } from 'src/questions/entities/question.entity';
 import { DashboardService } from './dashboard.service';
 import { DashboardFiltersDto } from './dto/dashboard-filters.dto';
-import { buildBins, positionStatsAllowed } from './dashboard-binning';
-import { MIN_SAMPLE_THRESHOLD, suppressCell } from './dashboard-privacy.config';
+import {
+  buildBins,
+  complementaryHidden,
+  positionStatsAllowed,
+} from './dashboard-binning';
+import {
+  MIN_CELL_SIZE,
+  MIN_SAMPLE_THRESHOLD,
+  suppressCell,
+} from './dashboard-privacy.config';
 import {
   RESPONSE_DERIVED_FILTERS,
   findEntityMetric,
@@ -255,13 +263,20 @@ export class DashboardAggregationService {
         ignoredFilters,
       };
     }
-    const buckets = rows
+    const sorted = rows
       .map((r) => ({ id: r.id, name: r.name, raw: Number(r.count) }))
-      .sort((a, b) => b.raw - a.raw || a.name.localeCompare(b.name))
-      .map(({ raw, ...b }) => ({
-        ...b,
-        ...suppressCell(raw, round2((raw / total) * 100)),
-      }));
+      .sort((a, b) => b.raw - a.raw || a.name.localeCompare(b.name));
+    // P18-e: solo `farms_by_department` particiona el total (una finca, un
+    // departamento): con una única celda suprimida, total − visibles la revelaría.
+    const hidden =
+      metricKey === 'farms_by_department'
+        ? complementaryHidden(sorted.map((b) => b.raw))
+        : sorted.map((b) => b.raw < MIN_CELL_SIZE);
+    const buckets = sorted.map(({ raw, ...b }, i) =>
+      hidden[i]
+        ? { ...b, count: null, percentage: null, suppressed: true }
+        : { ...b, ...suppressCell(raw, round2((raw / total) * 100)) },
+    );
     return {
       answeredCount: total,
       suppressed: false,

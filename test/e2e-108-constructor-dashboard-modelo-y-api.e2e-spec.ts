@@ -1417,10 +1417,12 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
         const series = body.series[0];
         expect(series.answeredCount).toBe(6);
         expect(series.suppressed).toBe(false);
-        expect(optionOf(series, 'Café')).toEqual(
-          expect.objectContaining({ count: 5, suppressed: false }),
-        );
         // Cacao tiene 1 respuesta (< MIN_CELL_SIZE): suprimida, nunca 0 ni omitida.
+        // Supresión complementaria del 107 (P18-d): con una sola celda oculta,
+        // total − visibles la revelaría, así que Café (5) también se suprime.
+        expect(optionOf(series, 'Café')).toEqual(
+          expect.objectContaining({ count: null, suppressed: true }),
+        );
         expect(optionOf(series, 'Cacao')).toEqual(
           expect.objectContaining({ count: null, suppressed: true }),
         );
@@ -1459,7 +1461,8 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
       const series = (await preview(chart.chartId, 'public')).series;
       expect(series).toHaveLength(1);
       expect(series[0].answeredCount).toBe(8);
-      expect(optionOf(series[0], 'Café').count).toBe(7);
+      // Cacao (1) suprimida; por la complementaria del 107 (P18-d) Café (7) también.
+      expect(optionOf(series[0], 'Café').suppressed).toBe(true);
       expect(optionOf(series[0], 'Cacao').suppressed).toBe(true);
     });
   });
@@ -2096,9 +2099,18 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
           expect(body.excludedSources).toEqual([]);
           expect(body.series).toHaveLength(1);
           expect(body.series[0].suppressed).toBe(false);
-          expect(bucket(body, geo[visible])).toEqual(
-            expect.objectContaining({ count: expected, suppressed: false }),
-          );
+          if (metricKey === 'farms_by_department') {
+            // Las fincas particionan el total (una finca, un departamento):
+            // P18-e — nunca queda una única celda suprimida; el grande se
+            // oculta junto con el pequeño si no hay otra visible que lo haga.
+            expect(
+              bucketsOf(body).filter((b) => b.suppressed),
+            ).not.toHaveLength(1);
+          } else {
+            expect(bucket(body, geo[visible])).toEqual(
+              expect.objectContaining({ count: expected, suppressed: false }),
+            );
+          }
           // 2 entidades (< MIN_CELL): presente, suprimida, nunca 0 ni omitida.
           expect(bucket(body, geo[hidden])).toEqual(
             expect.objectContaining({
