@@ -192,6 +192,25 @@ describe('Spec 108 — dashboard-chart-compat', () => {
         }).ok,
       ).toBe(false);
     });
+
+    it('spec 109: el calendario ignora opciones de escape como «No aplica»', () => {
+      expect(
+        validateChartKind({
+          questionType: 'multiple_choice',
+          chartKind: 'harvest-calendar',
+          combineMode: 'merge',
+          optionTexts: [...MONTHS, 'No aplica'],
+        }).ok,
+      ).toBe(true);
+      expect(
+        validateChartKind({
+          questionType: 'multiple_choice',
+          chartKind: 'harvest-calendar',
+          combineMode: 'merge',
+          optionTexts: [...MONTHS.slice(0, 11), 'No aplica'],
+        }).ok,
+      ).toBe(false);
+    });
   });
 
   describe('P9/P10 — modo de combinación', () => {
