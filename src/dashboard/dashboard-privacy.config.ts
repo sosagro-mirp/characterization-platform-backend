@@ -294,3 +294,25 @@ export function suppressCell(
   }
   return { count, percentage, suppressed: false };
 }
+
+/**
+ * Spec 108 — motivo legible por el que `isQuestionEligible` rechaza una
+ * pregunta, o `null` si es elegible. Misma lógica que `isQuestionEligible`
+ * (que sigue siendo la fuente única de la decisión): el motivo solo explica.
+ */
+export function explainIneligibility(
+  question: EligibilityCandidate,
+): string | null {
+  if (isQuestionEligible(question)) return null;
+  if (!question.typeName) return 'La pregunta no tiene tipo cargado.';
+  if (EXCLUDED_QUESTION_TYPES.includes(question.typeName)) {
+    return `Los datos de tipo «${question.typeName}» no se pueden graficar.`;
+  }
+  if (
+    question.systemField &&
+    DENIED_SYSTEM_FIELDS.includes(question.systemField)
+  ) {
+    return 'La pregunta alimenta un dato que identifica a una persona.';
+  }
+  return 'La pregunta pide datos que identifican a una persona.';
+}
