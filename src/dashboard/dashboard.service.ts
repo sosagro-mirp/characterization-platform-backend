@@ -47,7 +47,7 @@ import {
   ResponseFilterSource,
 } from './dashboard-response-filters.config';
 import {
-  C15_KPIS,
+  DIGITAL_DEMAND_KPIS,
   DIGITAL_DEMAND_SOURCES,
   KpiDefinition,
   OVERVIEW_KPIS,
@@ -60,8 +60,28 @@ import {
   InstitutionTrustItemDto,
   LikertRankingItemDto,
 } from './dto/dashboard-digital-demand.dto';
-
-const MIN_SAMPLE_THRESHOLD = 5;
+import {
+  attachExternalIds,
+  collapseMergeGroups,
+} from './dashboard-question-merge';
+import { mergeGroupsForCategory } from './dashboard-question-merge.config';
+import {
+  DENIED_SYSTEM_FIELDS,
+  EXCLUDED_QUESTION_TYPES,
+  explainIneligibility,
+  isQuestionEligible,
+  MIN_SAMPLE_THRESHOLD,
+  suppressCell,
+} from './dashboard-privacy.config';
+import {
+  buildBins,
+  complementaryHidden,
+  positionStatsAllowed,
+} from './dashboard-binning';
+import {
+  isQuestionHidden,
+  resolveCuratedChartHint,
+} from './dashboard-question-curation.config';
 
 /**
  * Spec 43 (Fase 3): filtros globales derivados de respuestas, ya resueltos a
@@ -80,35 +100,6 @@ type ResolvedResponseFilter = {
   optionTexts?: string[];
 };
 type ResolvedResponseFilters = ResolvedResponseFilter[] | 'impossible';
-
-const EXCLUDED_QUESTION_TYPES = [
-  'open_text',
-  'image',
-  'voice_recording',
-  'document',
-  'video',
-];
-
-// Spec 97 — la denylist se expresa en claves canónicas y se expande con sus alias.
-const DENIED_SYSTEM_FIELDS = [
-  'farm.latitude',
-  'farm.longitude',
-  'farm.name',
-  'farm.vereda',
-  'farm.corregimiento',
-  // Identificantes directos del productor y del propietario. Antes solo los
-  // bloqueaba el tipo `open_text`, pero los talleres capturan documento y
-  // celular como `numeric_with_unit` y `numeric`, y el endpoint público
-  // devolvía sus valores crudos en `distribution`.
-  'farmer.name',
-  'farmer.documentId',
-  'farmer.phone',
-  'farmer.email',
-  'farmer.producerName',
-  'farmer.producerDocumentId',
-  'farmer.producerPhone',
-  'farmer.producerEmail',
-].flatMap((key) => keysFor(key));
 
 /** Spec 97 — una pregunta, más las demás que alimentan el mismo destino. */
 type DestinationQuestion = Question & { destinationQuestionIds?: string[] };
@@ -425,6 +416,28 @@ export class DashboardService {
         ));
     }
 
+    // D4 (spec 66): curaduría editorial — una pregunta oculta sigue siendo
+    // elegible por privacidad/tipo, pero se decidió con el usuario que no
+    // aporta valor analítico al dashboard público (ver
+    // dashboard-question-curation.config.ts).
+    questions = questions.filter(
+      (question) =>
+        !isQuestionHidden(
+          instrumentByQuestionId.get(question.questionId)?.code,
+          question.text,
+        ),
+    );
+
+    // D15 (spec 66): preguntas equivalentes de varios instrumentos se juntan
+    // en una sola gráfica (ver dashboard-question-merge.config.ts).
+    if (category) {
+      questions = await this.applyQuestionMerges(
+        category.id,
+        questions,
+        instrumentByQuestionId,
+      );
+    }
+
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
       // Una pregunta de un tipo sin agregación se omite y se registra: no
@@ -666,16 +679,209 @@ export class DashboardService {
     return this.questionRepo
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.section', 'section')
-      .innerJoin('question.type', 'type')
+      .leftJoinAndSelect('section.instrument', 'instrument')
+      .innerJoinAndSelect('question.type', 'type')
       .where('type.name = :typeName', { typeName: 'likert' })
       .andWhere('question.isDigitalDemandItem = true')
       .orderBy('question.order', 'ASC')
-      .getMany();
+      .getMany()
+      .then((questions) => questions.filter((q) => this.passesBarrier(q)));
+  }
+
+  /**
+   * D15 (spec 66, Fase 3): colapsa los grupos de preguntas equivalentes de la
+   * categoría y suma los miembros `external` (de otra categoría) al
+   * representante. Un grupo sin representante en la categoría no se muestra.
+   */
+  private async applyQuestionMerges(
+    categoryId: string,
+    questions: Question[],
+    instrumentByQuestionId: Map<string, Instrument>,
+  ): Promise<Question[]> {
+    const groups = mergeGroupsForCategory(categoryId);
+    if (groups.length === 0) return questions;
+    const { questions: merged, externalToFetch } = collapseMergeGroups(
+      groups,
+      questions,
+      (q) => instrumentByQuestionId.get(q.questionId)?.code,
+    );
+    for (const { member, representative } of externalToFetch) {
+      const external = await this.findEligibleQuestionByInstrumentAndText(
+        member.instrumentCode,
+        member.questionText,
+      );
+      if (!external) continue;
+      this.warnIfOptionsDiffer(representative, external);
+      attachExternalIds(representative, external.questionId);
+    }
+    for (const question of merged) {
+      const ids = (question as DestinationQuestion).destinationQuestionIds;
+      if (!ids || ids.length < 2) continue;
+      for (const other of questions) {
+        if (other === question || !ids.includes(other.questionId)) continue;
+        this.warnIfOptionsDiffer(question, other);
+      }
+    }
+    return merged;
+  }
+
+  /**
+   * Como `findQuestionByInstrumentAndText`, pero con las mismas barreras de
+   * privacidad que `getEligibleQuestions` (tipos y `systemField` bloqueados) y
+   * prefiriendo la versión no archivada. Para miembros `external` de una
+   * fusión (D15), que no pasan por la lista de su categoría.
+   */
+  private async findEligibleQuestionByInstrumentAndText(
+    instrumentCode: string,
+    text: string,
+  ): Promise<Question | null> {
+    return this.questionRepo
+      .createQueryBuilder('question')
+      .innerJoin('question.section', 'section')
+      .innerJoin(
+        'section.instrument',
+        'instrument',
+        'instrument.code = :instrumentCode',
+        { instrumentCode },
+      )
+      .innerJoinAndSelect('question.type', 'type')
+      .leftJoinAndSelect('question.options', 'options')
+      .where('question.text = :text', { text })
+      .andWhere('type.name NOT IN (:...excludedTypes)', {
+        excludedTypes: EXCLUDED_QUESTION_TYPES,
+      })
+      .andWhere(
+        '(question.systemField IS NULL OR question.systemField NOT IN (:...deniedFields))',
+        { deniedFields: DENIED_SYSTEM_FIELDS },
+      )
+      .orderBy('question.archivedAt', 'ASC', 'NULLS FIRST')
+      .getOne()
+      .then((question) =>
+        question &&
+        isQuestionEligible({
+          text: question.text,
+          systemField: question.systemField,
+          typeName: question.type?.name,
+          instrumentCode,
+        })
+          ? question
+          : null,
+      );
+  }
+
+  /** D15 exige las mismas opciones en todos los miembros; si difieren, se avisa. */
+  private warnIfOptionsDiffer(a: Question, b: Question): void {
+    const texts = (q: Question) =>
+      new Set((q.options ?? []).map((option) => option.text));
+    const ta = texts(a);
+    const tb = texts(b);
+    const diff = [...ta]
+      .filter((t) => !tb.has(t))
+      .concat([...tb].filter((t) => !ta.has(t)));
+    if (diff.length > 0) {
+      this.logger.warn(
+        `Fusión de preguntas con opciones distintas ("${a.text}" / "${b.text}"): ${diff.join(', ')}`,
+      );
+    }
   }
 
   /** Ids de las preguntas a leer para una pregunta resuelta por destino. */
   private idsOf(question: DestinationQuestion): string[] {
     return question.destinationQuestionIds ?? [question.questionId];
+  }
+
+  // ───────────── Spec 108 — puntos de entrada del constructor ─────────────
+
+  /** Motivo por el que la barrera del 107 bloquea una pregunta, o `null` si es elegible. */
+  blockedReasonFor(question: Question): string | null {
+    return explainIneligibility({
+      text: question.text,
+      systemField: question.systemField,
+      typeName: question.type?.name,
+      instrumentCode: question.section?.instrument?.code,
+    });
+  }
+
+  /**
+   * Agrega una pregunta (o las que alimentan un mismo destino, contadas por
+   * encuesta distinta) con la misma lógica, supresión y barreras del 107.
+   * Si el tipo no se puede agregar devuelve `null`.
+   */
+  async aggregateDestination(
+    question: Question,
+    destinationIds: string[],
+    filters: DashboardFiltersDto,
+    instrument?: Instrument,
+  ): Promise<DashboardQuestionDto | null> {
+    const destination = question as DestinationQuestion;
+    destination.destinationQuestionIds =
+      destinationIds.length > 1 ? destinationIds : undefined;
+    try {
+      return await this.aggregateQuestion(destination, filters, [], instrument);
+    } catch (error) {
+      if (error instanceof UnsupportedQuestionTypeError) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * Spec 108 (P16) — lo que la curaduría del 66 sirve hoy para una categoría
+   * (elegibles, sin ocultas, con las fusiones aplicadas), sin agregar datos.
+   * Insumo de la semilla `seed:dashboard-charts`.
+   */
+  async listCuratedDestinations(categoryCode: string): Promise<
+    {
+      question: Question;
+      instrument: Instrument | undefined;
+      questionIds: string[];
+      chartHint: string | null;
+    }[]
+  > {
+    const category = DASHBOARD_CATEGORIES.find((c) => c.code === categoryCode);
+    if (!category) return [];
+    const instruments = await this.getCategoryInstruments(category);
+    const { questions, instrumentByQuestionId } =
+      await this.getEligibleQuestionsForCategory(category, instruments);
+    const visible = questions.filter(
+      (q) =>
+        !isQuestionHidden(
+          instrumentByQuestionId.get(q.questionId)?.code,
+          q.text,
+        ),
+    );
+    const merged = await this.applyQuestionMerges(
+      category.id,
+      visible,
+      instrumentByQuestionId,
+    );
+    return merged.map((question) => {
+      const instrument = instrumentByQuestionId.get(question.questionId);
+      return {
+        question,
+        instrument,
+        questionIds: this.idsOf(question as DestinationQuestion),
+        chartHint: resolveCuratedChartHint(instrument?.code, question.text),
+      };
+    });
+  }
+
+  /** Valores y unidades de un destino `numeric_with_unit`, solo para normalizarlos en el servidor. */
+  async fetchUnitValues(
+    questionIds: string[],
+    filters: DashboardFiltersDto,
+  ): Promise<{ value: number; unit: string; surveyId: string }[]> {
+    const rows = await this.buildResponseBaseQuery(questionIds, filters, [])
+      .innerJoin('response.option', 'option')
+      .andWhere('response.numericValue IS NOT NULL')
+      .select('response.numericValue', 'value')
+      .addSelect('option.text', 'unit')
+      .addSelect('response.survey', 'surveyId')
+      .getRawMany<{ value: string; unit: string; surveyId: string }>();
+    return rows.map((r) => ({
+      value: Number(r.value),
+      unit: r.unit,
+      surveyId: r.surveyId,
+    }));
   }
 
   /** Cuenta filas, o encuestas distintas si el destino viene de varias preguntas. */
@@ -698,8 +904,8 @@ export class DashboardService {
   ): Promise<Question | null> {
     const qb = this.questionRepo
       .createQueryBuilder('question')
-      .innerJoin('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect('question.section', 'section')
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.code = :instrumentCode',
@@ -729,20 +935,67 @@ export class DashboardService {
       // Spec 97 (D-H4-12): el destino puede estar en varias preguntas (alias,
       // otros instrumentos, archivadas). La representante —la vigente primero—
       // aporta tipo y opciones; las agregaciones leen todas con `idsOf`.
-      const all = await this.findQuestionsBySystemField(
-        locator.systemField,
-        opts,
-      );
+      const all = (
+        await this.findQuestionsBySystemField(locator.systemField, {
+          ...opts,
+          withType: true,
+        })
+      ).filter((q) => this.passesBarrier(q));
       if (all.length === 0) return null;
       return Object.assign(all[0], {
         destinationQuestionIds: all.map((q) => q.questionId),
       });
     }
-    return this.findQuestionByInstrumentAndText(
+    if (locator.locate === 'anyOf') {
+      // Spec 66 (D13): la misma pregunta en varias fuentes (vigente primero,
+      // luego la histórica). La primera que resuelva es la representante; si se
+      // piden opciones, se le suman las de las demás por texto, para que los
+      // cortes no pierdan una opción que solo existe en otra fuente.
+      const found = (
+        await Promise.all(
+          locator.sources.map((source) =>
+            this.findQuestionByInstrumentAndText(
+              source.instrumentCode,
+              source.questionText,
+              { ...opts, withType: true },
+            ),
+          ),
+        )
+      )
+        .filter((q): q is Question => q !== null)
+        .filter((q) => this.passesBarrier(q));
+      if (found.length === 0) return null;
+      const [representative, ...rest] = found;
+      if (opts.withOptions) {
+        const texts = new Set(representative.options.map((o) => o.text));
+        for (const option of rest.flatMap((q) => q.options)) {
+          if (!texts.has(option.text)) {
+            texts.add(option.text);
+            representative.options.push(option);
+          }
+        }
+      }
+      return Object.assign(representative, {
+        destinationQuestionIds: found.map((q) => q.questionId),
+      });
+    }
+    const byText = await this.findQuestionByInstrumentAndText(
       locator.instrumentCode,
       locator.questionText,
-      opts,
+      { ...opts, withType: true },
     );
+    return byText && this.passesBarrier(byText) ? byText : null;
+  }
+
+  /** Spec 107 (P18-a): barrera de elegibilidad para preguntas ya cargadas
+   * (necesita `section.instrument` para la denylist por locator). */
+  private passesBarrier(question: Question): boolean {
+    return isQuestionEligible({
+      text: question.text,
+      systemField: question.systemField,
+      typeName: question.type?.name,
+      instrumentCode: question.section?.instrument?.code,
+    });
   }
 
   /**
@@ -1001,7 +1254,7 @@ export class DashboardService {
     const qb = this.questionRepo
       .createQueryBuilder('question')
       .leftJoinAndSelect('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.instrumentId = :instrumentId',
@@ -1021,10 +1274,13 @@ export class DashboardService {
       qb.andWhere('section.name IN (:...sectionNames)', { sectionNames });
     }
 
-    return qb
+    const questions = await qb
       .orderBy('section.order', 'ASC')
       .addOrderBy('question.order', 'ASC')
       .getMany();
+    // Spec 107 (P18-a): barrera única (denylist por locator y texto). El código
+    // del instrumento viene en la misma consulta: sin viaje extra a la base.
+    return questions.filter((question) => this.passesBarrier(question));
   }
 
   /**
@@ -1093,6 +1349,9 @@ export class DashboardService {
       systemField: question.systemField ?? null,
       isInverted,
       answeredCount,
+      // D3 (spec 66): gráfica curada explícitamente para esta pregunta, si
+      // la hay — el frontend cae al comportamiento por tipo cuando es null.
+      chartHint: resolveCuratedChartHint(instrument?.code, question.text),
       // D9 (spec 43, Fase 7): procedencia por pregunta — necesaria para que
       // una vista de categoría (que agrega varios instrumentos) pueda
       // etiquetar de dónde viene cada tarjeta.
@@ -1219,12 +1478,24 @@ export class DashboardService {
     );
     const noCount = answeredCount - yesCount;
 
+    // P18-b/d: celda mínima; si una celda se suprime, la otra también (con el
+    // total visible, restar revelaría la oculta).
+    const [yesHidden, noHidden] = complementaryHidden([yesCount, noCount]);
+    const yesCell = yesHidden
+      ? { count: null, percentage: null, suppressed: true }
+      : suppressCell(yesCount, round2((yesCount / answeredCount) * 100));
+    const noCell = noHidden
+      ? { count: null, percentage: null, suppressed: true }
+      : suppressCell(noCount, round2((noCount / answeredCount) * 100));
+
     return {
       type: 'yes_no',
-      yesCount,
-      noCount,
-      yesPercentage: round2((yesCount / answeredCount) * 100),
-      noPercentage: round2((noCount / answeredCount) * 100),
+      yesCount: yesCell.count,
+      noCount: noCell.count,
+      yesPercentage: yesCell.percentage,
+      noPercentage: noCell.percentage,
+      yesSuppressed: yesCell.suppressed,
+      noSuppressed: noCell.suppressed,
     };
   }
 
@@ -1250,15 +1521,19 @@ export class DashboardService {
     )
       .innerJoin('response.option', 'option')
       .select(
-        multi ? 'MIN(option.optionId::text)' : 'option.optionId',
+        multi ? 'MIN("option"."option_id"::text)' : 'option.optionId',
         'optionId',
       )
       .addSelect('option.text', 'text')
-      .addSelect('option.value', 'value')
+      // Con varias preguntas por destino (incluida la fusión D15) las opciones
+      // se agrupan SOLO por texto: si el `value` entrara en el agrupamiento,
+      // una opción con el mismo texto y distinto `value` saldría como dos
+      // barras y la supresión de celda se aplicaría a cada parte.
+      .addSelect(multi ? 'MIN(option.value)' : 'option.value', 'value')
       .addSelect(countExpression, 'count')
       .groupBy(multi ? 'option.text' : 'option.optionId')
       .addGroupBy('option.text')
-      .addGroupBy('option.value')
+      .addGroupBy(multi ? 'option.text' : 'option.value')
       .getRawMany<{
         optionId: string;
         text: string;
@@ -1267,18 +1542,44 @@ export class DashboardService {
       }>();
 
     const options = rows
-      .map((row) => ({
-        optionId: row.optionId,
-        text: row.text,
-        value: row.value !== null ? Number(row.value) : null,
-        count: Number(row.count),
-        percentage: round2((Number(row.count) / answeredCount) * 100),
-      }))
-      .sort((a, b) => b.count - a.count);
+      .map((row) => {
+        const rawCount = Number(row.count);
+        const rawPercentage = round2((rawCount / answeredCount) * 100);
+        return {
+          optionId: row.optionId,
+          text: row.text,
+          value: row.value !== null ? Number(row.value) : null,
+          // D2 (spec 66): orden y "top" se deciden sobre el conteo real, no
+          // sobre el valor ya suprimido — una celda suprimida no deja de
+          // existir, solo deja de mostrarse. `_rawCount` no viaja al DTO.
+          _rawCount: rawCount,
+          ...suppressCell(rawCount, rawPercentage),
+        };
+      })
+      .sort((a, b) => b._rawCount - a._rawCount);
+
+    // Auditoría 95 (hallazgo 2): en single_choice y compliance las celdas
+    // suman `answeredCount`; con una sola suprimida se deduciría restando.
+    if (typeName === 'single_choice' || typeName === 'compliance') {
+      const hidden = complementaryHidden(options.map((o) => o._rawCount));
+      options.forEach((option, index) => {
+        if (hidden[index] && !option.suppressed) {
+          Object.assign(option, {
+            count: null,
+            percentage: null,
+            suppressed: true,
+          });
+        }
+      });
+    }
+
+    const publicOptions = options.map(
+      ({ _rawCount: _discard, ...option }) => option,
+    );
 
     return {
       type: typeName as 'single_choice' | 'multiple_choice' | 'compliance',
-      options,
+      options: publicOptions,
     };
   }
 
@@ -1326,12 +1627,15 @@ export class DashboardService {
         scoredCount += count;
       }
 
+      // D2 (spec 66): meanScore arriba ya usó el conteo real (count, no
+      // suprimido) — es un agregado único legítimo sobre toda la muestra.
+      // Lo que se suprime es la exposición por nivel individual.
+      const percentage = round2((count / answeredCount) * 100);
       return {
         optionId: row.optionId,
         text: row.text,
         value: hasScore ? rawValue : null,
-        count,
-        percentage: round2((count / answeredCount) * 100),
+        ...suppressCell(count, percentage),
       };
     });
 
@@ -1370,37 +1674,38 @@ export class DashboardService {
         'PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY response.numericValue)',
         'q3',
       )
-      .addSelect('MIN(response.numericValue)', 'min')
-      .addSelect('MAX(response.numericValue)', 'max')
       .addSelect('STDDEV(response.numericValue)', 'stdDev')
       .getRawOne<Record<string, string | null>>();
 
-    let distribution: number[] | undefined;
-
-    // D7: el array de valores crudos solo se expone si la muestra supera el umbral de privacidad.
-    if (answeredCount >= MIN_SAMPLE_THRESHOLD) {
-      const valueRows = await this.buildResponseBaseQuery(
-        this.idsOf(question),
-        filters,
-        responseFilters,
-      )
-        .andWhere('response.numericValue IS NOT NULL')
-        .select('response.numericValue', 'value')
-        .getRawMany<{ value: string }>();
-      distribution = valueRows.map((row) => Number(row.value));
-    }
+    // P18-c/P24: los valores se leen solo para agruparlos en intervalos; nunca
+    // salen del servidor (ni la lista cruda ni el mínimo/máximo).
+    const valueRows = await this.buildResponseBaseQuery(
+      this.idsOf(question),
+      filters,
+      responseFilters,
+    )
+      .andWhere('response.numericValue IS NOT NULL')
+      .select('response.numericValue', 'value')
+      .getRawMany<{ value: string }>();
+    const bins = buildBins(
+      valueRows.map((row) => Number(row.value)),
+      answeredCount,
+    );
+    const positional = positionStatsAllowed(
+      answeredCount,
+      MIN_SAMPLE_THRESHOLD,
+    );
 
     return {
       type: 'numeric',
       count: answeredCount,
       average: toNumberOrNull(stats?.average),
-      median: toNumberOrNull(stats?.median),
-      q1: toNumberOrNull(stats?.q1),
-      q3: toNumberOrNull(stats?.q3),
-      min: toNumberOrNull(stats?.min),
-      max: toNumberOrNull(stats?.max),
-      stdDev: toNumberOrNull(stats?.stdDev),
-      distribution,
+      median: positional ? toNumberOrNull(stats?.median) : null,
+      q1: positional ? toNumberOrNull(stats?.q1) : null,
+      q3: positional ? toNumberOrNull(stats?.q3) : null,
+      // P24: la desviación estándar sigue el umbral de la mediana y los cuartiles.
+      stdDev: positional ? toNumberOrNull(stats?.stdDev) : null,
+      bins,
     };
   }
 
@@ -1408,7 +1713,7 @@ export class DashboardService {
    * `numeric_with_unit`: el número va en `numericValue` y la unidad en la
    * opción elegida (spec 42). Se agrupa por unidad y no se convierte entre
    * unidades: la normalización por factor es una decisión de curaduría
-   * (spec 66). Las estadísticas y los valores crudos de un grupo solo se
+   * (spec 66). Las estadísticas y los intervalos de un grupo solo se
    * exponen si ese grupo alcanza el umbral de privacidad, igual que una
    * pregunta `numeric` suelta (D7).
    */
@@ -1434,7 +1739,7 @@ export class DashboardService {
       .innerJoin('response.option', 'option')
       .andWhere('response.numericValue IS NOT NULL')
       .select(
-        multi ? 'MIN(option.optionId::text)' : 'option.optionId',
+        multi ? 'MIN("option"."option_id"::text)' : 'option.optionId',
         'optionId',
       )
       .addSelect('option.text', 'unit')
@@ -1452,8 +1757,6 @@ export class DashboardService {
         'PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY response.numericValue)',
         'q3',
       )
-      .addSelect('MIN(response.numericValue)', 'min')
-      .addSelect('MAX(response.numericValue)', 'max')
       .addSelect('STDDEV(response.numericValue)', 'stdDev')
       .addSelect('ARRAY_AGG(response.numericValue)', 'values')
       .groupBy(multi ? 'option.text' : 'option.optionId')
@@ -1466,66 +1769,104 @@ export class DashboardService {
         median: string | null;
         q1: string | null;
         q3: string | null;
-        min: string | null;
-        max: string | null;
         stdDev: string | null;
         values: (string | number)[] | null;
       }>();
 
-    const units: AggregationUnitGroupDto[] = rows
+    // D2 (spec 66): un grupo con menos de MIN_CELL_SIZE respuestas no expone
+    // ni su conteo; el orden se decide sobre el conteo real (`_rawCount`, que
+    // no viaja al DTO), igual que en `aggregateChoices`.
+    const units = rows
       .map((row) => {
-        const count = Number(row.count);
-        const percentage = round2((count / answeredCount) * 100);
-        if (count < MIN_SAMPLE_THRESHOLD) {
+        const rawCount = Number(row.count);
+        const cell = suppressCell(
+          rawCount,
+          round2((rawCount / answeredCount) * 100),
+        );
+        if (cell.suppressed) {
           return {
             optionId: row.optionId,
             unit: row.unit,
-            count,
-            percentage,
+            _rawCount: rawCount,
+            ...cell,
             average: null,
             median: null,
             q1: null,
             q3: null,
-            min: null,
-            max: null,
             stdDev: null,
+            bins: [],
           };
         }
+        const positional = positionStatsAllowed(rawCount, MIN_SAMPLE_THRESHOLD);
         return {
           optionId: row.optionId,
           unit: row.unit,
-          count,
-          percentage,
+          _rawCount: rawCount,
+          ...cell,
           average: toNumberOrNull(row.average),
-          median: toNumberOrNull(row.median),
-          q1: toNumberOrNull(row.q1),
-          q3: toNumberOrNull(row.q3),
-          min: toNumberOrNull(row.min),
-          max: toNumberOrNull(row.max),
-          stdDev: toNumberOrNull(row.stdDev),
-          distribution: (row.values ?? []).map((value) => Number(value)),
+          median: positional ? toNumberOrNull(row.median) : null,
+          q1: positional ? toNumberOrNull(row.q1) : null,
+          q3: positional ? toNumberOrNull(row.q3) : null,
+          stdDev: positional ? toNumberOrNull(row.stdDev) : null,
+          // Los intervalos se calculan en el servidor; los valores no salen.
+          bins: buildBins(
+            (row.values ?? []).map((value) => Number(value)),
+            rawCount,
+          ),
         };
       })
-      .sort((a, b) => b.count - a.count || a.unit.localeCompare(b.unit));
+      .sort(
+        (a, b) => b._rawCount - a._rawCount || a.unit.localeCompare(b.unit),
+      );
 
-    return { type: 'numeric_with_unit', count: answeredCount, units };
+    // P18-e: los grupos suman `answeredCount`; con un único grupo suprimido,
+    // total − visibles revelaría cuántas respuestas usaron esa unidad.
+    const hiddenGroups = complementaryHidden(units.map((u) => u._rawCount));
+    const publicUnits: AggregationUnitGroupDto[] = units.map(
+      ({ _rawCount: _discard, ...unitGroup }, index) =>
+        hiddenGroups[index] && !unitGroup.suppressed
+          ? {
+              ...unitGroup,
+              count: null,
+              percentage: null,
+              suppressed: true,
+              average: null,
+              median: null,
+              q1: null,
+              q3: null,
+              stdDev: null,
+              bins: [],
+            }
+          : unitGroup,
+    );
+
+    return {
+      type: 'numeric_with_unit',
+      count: answeredCount,
+      units: publicUnits,
+    };
   }
 
   // ─────────────────────────── Fase 4 (spec 43) ───────────────────────────
 
   /**
    * D5: tira de KPIs curados. Solo existen dos vistas curadas en el diseño
-   * (`categoryId=C15` → `C15_KPIS`; cualquier otro caso, incluida la vista
-   * de resumen general, → `OVERVIEW_KPIS`). `instrumentId`/`categoryId` se
-   * descartan de los filtros reales de cada KPI (cada uno ya declara su
-   * propia pregunta fuente — igual que `getOverview`, D2) y solo se usa
-   * `categoryId` para elegir qué catálogo de KPIs devolver.
+   * (`categoryId=C14` → `DIGITAL_DEMAND_KPIS`; cualquier otro caso,
+   * incluida la vista de resumen general, → `OVERVIEW_KPIS`).
+   * `instrumentId`/`categoryId` se descartan de los filtros reales de cada
+   * KPI (cada uno ya declara su propia pregunta fuente — igual que
+   * `getOverview`, D2) y solo se usa `categoryId` para elegir qué catálogo
+   * de KPIs devolver.
+   *
+   * Nota (spec 66, Fase 3, D7, 2026-08-10): era `categoryId=C15` antes de la
+   * renumeración en cascada al fusionar C1+C3.
    */
   async getKpis(filters: DashboardFiltersDto): Promise<DashboardKpiDto[]> {
     const { categoryId, instrumentId: _instrumentId, ...rest } = filters;
     await this.validateFilters(rest);
     const responseFilters = await this.resolveResponseFilters(rest);
-    const definitions = categoryId === 'C15' ? C15_KPIS : OVERVIEW_KPIS;
+    const definitions =
+      categoryId === 'C14' ? DIGITAL_DEMAND_KPIS : OVERVIEW_KPIS;
 
     const kpis: DashboardKpiDto[] = [];
     for (const definition of definitions) {
@@ -1594,6 +1935,9 @@ export class DashboardService {
           answeredCount,
           responseFilters,
         );
+        if (aggregation.yesPercentage === null) {
+          return { ...base, value: null, suppressed: true };
+        }
         return { ...base, value: aggregation.yesPercentage, suppressed: false };
       }
 
@@ -1900,12 +2244,15 @@ export class DashboardService {
             weightedSum += score * count;
             scoredCount += count;
           }
+          // D2 (spec 66): meanScore arriba ya usó el conteo real; solo se
+          // suprime la exposición por banda individual (mismo criterio que
+          // aggregateLikert, que esta función reimplementa en batch).
+          const percentage = round2((count / answeredCount) * 100);
           return {
             optionId: row.optionId,
             text: row.text,
             value: hasScore ? rawValue : null,
-            count,
-            percentage: round2((count / answeredCount) * 100),
+            ...suppressCell(count, percentage),
           };
         })
         .sort((a, b) => (a.value ?? 0) - (b.value ?? 0));
@@ -2016,17 +2363,19 @@ export class DashboardService {
   ): Promise<number | null> {
     const questions = await this.questionRepo
       .createQueryBuilder('question')
-      .innerJoin('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect('question.section', 'section')
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.code = :instrumentCode',
         { instrumentCode: DIGITAL_DEMAND_SOURCES.sDcuInstrumentCode },
       )
-      .innerJoin('question.type', 'type')
+      .innerJoinAndSelect('question.type', 'type')
       .where('type.name = :typeName', { typeName: 'likert' })
       .andWhere('section.name = :sectionName', { sectionName })
-      .getMany();
+      .getMany()
+      // Spec 107 (P18-a): también la demanda digital pasa por la barrera.
+      .then((found) => found.filter((q) => this.passesBarrier(q)));
 
     const means: number[] = [];
     for (const question of questions) {
@@ -2060,18 +2409,20 @@ export class DashboardService {
   ): Promise<InstitutionTrustItemDto[]> {
     const questions = await this.questionRepo
       .createQueryBuilder('question')
-      .innerJoin('question.section', 'section')
-      .innerJoin(
+      .innerJoinAndSelect('question.section', 'section')
+      .innerJoinAndSelect(
         'section.instrument',
         'instrument',
         'instrument.code = :instrumentCode',
         { instrumentCode: DIGITAL_DEMAND_SOURCES.sDcuInstrumentCode },
       )
+      .leftJoinAndSelect('question.type', 'type')
       .where('section.name = :sectionName', {
         sectionName: DIGITAL_DEMAND_SOURCES.institutionTrustSection,
       })
       .orderBy('question.order', 'ASC')
-      .getMany();
+      .getMany()
+      .then((found) => found.filter((q) => this.passesBarrier(q)));
 
     const items: InstitutionTrustItemDto[] = [];
     for (const question of questions) {
@@ -2143,7 +2494,7 @@ export class DashboardService {
   }
 
   /**
-   * D4: vista consolidada "Demanda digital" (C15). `instrumentId`/`categoryId`
+   * D4: vista consolidada "Demanda digital" (C14). `instrumentId`/`categoryId`
    * se descartan de los filtros reales (esta consolidación siempre cruza los
    * mismos instrumentos — S_DCU, S11 y las baterías ★ transversales — nunca
    * "otro" instrumento; mismo criterio D2 que `getOverview`/`getKpis`).

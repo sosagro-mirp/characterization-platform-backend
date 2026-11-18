@@ -11,6 +11,8 @@
  *   - cada grupo trae su conteo y su porcentaje sobre las respuestas;
  *   - las estadísticas y los valores crudos de un grupo solo se exponen si ese
  *     grupo alcanza el umbral de privacidad (5); si no, van en `null`.
+ *   - Spec 66 (D2, celda mínima): un grupo bajo el umbral tampoco expone su
+ *     conteo ni su porcentaje (`suppressed: true`), igual que una opción.
  */
 
 import { INestApplication, ValidationPipe } from '@nestjs/common';
@@ -18,18 +20,23 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { AppModule } from '../src/app.module';
 
 interface UnitGroup {
   optionId: string;
   unit: string;
-  count: number;
-  percentage: number;
+  count: number | null;
+  percentage: number | null;
+  suppressed: boolean;
   average: number | null;
   median: number | null;
-  min: number | null;
-  max: number | null;
-  distribution?: number[];
+  bins: {
+    from: number | null;
+    to: number | null;
+    count: number | null;
+    suppressed: boolean;
+  }[];
 }
 
 interface AnalyticsBody {
@@ -55,6 +62,28 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
   let optHectares: string;
   let optSquareMeters: string;
   const surveyIds: string[] = [];
+
+  // Spec 107 (P20): la consulta por instrumento exige ADMIN o RESEARCHER.
+  const ADMIN_EMAIL = 'e2e-bug-numeric-unit-admin@test.local';
+  const ADMIN_PASSWORD = 'E2eTest1234!';
+  let adminToken: string;
+
+  async function createAdminToken(): Promise<string> {
+    const roles = await ds.query<{ role_id: string }[]>(
+      `SELECT role_id FROM roles WHERE name = 'admin'`,
+    );
+    await ds.query(`DELETE FROM users WHERE email = $1`, [ADMIN_EMAIL]);
+    await ds.query(
+      `INSERT INTO users (user_id, name, last_name, email, password, role_id, must_change_password)
+       VALUES (gen_random_uuid(), 'E2E', 'Bug', $1, $2, $3, false)`,
+      [ADMIN_EMAIL, await bcrypt.hash(ADMIN_PASSWORD, 10), roles[0].role_id],
+    );
+    const login = await request(app.getHttpServer())
+      .post('/api/auth/login')
+      .send({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD })
+      .expect(200);
+    return (login.body as { accessToken: string }).accessToken;
+  }
 
   async function insertSurveyWithAnswer(
     value: number,
@@ -93,6 +122,7 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
     );
     await app.init();
     ds = moduleFixture.get(DataSource);
+    adminToken = await createAdminToken();
 
     const instrumentRows = await ds.query<{ instrument_id: string }[]>(
       `INSERT INTO instruments (instrument_id, name, version, publish_date, is_active)
@@ -140,6 +170,7 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
   });
 
   afterAll(async () => {
+    await ds.query(`DELETE FROM users WHERE email = $1`, [ADMIN_EMAIL]);
     if (surveyIds.length) {
       await ds.query(
         `DELETE FROM responses WHERE survey_id = ANY($1::uuid[])`,
@@ -180,6 +211,7 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get('/api/dashboard/analytics')
       .query({ instrumentId })
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     const body = res.body as AnalyticsBody;
@@ -198,33 +230,30 @@ describe('bug — numeric_with_unit en el dashboard (e2e)', () => {
     expect(aggregation.units.map((u) => u.unit)).toEqual(['hectáreas', 'm²']);
   });
 
-  it('expone estadísticas solo en los grupos que alcanzan el umbral', async () => {
+  it('suprime ambos grupos cuando solo uno alcanza el umbral (supresión complementaria, P18-e)', async () => {
     const res = await request(app.getHttpServer())
       .get('/api/dashboard/analytics')
       .query({ instrumentId })
+      .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
     const body = res.body as AnalyticsBody;
     const units = body.questions.find((q) => q.questionId === questionId)!
       .aggregation!.units;
 
-    const hectares = units.find((u) => u.optionId === optHectares)!;
-    expect(hectares.count).toBe(HECTARES.length);
-    expect(hectares.percentage).toBe(75);
-    expect(hectares.average).toBe(3.5);
-    expect(hectares.median).toBe(3.5);
-    expect(hectares.min).toBe(1);
-    expect(hectares.max).toBe(6);
-    expect([...(hectares.distribution ?? [])].sort((a, b) => a - b)).toEqual(
-      HECTARES,
-    );
-
-    const squareMeters = units.find((u) => u.optionId === optSquareMeters)!;
-    expect(squareMeters.count).toBe(SQUARE_METERS.length);
-    expect(squareMeters.percentage).toBe(25);
-    expect(squareMeters.average).toBeNull();
-    expect(squareMeters.min).toBeNull();
-    expect(squareMeters.max).toBeNull();
-    expect(squareMeters.distribution).toBeUndefined();
+    // 6 hectáreas (visible por sí sola) y 2 m² (bajo el umbral): con el total
+    // visible, restar revelaría el grupo oculto, así que se suprimen los dos.
+    for (const optionId of [optHectares, optSquareMeters]) {
+      const group = units.find((u) => u.optionId === optionId)!;
+      expect(group.suppressed).toBe(true);
+      expect(group.count).toBeNull();
+      expect(group.percentage).toBeNull();
+      expect(group.average).toBeNull();
+      expect(group.median).toBeNull();
+      expect(group.bins).toEqual([]);
+      expect(group).not.toHaveProperty('min');
+      expect(group).not.toHaveProperty('max');
+      expect(group).not.toHaveProperty('distribution');
+    }
   });
 });
