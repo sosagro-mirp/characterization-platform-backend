@@ -13,8 +13,14 @@ import { DashboardService, ServingFilterContext } from './dashboard.service';
 import { DashboardChart } from './entities/dashboard-chart.entity';
 import { DashboardChartSource } from './entities/dashboard-chart-source.entity';
 import { findEntityMetric } from './dashboard-entity-metrics.config';
+import {
+  privateOnlyMetricReason,
+  privateOnlyReason,
+} from './dashboard-privacy.config';
 
 export const SOURCE_BLOCKED = 'DASHBOARD_SOURCE_BLOCKED';
+/** Spec 109 (Fase 6): fuente sensible en un gráfico de audiencia pública. */
+export const SOURCE_PRIVATE_ONLY = 'DASHBOARD_SOURCE_PRIVATE_ONLY';
 export const CHART_INCOMPATIBLE = 'DASHBOARD_CHART_INCOMPATIBLE';
 
 export interface SeriesConfig {
@@ -120,9 +126,13 @@ export class DashboardChartsService {
   /**
    * Validación de escritura (crear, editar, publicar, vista previa sin
    * guardar). Lanza 400 con código. Devuelve el tipo común de las preguntas
-   * (`null` para métricas).
+   * (`null` para métricas). Con `audience: 'public'` rechaza además las
+   * fuentes que solo admiten audiencia privada (spec 109, Fase 6).
    */
-  async validate(config: ChartConfig): Promise<string | null> {
+  async validate(
+    config: ChartConfig,
+    audience?: string,
+  ): Promise<string | null> {
     if (config.sourceKind === 'entity_metric') {
       const metric = config.metricKey
         ? findEntityMetric(config.metricKey)
@@ -139,6 +149,17 @@ export class DashboardChartsService {
         throw new BadRequestException({
           code: CHART_INCOMPATIBLE,
           message: `La métrica «${metric.metricKey}» no admite el gráfico «${config.chartKind}» (permitidos: ${metric.charts.join(', ')}).`,
+        });
+      }
+      const metricReason =
+        audience === 'public'
+          ? privateOnlyMetricReason(metric.metricKey)
+          : null;
+      if (metricReason) {
+        throw new BadRequestException({
+          code: SOURCE_PRIVATE_ONLY,
+          message: `${metricReason} (métrica «${metric.metricKey}»).`,
+          blocked: [],
         });
       }
       return null;
@@ -189,6 +210,22 @@ export class DashboardChartsService {
         message: 'Hay preguntas bloqueadas por privacidad.',
         blocked,
       });
+    }
+    if (audience === 'public') {
+      const privateOnly = allIds
+        .map((id) => ({
+          questionId: id,
+          reason: privateOnlyReason(questions.get(id)!),
+        }))
+        .filter((b) => b.reason !== null);
+      if (privateOnly.length > 0) {
+        throw new BadRequestException({
+          code: SOURCE_PRIVATE_ONLY,
+          message:
+            'Hay preguntas con datos sensibles: el gráfico tiene que ser de audiencia privada.',
+          blocked: privateOnly,
+        });
+      }
     }
 
     const typeNames = new Set(allIds.map((id) => questions.get(id)!.type.name));
@@ -325,12 +362,15 @@ export class DashboardChartsService {
     config: ChartConfig,
     questions: Map<string, Question>,
     expectedType: string | null,
+    audience?: string,
   ): ExcludedSource[] {
     const out: ExcludedSource[] = [];
     for (const id of config.series.flatMap((s) => s.questionIds)) {
       const q = questions.get(id);
       if (!q) continue; // borrada: la fuente ya no existe
-      const blocked = this.dashboard.blockedReasonFor(q);
+      const blocked =
+        this.dashboard.blockedReasonFor(q) ??
+        (audience === 'public' ? privateOnlyReason(q) : null);
       if (blocked) {
         out.push({ questionId: id, reason: blocked });
       } else if (expectedType && q.type.name !== expectedType) {
@@ -349,12 +389,17 @@ export class DashboardChartsService {
   async healthOf(
     config: ChartConfig,
     expectedType: string | null,
+    audience?: string,
   ): Promise<Health> {
-    if (config.sourceKind === 'entity_metric') return 'ok';
+    if (config.sourceKind === 'entity_metric') {
+      return audience === 'public' && privateOnlyMetricReason(config.metricKey)
+        ? 'needs_review'
+        : 'ok';
+    }
     const ids = config.series.flatMap((s) => s.questionIds);
     if (ids.length === 0) return 'needs_review';
     const questions = await this.loadQuestions(ids);
-    if (this.excluded(config, questions, expectedType).length > 0) {
+    if (this.excluded(config, questions, expectedType, audience).length > 0) {
       return 'needs_review';
     }
     return config.series.some((s) => s.questionIds.length === 0)
@@ -367,9 +412,28 @@ export class DashboardChartsService {
     expectedType: string | null,
     query: Record<string, string | undefined> = {},
     ctx?: ServingFilterContext,
+    audience?: string,
   ): Promise<PreviewResult> {
     if (config.sourceKind === 'entity_metric') {
       const metric = findEntityMetric(config.metricKey!)!;
+      if (audience === 'public' && privateOnlyMetricReason(metric.metricKey)) {
+        // Spec 109 (Fase 6): dato sensible; en público no se calcula.
+        return {
+          health: 'needs_review',
+          metricKey: metric.metricKey,
+          ignoredFilters: [],
+          excludedSources: [],
+          series: [
+            {
+              seriesKey: 'metric',
+              label: metric.label,
+              answeredCount: 0,
+              suppressed: true,
+              aggregation: null,
+            },
+          ],
+        };
+      }
       const result = await this.aggregation.runEntityMetric(
         metric.metricKey,
         query,
@@ -393,7 +457,12 @@ export class DashboardChartsService {
 
     const ids = config.series.flatMap((s) => s.questionIds);
     const questions = await this.loadQuestions(ids);
-    const excludedSources = this.excluded(config, questions, expectedType);
+    const excludedSources = this.excluded(
+      config,
+      questions,
+      expectedType,
+      audience,
+    );
     const excludedIds = new Set(excludedSources.map((e) => e.questionId));
     const nwu = config.settings.numericWithUnit as
       | NumericWithUnitSettings
