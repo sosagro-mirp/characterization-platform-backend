@@ -1,4 +1,5 @@
 import {
+  Check,
   Column,
   CreateDateColumn,
   Entity,
@@ -20,6 +21,17 @@ export type DashboardChartLayout = 'normal' | 'wide';
 
 /** Spec 108 (P1, P6, P7, P9, P23) — gráfico armado por un admin. */
 @Entity({ name: 'dashboard_charts' })
+@Check(
+  'CHK_dashboard_charts_source_kind',
+  `"source_kind" IN ('questions','entity_metric')`,
+)
+@Check(
+  'CHK_dashboard_charts_combine_mode',
+  `"combine_mode" IN ('merge','compare')`,
+)
+@Check('CHK_dashboard_charts_audience', `"audience" IN ('public','private')`)
+@Check('CHK_dashboard_charts_status', `"status" IN ('draft','published')`)
+@Check('CHK_dashboard_charts_layout', `"layout" IN ('normal','wide')`)
 @Index('IDX_dashboard_charts_listing', [
   'categoryId',
   'status',

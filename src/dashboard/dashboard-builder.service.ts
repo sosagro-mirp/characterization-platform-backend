@@ -488,10 +488,27 @@ export class DashboardBuilderService {
     return this.getChart(newId);
   }
 
-  async reorderCharts(categoryId: string, chartIds: string[], userId: string) {
+  async reorderCharts(
+    categoryId: string,
+    chartIds: string[],
+    userId: string,
+    viaApiKey = false,
+  ) {
     await this.assertCategory(categoryId);
+    // Solo los gráficos que existen en esa categoría; el resto se ignora.
+    const existing = await this.chartRepo.find({ where: { categoryId } });
+    const byId = new Map(existing.map((c) => [c.chartId, c]));
+    const targets = chartIds.filter((id) => byId.has(id));
+    if (
+      viaApiKey &&
+      targets.some((id) => byId.get(id)!.status === 'published')
+    ) {
+      throw new ForbiddenException(
+        'Una API key no reordena gráficos publicados.',
+      );
+    }
     await this.ds.transaction(async (m) => {
-      for (const [index, chartId] of chartIds.entries()) {
+      for (const [index, chartId] of targets.entries()) {
         await m.update(
           DashboardChart,
           { chartId, categoryId },

@@ -1,6 +1,7 @@
 import {
   Column,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -11,6 +12,7 @@ import { DashboardChart } from './dashboard-chart.entity';
 
 /** Spec 108 (P4, P5, P9) — pregunta de una serie, con huella de instrumento y texto. */
 @Entity({ name: 'dashboard_chart_sources' })
+@Index('IDX_dashboard_chart_sources_question', ['questionId'])
 @Unique('UQ_dashboard_chart_sources_chart_question', ['chartId', 'questionId'])
 export class DashboardChartSource {
   @PrimaryGeneratedColumn('uuid', { name: 'source_id' })

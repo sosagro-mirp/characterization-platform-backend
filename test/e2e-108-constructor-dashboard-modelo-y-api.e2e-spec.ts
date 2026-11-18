@@ -616,6 +616,18 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
       likert(3),
     );
 
+    // Fusión de numeric_with_unit contada por encuesta (auditoría 103): dos
+    // preguntas respondidas por las mismas 3 encuestas.
+    for (const key of ['nwuB', 'nwuC']) {
+      await insertQuestion(
+        key,
+        B.sectionId,
+        'numeric_with_unit',
+        `Área ${key} (e2e 108 B)`,
+        [{ text: 'ha' }, { text: 'm2' }],
+      );
+    }
+
     // ── encuestas ────────────────────────────────────────────────────────
     // S0..S5 responden A; S0..S2, S6 y S7 responden B (S0..S2 responden ambos).
     for (let i = 0; i < 8; i++) {
@@ -655,6 +667,10 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
     await answer(3, 'nwuA', { option: 'm2', numeric: 10000 });
     await answer(4, 'nwuA', { option: 'm2', numeric: 20000 });
     await answer(5, 'nwuA', { option: 'cuadras', numeric: 1 });
+    for (const i of [0, 1, 2]) {
+      await answer(i, 'nwuB', { option: 'ha', numeric: i + 1 });
+      await answer(i, 'nwuC', { option: 'ha', numeric: i + 2 });
+    }
     // Identificantes (no deben ser seleccionables).
     for (const i of inA) await answer(i, 'phoneA', { numeric: 3009990000 + i });
     for (const i of inA) await answer(i, 'identA', { numeric: 3109990000 + i });
@@ -2281,6 +2297,44 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
         .send({ audience: 'private' })
         .expect(403);
       expect((await getChart(chart.chartId)).audience).toBe('public');
+    });
+
+    it('la normalización cuenta encuestas, no filas: 2 preguntas × 3 encuestas = 3 y se suprime', async () => {
+      const chart = await createChart(
+        chartBody(single([q.nwuB, q.nwuC]), {
+          chartKind: 'histogram-normalized',
+          settings: {
+            numericWithUnit: {
+              strategy: 'normalize',
+              targetUnit: 'ha',
+              factors: { ha: 1, m2: 0.0001 },
+            },
+          },
+        }),
+      );
+      const series = (await preview(chart.chartId, 'public')).series[0];
+      expect(series.answeredCount).toBe(3);
+      expect(series.suppressed).toBe(true);
+      expect(series.aggregation).toBeNull();
+    });
+
+    it('reordenar con un UUID inexistente no falla ni deja eventos espurios', async () => {
+      const chart = await createChart(chartBody(single([q.scA])));
+      await http()
+        .patch(`${BASE}/charts/reorder`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ categoryId, chartIds: [randomUUID(), chart.chartId] })
+        .expect(200);
+    });
+
+    it('una API key no reordena gráficos publicados (403)', async () => {
+      const chart = await createChart(chartBody(single([q.scA])));
+      await action(chart.chartId, 'publish').expect(okStatus);
+      await http()
+        .patch(`${BASE}/charts/reorder`)
+        .set('X-API-Key', apiKey)
+        .send({ categoryId, chartIds: [chart.chartId] })
+        .expect(403);
     });
 
     it('settings inválidos (factor no positivo, estrategia desconocida, claves extra) responden 400', async () => {

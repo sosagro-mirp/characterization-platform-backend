@@ -127,11 +127,13 @@ export class DashboardBuilderController {
   reorderCharts(
     @Body() dto: ReorderChartsDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request & { apiKey?: unknown },
   ) {
     return this.builder.reorderCharts(
       dto.categoryId,
       dto.chartIds,
       user.userId,
+      !!req.apiKey,
     );
   }
 

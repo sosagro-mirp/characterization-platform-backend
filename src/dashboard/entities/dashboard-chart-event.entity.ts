@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -18,6 +19,7 @@ export type DashboardChartEventType =
 
 /** Spec 108 (P7) — bitácora append-only de cada escritura sobre un gráfico. */
 @Entity({ name: 'dashboard_chart_events' })
+@Index('IDX_dashboard_chart_events_chart', ['chartId', 'createdAt'])
 export class DashboardChartEvent {
   @PrimaryGeneratedColumn('uuid', { name: 'event_id' })
   eventId: string;
