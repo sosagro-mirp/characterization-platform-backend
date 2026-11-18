@@ -19,8 +19,14 @@ export class ServedSeriesDto {
   @ApiProperty()
   label: string;
 
-  @ApiProperty({ example: 42 })
-  answeredCount: number;
+  @ApiProperty({
+    example: 42,
+    nullable: true,
+    type: Number,
+    description:
+      'null si la serie está suprimida (no se publica un conteo bajo el umbral).',
+  })
+  answeredCount: number | null;
 
   @ApiProperty()
   suppressed: boolean;
@@ -72,10 +78,12 @@ export class ServedChartDto {
   suppressed: boolean;
 
   @ApiProperty({
+    nullable: true,
+    type: Number,
     description:
-      'Encuestas con respuesta (en comparación, la serie con más respuestas).',
+      'Encuestas con respuesta (en comparación, la serie visible con más respuestas); null si el gráfico está suprimido.',
   })
-  answeredCount: number;
+  answeredCount: number | null;
 
   @ApiProperty({
     type: [String],
@@ -96,7 +104,7 @@ export class ServedChartDto {
   @ApiPropertyOptional({
     description: 'Normalización de unidades (P11), si aplica.',
   })
-  normalization?: { targetUnit: string; excludedCount: number };
+  normalization?: { targetUnit: string; excludedCount: number | null };
 
   @ApiProperty({ type: [ServedSeriesDto] })
   series: ServedSeriesDto[];

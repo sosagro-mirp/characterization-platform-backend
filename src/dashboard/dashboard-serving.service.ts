@@ -66,6 +66,14 @@ export function withYesNoCells(aggregation: unknown): unknown {
  */
 export const DIGITAL_DEMAND_CATEGORY_CODE = 'C14';
 
+/**
+ * Revisión 105: un conteo por debajo del umbral no se publica (diría
+ * «exactamente N productores» con filtros combinados). Se sirve `null`.
+ */
+function visibleCount(count: number, suppressed: boolean): number | null {
+  return suppressed ? null : count;
+}
+
 /** Audiencias que ve cada dashboard (P8, P19, P20). */
 export const PUBLIC_AUDIENCES: DashboardAudience[] = ['public'];
 export const PRIVATE_AUDIENCES: DashboardAudience[] = ['public', 'private'];
@@ -187,12 +195,15 @@ export class DashboardServingService {
           metricKey: result.metricKey,
           ignoredFilters: result.ignoredFilters ?? [],
           suppressed: s?.suppressed ?? true,
-          answeredCount: s?.answeredCount ?? 0,
+          answeredCount: visibleCount(
+            s?.answeredCount ?? 0,
+            s?.suppressed ?? true,
+          ),
           instrumentNames: [],
           series: result.series.map((x) => ({
             seriesKey: x.seriesKey,
             label: x.label,
-            answeredCount: x.answeredCount,
+            answeredCount: visibleCount(x.answeredCount, x.suppressed),
             suppressed: x.suppressed,
             aggregation: x.aggregation,
           })),
@@ -204,10 +215,13 @@ export class DashboardServingService {
       const valid = result.series.filter((s) => s.hasValidSources !== false);
       if (valid.length === 0) continue;
 
+      const shown = valid.filter((s) => !s.suppressed);
       const answeredCount =
-        chart.combineMode === 'merge'
-          ? valid[0].answeredCount
-          : Math.max(...valid.map((s) => s.answeredCount));
+        shown.length === 0
+          ? null
+          : chart.combineMode === 'merge'
+            ? shown[0].answeredCount
+            : Math.max(...shown.map((s) => s.answeredCount));
       served.push({
         ...base,
         suppressed: valid.every((s) => s.suppressed),
@@ -216,12 +230,20 @@ export class DashboardServingService {
           ...new Set(valid.flatMap((s) => s.instrumentNames ?? [])),
         ],
         ...(result.normalization
-          ? { normalization: result.normalization }
+          ? {
+              normalization: {
+                targetUnit: result.normalization.targetUnit,
+                excludedCount: visibleCount(
+                  result.normalization.excludedCount,
+                  result.normalization.excludedCount < MIN_SAMPLE_THRESHOLD,
+                ),
+              },
+            }
           : {}),
         series: valid.map((s) => ({
           seriesKey: s.seriesKey,
           label: s.label,
-          answeredCount: s.answeredCount,
+          answeredCount: visibleCount(s.answeredCount, s.suppressed),
           suppressed: s.suppressed,
           aggregation: withYesNoCells(s.aggregation),
         })),

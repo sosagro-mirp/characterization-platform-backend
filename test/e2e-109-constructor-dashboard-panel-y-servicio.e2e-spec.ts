@@ -777,6 +777,9 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
         const small = find(body, ch.small);
         expect(small).toBeDefined();
         expect(small?.suppressed).toBe(true);
+        // Revisión 105: el conteo bajo el umbral (3) no se publica.
+        expect(small?.answeredCount ?? null).toBeNull();
+        expect(JSON.stringify(small)).not.toMatch(/"answeredCount":3\b/);
       },
     );
 
