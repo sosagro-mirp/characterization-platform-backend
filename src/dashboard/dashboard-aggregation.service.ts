@@ -86,16 +86,30 @@ export class DashboardAggregationService {
       questionIds,
       {} as DashboardFiltersDto,
     );
+    // Una encuesta cuenta una sola vez aunque responda a varias fuentes de la
+    // fusión (criterio 15): se toma su primer valor con factor.
     const values: number[] = [];
     let excludedCount = 0;
+    const surveyRows = new Map<string, typeof rows>();
     for (const row of rows) {
-      const factor =
-        row.unit === targetUnit ? (factors[row.unit] ?? 1) : factors[row.unit];
-      if (factor === undefined || !Number.isFinite(factor)) {
-        excludedCount++;
-        continue;
+      const list = surveyRows.get(row.surveyId) ?? [];
+      list.push(row);
+      surveyRows.set(row.surveyId, list);
+    }
+    for (const list of surveyRows.values()) {
+      let picked: number | null = null;
+      for (const row of list) {
+        const factor =
+          row.unit === targetUnit
+            ? (factors[row.unit] ?? 1)
+            : factors[row.unit];
+        if (factor !== undefined && Number.isFinite(factor)) {
+          picked = row.value * factor;
+          break;
+        }
       }
-      values.push(row.value * factor);
+      if (picked === null) excludedCount++;
+      else values.push(picked);
     }
     const answeredCount = values.length;
     if (answeredCount < MIN_SAMPLE_THRESHOLD) {
@@ -266,12 +280,10 @@ export class DashboardAggregationService {
     const sorted = rows
       .map((r) => ({ id: r.id, name: r.name, raw: Number(r.count) }))
       .sort((a, b) => b.raw - a.raw || a.name.localeCompare(b.name));
-    // P18-e: solo `farms_by_department` particiona el total (una finca, un
-    // departamento): con una única celda suprimida, total − visibles la revelaría.
-    const hidden =
-      metricKey === 'farms_by_department'
-        ? complementaryHidden(sorted.map((b) => b.raw))
-        : sorted.map((b) => b.raw < MIN_CELL_SIZE);
+    // P18-e: en las métricas de conteo por categoría (cada entidad cae casi
+    // siempre en una sola celda) los buckets suman o casi suman el total: con
+    // una única celda suprimida, total − visibles la revelaría.
+    const hidden = complementaryHidden(sorted.map((b) => b.raw));
     const buckets = sorted.map(({ raw, ...b }, i) =>
       hidden[i]
         ? { ...b, count: null, percentage: null, suppressed: true }

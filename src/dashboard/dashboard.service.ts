@@ -869,14 +869,19 @@ export class DashboardService {
   async fetchUnitValues(
     questionIds: string[],
     filters: DashboardFiltersDto,
-  ): Promise<{ value: number; unit: string }[]> {
+  ): Promise<{ value: number; unit: string; surveyId: string }[]> {
     const rows = await this.buildResponseBaseQuery(questionIds, filters, [])
       .innerJoin('response.option', 'option')
       .andWhere('response.numericValue IS NOT NULL')
       .select('response.numericValue', 'value')
       .addSelect('option.text', 'unit')
-      .getRawMany<{ value: string; unit: string }>();
-    return rows.map((r) => ({ value: Number(r.value), unit: r.unit }));
+      .addSelect('response.survey', 'surveyId')
+      .getRawMany<{ value: string; unit: string; surveyId: string }>();
+    return rows.map((r) => ({
+      value: Number(r.value),
+      unit: r.unit,
+      surveyId: r.surveyId,
+    }));
   }
 
   /** Cuenta filas, o encuestas distintas si el destino viene de varias preguntas. */

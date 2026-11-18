@@ -2099,7 +2099,10 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
           expect(body.excludedSources).toEqual([]);
           expect(body.series).toHaveLength(1);
           expect(body.series[0].suppressed).toBe(false);
-          if (metricKey === 'farms_by_department') {
+          if (
+            metricKey === 'farms_by_department' ||
+            metricKey === 'farmers_by_department'
+          ) {
             // Las fincas particionan el total (una finca, un departamento):
             // P18-e — nunca queda una única celda suprimida; el grande se
             // oculta junto con el pequeño si no hay otra visible que lo haga.
@@ -2134,16 +2137,25 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
         const chart = await createMetricChart(metricKey, 'bars');
         for (const audience of ['public', 'private'] as const) {
           const body = await metricPreview(chart.chartId, audience);
-          // X: 8 activos (el archivado de B12 no cuenta); Y: 8.
-          expect(bucket(body, crop.x)).toEqual(
-            expect.objectContaining({ count: 8, suppressed: false }),
-          );
-          expect(bucket(body, crop.y)).toEqual(
-            expect.objectContaining({ count: 8, suppressed: false }),
-          );
+          // X: 8 activos (el archivado de B12 no cuenta); Y: 8; Z: pequeño.
+          // P18-e: las celdas casi suman el total, así que nunca queda una
+          // única suprimida; con Z oculta, también la siguiente más pequeña.
           expect(bucket(body, crop.z)).toEqual(
             expect.objectContaining({ count: null, suppressed: true }),
           );
+          expect(bucketsOf(body).filter((b) => b.suppressed)).not.toHaveLength(
+            1,
+          );
+          // Solo cultivos activos: el archivado no suma (8, no 9).
+          for (const id of [crop.x, crop.y]) {
+            const b = bucket(body, id);
+            if (!b.suppressed) expect(b.count).toBe(8);
+          }
+          for (const b of bucketsOf(body)) {
+            if (!b.suppressed) {
+              expect(b.count).toBeGreaterThanOrEqual(MIN_CELL);
+            }
+          }
         }
       },
     );
@@ -2241,6 +2253,79 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
       });
       expect(body.series[0].suppressed).toBe(true);
       expect(body.series[0].aggregation).toBeNull();
+    });
+  });
+
+  // ── Hallazgos de la auditoría 102 (revisión del spec 108) ────────────────
+
+  describe('Auditoría 102 — cierres de la revisión', () => {
+    it('una fusión (merge) con varias series responde 400', async () => {
+      await http()
+        .post(`${BASE}/charts`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(
+          chartBody([
+            { seriesKey: 'a', label: 'A', questionIds: [q.scA] },
+            { seriesKey: 'b', label: 'B', questionIds: [q.scB] },
+          ]),
+        )
+        .expect(400);
+    });
+
+    it('una API key no edita un gráfico publicado (403)', async () => {
+      const chart = await createChart(chartBody(single([q.scA])));
+      await action(chart.chartId, 'publish').expect(okStatus);
+      await http()
+        .patch(`${BASE}/charts/${chart.chartId}`)
+        .set('X-API-Key', apiKey)
+        .send({ audience: 'private' })
+        .expect(403);
+      expect((await getChart(chart.chartId)).audience).toBe('public');
+    });
+
+    it('settings inválidos (factor no positivo, estrategia desconocida, claves extra) responden 400', async () => {
+      for (const settings of [
+        {
+          numericWithUnit: {
+            strategy: 'normalize',
+            targetUnit: 'ha',
+            factors: { ha: 1, m2: -1 },
+          },
+        },
+        { numericWithUnit: { strategy: 'otra' } },
+        { cualquierCosa: true },
+      ]) {
+        await http()
+          .post(`${BASE}/charts`)
+          .set('Authorization', `Bearer ${adminToken}`)
+          .send(
+            chartBody(single([q.nwuA]), {
+              chartKind: 'histogram-normalized',
+              settings,
+            }),
+          )
+          .expect(400);
+      }
+    });
+
+    it('un filtro de métrica que no es UUID responde 400, no 500', async () => {
+      const res = await http()
+        .post(`${BASE}/charts`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({
+          categoryId,
+          title: `${TITLE_PREFIX} métrica filtro`,
+          sourceKind: 'entity_metric',
+          metricKey: 'farms_by_department',
+          chartKind: 'bars',
+          audience: 'public',
+        })
+        .expect(201);
+      await http()
+        .get(`${BASE}/charts/${(res.body as ChartBody).chartId}/preview`)
+        .query({ audience: 'public', departmentId: 'no-es-uuid' })
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(400);
     });
   });
 });

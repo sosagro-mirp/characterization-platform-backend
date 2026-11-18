@@ -121,6 +121,12 @@ export class DashboardChartsService {
     if (config.series.length === 0) {
       throw new BadRequestException('El gráfico necesita al menos una serie.');
     }
+    if (config.combineMode === 'merge' && config.series.length > 1) {
+      throw new BadRequestException(
+        'Una fusión (merge) tiene una sola serie; para varias series use combineMode «compare».',
+      );
+    }
+    this.validateSettings(config);
     const keys = config.series.map((s) => s.seriesKey);
     if (new Set(keys).size !== keys.length) {
       throw new BadRequestException('Las series repiten seriesKey.');
@@ -215,6 +221,72 @@ export class DashboardChartsService {
       }
     }
     return questionType;
+  }
+
+  /** `settings`: solo claves conocidas, con tipos y valores válidos. */
+  private validateSettings(config: ChartConfig): void {
+    const { optionsMismatchAck, numericWithUnit, ...unknown } = config.settings;
+    if (Object.keys(unknown).length > 0) {
+      throw new BadRequestException(
+        `settings contiene claves desconocidas: ${Object.keys(unknown).join(', ')}.`,
+      );
+    }
+    if (
+      optionsMismatchAck !== undefined &&
+      typeof optionsMismatchAck !== 'boolean'
+    ) {
+      throw new BadRequestException('optionsMismatchAck debe ser booleano.');
+    }
+    if (numericWithUnit === undefined) {
+      if (config.chartKind === 'histogram-normalized') {
+        throw new BadRequestException(
+          'histogram-normalized requiere settings.numericWithUnit con estrategia normalize.',
+        );
+      }
+      return;
+    }
+    if (typeof numericWithUnit !== 'object' || numericWithUnit === null) {
+      throw new BadRequestException('numericWithUnit debe ser un objeto.');
+    }
+    const { strategy, targetUnit, factors, ...extra } =
+      numericWithUnit as Record<string, unknown>;
+    if (Object.keys(extra).length > 0) {
+      throw new BadRequestException(
+        `numericWithUnit contiene claves desconocidas: ${Object.keys(extra).join(', ')}.`,
+      );
+    }
+    if (strategy !== 'by_unit' && strategy !== 'normalize') {
+      throw new BadRequestException('strategy debe ser by_unit o normalize.');
+    }
+    if (strategy === 'normalize') {
+      if (typeof targetUnit !== 'string' || targetUnit.length === 0) {
+        throw new BadRequestException('normalize requiere targetUnit.');
+      }
+      if (typeof factors !== 'object' || factors === null) {
+        throw new BadRequestException('normalize requiere factors.');
+      }
+      for (const [unit, factor] of Object.entries(factors)) {
+        if (
+          typeof factor !== 'number' ||
+          !Number.isFinite(factor) ||
+          factor <= 0
+        ) {
+          throw new BadRequestException(
+            `El factor de «${unit}» debe ser un número positivo.`,
+          );
+        }
+      }
+    }
+    if (
+      (config.chartKind === 'histogram-normalized') !==
+        (strategy === 'normalize') &&
+      (config.chartKind === 'histogram-normalized' ||
+        config.chartKind === 'histogram-by-unit')
+    ) {
+      throw new BadRequestException(
+        'El gráfico y la estrategia de unidades se contradicen.',
+      );
+    }
   }
 
   /** Fuentes que hoy no se pueden usar (bloqueadas o de otro tipo). */

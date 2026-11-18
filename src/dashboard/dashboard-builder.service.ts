@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -40,6 +41,8 @@ import {
 } from './dto/builder/builder.dto';
 
 const OVERVIEW_CODE = 'OVERVIEW';
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class DashboardBuilderService {
@@ -402,8 +405,18 @@ export class DashboardBuilderService {
     return this.getChart(id);
   }
 
-  async updateChart(id: string, dto: UpdateChartDto, userId: string) {
+  async updateChart(
+    id: string,
+    dto: UpdateChartDto,
+    userId: string,
+    viaApiKey = false,
+  ) {
     const chart = await this.getChartEntity(id);
+    if (viaApiKey && chart.status === 'published') {
+      throw new ForbiddenException(
+        'Una API key no edita gráficos publicados: despublique con JWT primero.',
+      );
+    }
     const current = this.toConfig(chart, await this.sourcesOf(id));
     const config: ChartConfig = {
       sourceKind: chart.sourceKind,
@@ -418,10 +431,15 @@ export class DashboardBuilderService {
 
     await this.ds.transaction(async (m) => {
       const changed = Object.keys(dto);
+      const movedCategory =
+        dto.categoryId !== undefined && dto.categoryId !== chart.categoryId;
       Object.assign(chart, {
         categoryId: dto.categoryId ?? chart.categoryId,
+        position: movedCategory
+          ? await this.nextPosition(m, dto.categoryId!)
+          : chart.position,
         title: dto.title ?? chart.title,
-        subtitle: dto.subtitle ?? chart.subtitle,
+        subtitle: 'subtitle' in dto ? (dto.subtitle ?? null) : chart.subtitle,
         questionType,
         chartKind: config.chartKind,
         combineMode: config.combineMode,
@@ -479,6 +497,10 @@ export class DashboardBuilderService {
           { chartId, categoryId },
           { position: index, updatedBy: userId },
         );
+        await this.event(m, chartId, 'updated', userId, {
+          fields: ['position'],
+          position: index,
+        });
       }
     });
     return this.listCharts({ categoryId });
@@ -550,6 +572,12 @@ export class DashboardBuilderService {
     query: Record<string, string | undefined>,
   ): Promise<PreviewResult> {
     this.assertAudience(audience);
+    for (const key of ['departmentId', 'townId', 'cropId']) {
+      const value = query[key];
+      if (value !== undefined && !UUID_RE.test(value)) {
+        throw new BadRequestException(`${key} debe ser un UUID.`);
+      }
+    }
     const chart = await this.getChartEntity(id);
     const config = this.toConfig(chart, await this.sourcesOf(id));
     return this.charts.preview(config, chart.questionType, query);

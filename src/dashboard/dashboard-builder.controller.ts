@@ -8,7 +8,9 @@ import {
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -145,8 +147,9 @@ export class DashboardBuilderController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateChartDto,
     @CurrentUser() user: AuthenticatedUser,
+    @Req() req: Request & { apiKey?: unknown },
   ) {
-    return this.builder.updateChart(id, dto, user.userId);
+    return this.builder.updateChart(id, dto, user.userId, !!req.apiKey);
   }
 
   @Post('charts/:id/duplicate')
