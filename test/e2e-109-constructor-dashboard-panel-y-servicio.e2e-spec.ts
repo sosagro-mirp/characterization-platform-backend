@@ -735,10 +735,17 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
         'kpis',
         'digital-demand',
       ]) {
-        const res = await http()
-          .get(`/api/dashboard/${route}`)
-          .query({ categoryId: 'C1' });
-        expect({ route, status: res.status }).toEqual({ route, status: 410 });
+        // Un código existente o uno inexistente: 410, nunca 404 ni 200.
+        for (const categoryId of ['C1', 'NO_EXISTE']) {
+          const res = await http()
+            .get(`/api/dashboard/${route}`)
+            .query({ categoryId });
+          expect({ route, categoryId, status: res.status }).toEqual({
+            route,
+            categoryId,
+            status: 410,
+          });
+        }
       }
     });
 

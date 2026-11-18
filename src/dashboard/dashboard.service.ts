@@ -1615,16 +1615,10 @@ export class DashboardService {
   // ─────────────────────────── Fase 4 (spec 43) ───────────────────────────
 
   /**
-   * D5: tira de KPIs curados. Solo existen dos vistas curadas en el diseño
-   * (`categoryId=C14` → `DIGITAL_DEMAND_KPIS`; cualquier otro caso,
-   * incluida la vista de resumen general, → `OVERVIEW_KPIS`).
-   * `instrumentId`/`categoryId` se descartan de los filtros reales de cada
-   * KPI (cada uno ya declara su propia pregunta fuente — igual que
-   * `getOverview`, D2) y solo se usa `categoryId` para elegir qué catálogo
-   * de KPIs devolver.
-   *
-   * Nota (spec 66, Fase 3, D7, 2026-08-10): era `categoryId=C15` antes de la
-   * renumeración en cascada al fusionar C1+C3.
+   * D5: tira de KPIs del resumen general (`OVERVIEW_KPIS`). Desde el spec
+   * 109 (Fase 6) `categoryId` responde 410 y ya no elige la tira de demanda
+   * digital. `instrumentId` se descarta de los filtros reales de cada KPI
+   * (cada uno declara su propia pregunta fuente, igual que `getOverview`).
    */
   async getKpis(filters: DashboardFiltersDto): Promise<DashboardKpiDto[]> {
     this.rejectLegacyCategory(filters);
