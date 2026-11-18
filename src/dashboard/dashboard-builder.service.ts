@@ -18,6 +18,7 @@ import {
 import {
   ChartConfig,
   DashboardChartsService,
+  chartConfigFrom,
   PreviewResult,
   SeriesConfig,
 } from './dashboard-charts.service';
@@ -184,24 +185,7 @@ export class DashboardBuilderService {
     chart: DashboardChart,
     sources: DashboardChartSource[],
   ): ChartConfig {
-    const bySeries = new Map<string, SeriesConfig>();
-    for (const s of sources) {
-      const entry = bySeries.get(s.seriesKey) ?? {
-        seriesKey: s.seriesKey,
-        label: s.seriesLabel,
-        questionIds: [],
-      };
-      entry.questionIds.push(s.questionId);
-      bySeries.set(s.seriesKey, entry);
-    }
-    return {
-      sourceKind: chart.sourceKind,
-      chartKind: chart.chartKind,
-      combineMode: chart.combineMode,
-      settings: chart.settings ?? {},
-      metricKey: chart.entityMetricKey,
-      series: [...bySeries.values()],
-    };
+    return chartConfigFrom(chart, sources);
   }
 
   private async toBody(

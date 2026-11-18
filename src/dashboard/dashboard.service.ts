@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  GoneException,
   Injectable,
   Logger,
   NotFoundException,
@@ -33,7 +34,6 @@ import {
   DashboardResponseDto,
 } from './dto/dashboard-response.dto';
 import { keysFor } from '../questions/system-fields/system-field-registry';
-import { DashboardCategoryDto } from './dto/dashboard-category.dto';
 import {
   DASHBOARD_CATEGORIES,
   DashboardCategoryConfig,
@@ -91,7 +91,7 @@ import {
  * `applySurveyFilters` fuerza cero resultados en vez de ignorar el filtro
  * (mismo criterio que `categoryInstrumentIds` vacío).
  */
-type ResolvedResponseFilter = {
+export type ResolvedResponseFilter = {
   key: string;
   /** Spec 97: todas las preguntas que alimentan el destino (alias y otros instrumentos). */
   questionIds: string[];
@@ -99,7 +99,19 @@ type ResolvedResponseFilter = {
   range?: { min?: number; max?: number };
   optionTexts?: string[];
 };
-type ResolvedResponseFilters = ResolvedResponseFilter[] | 'impossible';
+export type ResolvedResponseFilters = ResolvedResponseFilter[] | 'impossible';
+
+/**
+ * Spec 109 — filtros globales ya validados y resueltos una sola vez por
+ * request, para servir todos los gráficos de una categoría.
+ */
+export interface ServingFilterContext {
+  /** Filtros sin `instrumentId` ni `categoryId` (los gráficos no se acotan por instrumento). */
+  filters: DashboardFiltersDto;
+  responseFilters: ResolvedResponseFilters;
+  /** Encuestas que cumplen los filtros (supresión global). */
+  totalCount: number;
+}
 
 /** Spec 97 — una pregunta, más las demás que alimentan el mismo destino. */
 type DestinationQuestion = Question & { destinationQuestionIds?: string[] };
@@ -344,6 +356,14 @@ export class DashboardService {
   async getAnalytics(
     filters: DashboardFiltersDto,
   ): Promise<DashboardResponseDto> {
+    // Spec 109 (P20): la ruta pública por categoría «todas las elegibles»
+    // (opt-out) se retira; el dashboard sirve gráficos configurados en
+    // `GET /dashboard/charts?categoryId=`.
+    if (filters.categoryId) {
+      throw new GoneException(
+        'La consulta por categoría se retiró: use GET /api/dashboard/charts?categoryId=<código>.',
+      );
+    }
     const {
       instrument,
       category,
@@ -803,6 +823,30 @@ export class DashboardService {
   }
 
   /**
+   * Spec 109 — valida los filtros globales (404 si un UUID no existe), resuelve
+   * los derivados de respuestas y cuenta la muestra, una vez por request. Los
+   * gráficos no se acotan por instrumento ni por la categoría del config.
+   */
+  async resolveServingContext(
+    raw: DashboardFiltersDto,
+  ): Promise<ServingFilterContext> {
+    const {
+      instrumentId: _instrumentId,
+      categoryId: _categoryId,
+      ...rest
+    } = raw;
+    const filters = rest as DashboardFiltersDto;
+    await this.validateFilters(filters);
+    const responseFilters = await this.resolveResponseFilters(filters);
+    const totalCount = await this.buildFilteredSurveyQuery(
+      filters,
+      undefined,
+      responseFilters,
+    ).getCount();
+    return { filters, responseFilters, totalCount };
+  }
+
+  /**
    * Agrega una pregunta (o las que alimentan un mismo destino, contadas por
    * encuesta distinta) con la misma lógica, supresión y barreras del 107.
    * Si el tipo no se puede agregar devuelve `null`.
@@ -812,12 +856,18 @@ export class DashboardService {
     destinationIds: string[],
     filters: DashboardFiltersDto,
     instrument?: Instrument,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<DashboardQuestionDto | null> {
     const destination = question as DestinationQuestion;
     destination.destinationQuestionIds =
       destinationIds.length > 1 ? destinationIds : undefined;
     try {
-      return await this.aggregateQuestion(destination, filters, [], instrument);
+      return await this.aggregateQuestion(
+        destination,
+        filters,
+        responseFilters,
+        instrument,
+      );
     } catch (error) {
       if (error instanceof UnsupportedQuestionTypeError) return null;
       throw error;
@@ -869,8 +919,13 @@ export class DashboardService {
   async fetchUnitValues(
     questionIds: string[],
     filters: DashboardFiltersDto,
+    responseFilters: ResolvedResponseFilters = [],
   ): Promise<{ value: number; unit: string; surveyId: string }[]> {
-    const rows = await this.buildResponseBaseQuery(questionIds, filters, [])
+    const rows = await this.buildResponseBaseQuery(
+      questionIds,
+      filters,
+      responseFilters,
+    )
       .innerJoin('response.option', 'option')
       .andWhere('response.numericValue IS NOT NULL')
       .select('response.numericValue', 'value')
@@ -1281,48 +1336,6 @@ export class DashboardService {
     // Spec 107 (P18-a): barrera única (denylist por locator y texto). El código
     // del instrumento viene en la misma consulta: sin viaje extra a la base.
     return questions.filter((question) => this.passesBarrier(question));
-  }
-
-  /**
-   * Fase 1 (Spec 43): catálogo de categorías con instrumentos activos y
-   * conteo de preguntas visualizables. D1: catálogo estático → instrumentos
-   * activos → secciones → preguntas, reutilizando `getEligibleQuestions`.
-   */
-  async getCategories(): Promise<DashboardCategoryDto[]> {
-    const results: DashboardCategoryDto[] = [];
-
-    for (const category of DASHBOARD_CATEGORIES) {
-      const mappingByCode = new Map(
-        category.instruments.map((mapping) => [
-          mapping.instrumentCode,
-          mapping,
-        ]),
-      );
-
-      const activeInstruments = await this.getCategoryInstruments(category);
-
-      let questionCount = 0;
-      for (const instrument of activeInstruments) {
-        const mapping = instrument.code
-          ? mappingByCode.get(instrument.code)
-          : undefined;
-        const questions = await this.getEligibleQuestions(
-          instrument.instrumentId,
-          mapping?.sectionNames,
-        );
-        questionCount += questions.length;
-      }
-
-      results.push({
-        id: category.id,
-        code: category.code,
-        name: category.name,
-        instrumentCount: activeInstruments.length,
-        questionCount,
-      });
-    }
-
-    return results;
   }
 
   private async aggregateQuestion(

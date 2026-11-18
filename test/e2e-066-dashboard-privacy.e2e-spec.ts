@@ -49,11 +49,20 @@ interface DashboardQuestion {
   aggregation: { options?: DashboardOption[] } | null;
 }
 
-interface DashboardResponse {
-  metadata: { totalCount: number };
+/** Spec 109: cuerpo de `GET /dashboard/charts`. */
+interface ServedChartsBody {
   suppressed: boolean;
-  reason?: string;
-  questions: DashboardQuestion[];
+  charts: {
+    chartId: string;
+    title: string;
+    sourceKind: string;
+    chartKind: string;
+    questionType: string | null;
+    series: {
+      suppressed: boolean;
+      aggregation: { options?: DashboardOption[] } | null;
+    }[];
+  }[];
 }
 
 /**
@@ -83,13 +92,27 @@ async function fetchAllCategoryQuestions(
     .expect(200);
   const categories = categoriesRes.body as DashboardCategory[];
 
+  // Spec 109: el público sirve gráficos configurados; cada serie se trata
+  // como una «pregunta servida» (título del gráfico como enunciado).
   const questions: DashboardQuestion[] = [];
   for (const category of categories) {
     const res = await request(server)
-      .get('/api/dashboard/analytics')
-      .query({ categoryId: category.id })
+      .get('/api/dashboard/charts')
+      .query({ categoryId: category.code })
       .expect(200);
-    questions.push(...(res.body as DashboardResponse).questions);
+    for (const chart of (res.body as ServedChartsBody).charts) {
+      for (const series of chart.series) {
+        questions.push({
+          questionId: chart.chartId,
+          questionText: chart.title,
+          questionType: chart.questionType ?? '',
+          systemField: null,
+          sectionName: '',
+          suppressed: series.suppressed,
+          aggregation: series.aggregation,
+        });
+      }
+    }
   }
   return questions;
 }
@@ -233,22 +256,29 @@ describe('e2e-066 — Privacidad del dashboard público', () => {
 
   describe('Supresión por muestra insuficiente (criterio 3)', () => {
     it('un filtro sin muestra suficiente suprime la respuesta entera', async () => {
-      // `departmentName`/`cropName` no son filtros válidos (el DTO usa IDs,
-      // ver `dashboard-filters.dto.ts`) y un `departmentId` inexistente
-      // devuelve 404, no una respuesta suprimida — se usa en su lugar una
-      // categoría con cero encuestas reales hoy en el entorno de desarrollo
-      // (C4 "Suelo, clima y fertilización" — S3, todavía inactivo en dev —,
-      // verificado antes de este test; era "Cultivos y variedades" antes de
-      // la renumeración en cascada de spec 66, Fase 3, D7, 2026-08-10).
+      // Spec 109: con la ruta por categoría retirada, se usa `/charts` de la
+      // primera categoría pública con un rango de fechas sin encuestas.
+      const categoriesRes = await request(server)
+        .get('/api/dashboard/categories')
+        .expect(200);
+      const [first] = categoriesRes.body as DashboardCategory[];
+      expect(first).toBeDefined();
       const res = await request(server)
-        .get('/api/dashboard/analytics')
-        .query({ categoryId: 'C4' })
+        .get('/api/dashboard/charts')
+        .query({ categoryId: first.code, dateFrom: '2099-01-01' })
         .expect(200);
 
-      const body = res.body as DashboardResponse;
+      const body = res.body as ServedChartsBody;
       expect(body.suppressed).toBe(true);
-      expect(body.questions).toEqual([]);
-      expect(body.reason).toBeTruthy();
+      for (const chart of body.charts) {
+        // Las métricas de entidad no aceptan filtros de respuestas (P13 del
+        // 108): los declaran en `ignoredFilters` y no se suprimen por ellos.
+        if (chart.sourceKind === 'entity_metric') continue;
+        for (const series of chart.series) {
+          expect(series.suppressed).toBe(true);
+          expect(series.aggregation).toBeNull();
+        }
+      }
     });
 
     it('una celda por debajo del umbral se marca suprimida, nunca como cero', () => {
@@ -278,15 +308,22 @@ describe('e2e-066 — Privacidad del dashboard público', () => {
       }
     });
 
-    it('cuando una pregunta declara chartHint, viaja en el DTO', () => {
-      const questions = allQuestions;
-
-      // Al menos una pregunta curada debe declarar su gráfica explícitamente;
-      // el resto puede venir con chartHint null (fallback por tipo).
-      const withHint = questions.filter(
-        (q) => typeof q.chartHint === 'string' && q.chartHint.length > 0,
-      );
-      expect(withHint.length).toBeGreaterThan(0);
+    // Spec 109: la gráfica la declara el gráfico configurado (`chartKind`),
+    // no una curaduría por pregunta (`chartHint`).
+    it('cada gráfico servido declara su chartKind', async () => {
+      const categoriesRes = await request(server)
+        .get('/api/dashboard/categories')
+        .expect(200);
+      for (const category of categoriesRes.body as DashboardCategory[]) {
+        const res = await request(server)
+          .get('/api/dashboard/charts')
+          .query({ categoryId: category.code })
+          .expect(200);
+        for (const chart of (res.body as ServedChartsBody).charts) {
+          expect(typeof chart.chartKind).toBe('string');
+          expect(chart.chartKind.length).toBeGreaterThan(0);
+        }
+      }
     });
   });
 });

@@ -19,7 +19,11 @@ import { DashboardAggregationService } from './dashboard-aggregation.service';
 import { DashboardBuilderController } from './dashboard-builder.controller';
 import { DashboardBuilderService } from './dashboard-builder.service';
 import { DashboardChartsService } from './dashboard-charts.service';
-import { DashboardController } from './dashboard.controller';
+import {
+  DashboardController,
+  DashboardPrivateController,
+} from './dashboard.controller';
+import { DashboardServingService } from './dashboard-serving.service';
 import { DashboardService } from './dashboard.service';
 
 @Module({
@@ -42,12 +46,17 @@ import { DashboardService } from './dashboard.service';
       DashboardChartEvent,
     ]),
   ],
-  controllers: [DashboardController, DashboardBuilderController],
+  controllers: [
+    DashboardController,
+    DashboardPrivateController,
+    DashboardBuilderController,
+  ],
   providers: [
     DashboardService,
     DashboardAggregationService,
     DashboardChartsService,
     DashboardBuilderService,
+    DashboardServingService,
   ],
 })
 export class DashboardModule {}

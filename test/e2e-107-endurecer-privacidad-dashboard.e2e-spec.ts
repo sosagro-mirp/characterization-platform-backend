@@ -245,8 +245,43 @@ interface OverviewBody {
   experienceYears: Record<string, unknown> | null;
 }
 
+/** Spec 109: la lista pública de categorías sale del constructor (`code`). */
 interface DashboardCategory {
-  id: string;
+  code: string;
+}
+
+/** Spec 109: cuerpo de `GET /dashboard/charts`. */
+interface ServedChartsBody {
+  suppressed: boolean;
+  charts: {
+    title: string;
+    questionType: string | null;
+    suppressed: boolean;
+    answeredCount: number;
+    series: {
+      suppressed: boolean;
+      answeredCount: number;
+      aggregation: Record<string, unknown> | null;
+    }[];
+  }[];
+}
+
+/** Aplana los gráficos servidos a la forma por pregunta que usan estos casos. */
+function chartsAsAnalytics(body: ServedChartsBody): AnalyticsBody {
+  return {
+    suppressed: body.suppressed,
+    questions: body.charts.flatMap((chart) =>
+      chart.series.map((series) => ({
+        questionId: '',
+        questionText: chart.title,
+        questionType: chart.questionType ?? '',
+        systemField: null,
+        suppressed: series.suppressed,
+        answeredCount: series.answeredCount,
+        aggregation: series.aggregation,
+      })),
+    ),
+  };
 }
 
 // ─── utilidades ─────────────────────────────────────────────────────────────
@@ -779,11 +814,14 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
     const categoriesRes = await http()
       .get('/api/dashboard/categories')
       .expect(200);
+    // Spec 109: el público sirve gráficos configurados por categoría.
     for (const category of categoriesRes.body as DashboardCategory[]) {
       const res = await http()
-        .get('/api/dashboard/analytics')
-        .query({ categoryId: category.id });
-      if (res.status === 200) categoryBodies.push(res.body as AnalyticsBody);
+        .get('/api/dashboard/charts')
+        .query({ categoryId: category.code });
+      if (res.status === 200) {
+        categoryBodies.push(chartsAsAnalytics(res.body as ServedChartsBody));
+      }
       allBodies.push(JSON.stringify(res.body));
     }
   });
@@ -1023,15 +1061,14 @@ describe('e2e-107 — Endurecer la privacidad del dashboard', () => {
     });
   });
 
-  it('criterio 9 — analytics?categoryId= sigue respondiendo sin token', async () => {
+  // Spec 109 (P20): la ruta opt-out por categoría se retiró; el público
+  // consulta `GET /dashboard/charts`, que responde sin token.
+  it('criterio 9 — analytics?categoryId= se retiró y /charts responde sin token', async () => {
     const res = await http()
       .get('/api/dashboard/analytics')
-      .query({ categoryId: 'C1' })
-      .expect(200);
-    const body = res.body as AnalyticsBody;
-    expect(Array.isArray(body.questions)).toBe(true);
-    expect(typeof body.suppressed).toBe('boolean');
-    // Todas las categorías respondieron 200 sin token en el beforeAll.
+      .query({ categoryId: 'C1' });
+    expect(res.status).not.toBe(200);
+    // Todas las categorías públicas respondieron 200 sin token en el beforeAll.
     expect(categoryBodies.length).toBe(allBodies.length - 3);
   });
 
