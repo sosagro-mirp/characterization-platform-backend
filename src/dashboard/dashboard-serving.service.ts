@@ -173,6 +173,7 @@ export class DashboardServingService {
         chart.questionType,
         query,
         ctx,
+        chart.audience,
       );
 
       const base = {

@@ -350,3 +350,42 @@ export function explainIneligibility(
   }
   return 'Identifica al productor: la pregunta pide datos que identifican a una persona.';
 }
+
+/**
+ * Spec 109 (Fase 6, decisión del usuario del 2026-11-18, tras TC-109-026) —
+ * preguntas que se pueden graficar solo con audiencia privada: la pertenencia
+ * a grupos o territorios (NARP, LGBTIQ+, ZOMAC; datos sensibles, Ley 1581) y
+ * las áreas del predio (cuasi-identificantes en municipios pequeños). El
+ * constructor rechaza un gráfico público con ellas y el servicio público las
+ * excluye; la analítica privada y los gráficos privados las conservan.
+ */
+const PRIVATE_ONLY_SYSTEM_FIELDS = ['farm.area'].flatMap((key) => keysFor(key));
+const PRIVATE_ONLY_TEXT_PATTERNS: RegExp[] = [
+  /pertenece el productor a alguno de los siguientes grupos o territorios/,
+  // «Área total del predio», «Área cultivada con las cadenas…», «Hectáreas
+  // totales del predio», «Hectáreas actualmente cultivadas…», «¿Cuál es el
+  // área del predio que está actualmente cultivada?».
+  /\b(area|hectareas)\b.*\b(predio|cultivad[ao]s?)\b/,
+];
+
+export const PRIVATE_ONLY_REASON =
+  'Dato sensible: solo se puede usar en gráficos de audiencia privada.';
+
+/** Motivo por el que una pregunta no puede ir en un gráfico público, o `null`. */
+export function privateOnlyReason(question: {
+  text: string;
+  systemField?: string | null;
+}): string | null {
+  if (
+    question.systemField &&
+    PRIVATE_ONLY_SYSTEM_FIELDS.includes(question.systemField)
+  ) {
+    return PRIVATE_ONLY_REASON;
+  }
+  const text = normalizeText(question.text)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+  return PRIVATE_ONLY_TEXT_PATTERNS.some((re) => re.test(text))
+    ? PRIVATE_ONLY_REASON
+    : null;
+}

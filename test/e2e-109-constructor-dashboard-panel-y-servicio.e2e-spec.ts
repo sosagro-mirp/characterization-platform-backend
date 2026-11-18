@@ -120,6 +120,7 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
   let pollsterToken: string;
 
   let instrumentId: string;
+  let sectionId: string;
   const surveyIds: string[] = [];
   const categoryIds: string[] = [];
 
@@ -401,6 +402,7 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
         i + 1,
       );
     }
+    sectionId = section.section_id;
     q.unused = await insertYesNo(
       section.section_id,
       UNUSED_TEXT,
@@ -1002,6 +1004,90 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
       expect(typeof e.userName).toBe('string');
       expect((e.userName ?? '').length).toBeGreaterThan(0);
     }
+  });
+
+  // ── Fase 6 — preguntas sensibles solo en audiencia privada ──────────────
+
+  describe('Fase 6 — datos sensibles solo en gráficos privados', () => {
+    const SENSITIVE_TEXT = `¿Pertenece el productor a alguno de los siguientes grupos o territorios? ${RUN}`;
+
+    it('rechaza un gráfico público con una pregunta sensible y admite el privado', async () => {
+      q.sensitive = await insertYesNo(sectionId, SENSITIVE_TEXT, 90);
+      const base = {
+        categoryId: cat.a.id,
+        title: `Spec109 sensible ${RUN}`,
+        sourceKind: 'questions',
+        combineMode: 'merge',
+        chartKind: 'donut',
+        layout: 'normal',
+        series: [{ seriesKey: 's1', label: 'x', questionIds: [q.sensitive] }],
+      };
+      const pub = await http()
+        .post(`${BUILDER}/charts`)
+        .set(auth(adminToken))
+        .send({ ...base, audience: 'public' });
+      expect(pub.status).toBe(400);
+      expect((pub.body as { code?: string }).code).toBe(
+        'DASHBOARD_SOURCE_PRIVATE_ONLY',
+      );
+
+      const priv = await http()
+        .post(`${BUILDER}/charts`)
+        .set(auth(adminToken))
+        .send({ ...base, audience: 'private' })
+        .expect(201);
+      const chartId = (priv.body as { chartId: string }).chartId;
+
+      // Pasarlo a público también se rechaza.
+      const patch = await http()
+        .patch(`${BUILDER}/charts/${chartId}`)
+        .set(auth(adminToken))
+        .send({ audience: 'public' });
+      expect(patch.status).toBe(400);
+
+      // El catálogo lo avisa sin bloquearla.
+      const catalog = await http()
+        .get(`${BUILDER}/questions`)
+        .query({ ids: q.sensitive })
+        .set(auth(adminToken))
+        .expect(200);
+      const [item] = catalog.body as {
+        selectable: boolean;
+        privateOnlyReason: string | null;
+      }[];
+      expect(item.selectable).toBe(true);
+      expect(item.privateOnlyReason).toEqual(expect.any(String));
+    });
+
+    it('un gráfico público cuya fuente pasa a ser sensible la excluye al servir', async () => {
+      q.turnsSensitive = await insertYesNo(
+        sectionId,
+        `Spec109 se vuelve sensible ${RUN}`,
+        91,
+      );
+      await answer(q.turnsSensitive, range(0, SURVEYS - 1));
+      const chartId = await publishedChart(
+        cat.a.id,
+        `Spec109 público que se vuelve sensible ${RUN}`,
+        'public',
+        [q.turnsSensitive],
+      );
+      await ds.query(`UPDATE questions SET text = $1 WHERE question_id = $2`, [
+        `Área total del predio ${RUN}`,
+        q.turnsSensitive,
+      ]);
+
+      const served = await servedCharts('public', cat.a.code);
+      expect(idsOf(served)).not.toContain(chartId);
+
+      const detail = await http()
+        .get(`${BUILDER}/charts/${chartId}`)
+        .set(auth(adminToken))
+        .expect(200);
+      expect((detail.body as { health: string }).health).toBe(
+        HEALTH_NEEDS_REVIEW,
+      );
+    });
   });
 
   // ── Caché pública (P22) ─────────────────────────────────────────────────
