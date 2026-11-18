@@ -65,17 +65,65 @@ export class DashboardMetadataDto {
 export class AggregationOptionDto {
   @ApiProperty() optionId: string;
   @ApiProperty() text: string;
-  @ApiProperty() count: number;
-  @ApiProperty() percentage: number;
+
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      'null si suppressed=true (spec 66, D2): la celda tiene menos de MIN_CELL_SIZE ' +
+      'respondientes y no se expone, aunque la muestra total supere el umbral global.',
+  })
+  count: number | null;
+
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null si suppressed=true, mismo criterio que count.',
+  })
+  percentage: number | null;
+
   @ApiProperty({ nullable: true, type: Number }) value: number | null;
+
+  @ApiProperty({
+    description:
+      'true si esta opción tiene menos de MIN_CELL_SIZE respondientes (spec 66, D2) ' +
+      'y por lo tanto count/percentage vienen en null. Nunca se representa como 0 ' +
+      'ni se omite del listado en silencio.',
+  })
+  suppressed: boolean;
 }
 
 export class AggregationYesNoDto {
   @ApiProperty({ enum: ['yes_no'] }) type: 'yes_no';
-  @ApiProperty() yesCount: number;
-  @ApiProperty() noCount: number;
-  @ApiProperty() yesPercentage: number;
-  @ApiProperty() noPercentage: number;
+  @ApiProperty({ nullable: true, type: Number }) yesCount: number | null;
+  @ApiProperty({ nullable: true, type: Number }) noCount: number | null;
+  @ApiProperty({ nullable: true, type: Number }) yesPercentage: number | null;
+  @ApiProperty({ nullable: true, type: Number }) noPercentage: number | null;
+  @ApiProperty({
+    description:
+      'true si «Sí» tiene menos de MIN_CELL_SIZE respuestas o si «No» se suprimió (supresión complementaria, spec 107 P18-d).',
+  })
+  yesSuppressed: boolean;
+  @ApiProperty({ description: 'Igual que yesSuppressed, para «No».' })
+  noSuppressed: boolean;
+}
+
+export class AggregationBinDto {
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null = extremo abierto inferior («menos de `to`»).',
+  })
+  from: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null = extremo abierto superior («`from` o más»).',
+  })
+  to: number | null;
+  @ApiProperty({ nullable: true, type: Number }) count: number | null;
+  @ApiProperty({ nullable: true, type: Number }) percentage: number | null;
+  @ApiProperty() suppressed: boolean;
 }
 
 export class AggregationChoicesDto {
@@ -115,29 +163,31 @@ export class AggregationNumericDto {
   @ApiProperty({ enum: ['numeric'] }) type: 'numeric';
   @ApiProperty() count: number;
   @ApiProperty({ nullable: true, type: Number }) average: number | null;
-  @ApiProperty({ nullable: true, type: Number }) median: number | null;
-  @ApiProperty({ nullable: true, type: Number }) min: number | null;
-  @ApiProperty({ nullable: true, type: Number }) max: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'null con menos de 2 × MIN_SAMPLE_THRESHOLD respuestas.',
+  })
+  median: number | null;
   @ApiProperty({ nullable: true, type: Number }) stdDev: number | null;
   @ApiProperty({
     nullable: true,
     type: Number,
-    description: 'Primer cuartil (Q1), para box plot.',
+    description: 'Primer cuartil (Q1); mismo umbral que la mediana.',
   })
   q1: number | null;
   @ApiProperty({
     nullable: true,
     type: Number,
-    description: 'Tercer cuartil (Q3), para box plot.',
+    description: 'Tercer cuartil (Q3); mismo umbral que la mediana.',
   })
   q3: number | null;
   @ApiProperty({
-    required: false,
-    type: [Number],
+    type: [AggregationBinDto],
     description:
-      'Valores crudos sin identificador personal. Solo presente si count >= umbral de privacidad.',
+      'Histograma agrupado en el servidor (spec 107, P24): extremos abiertos y celda mínima por intervalo. Reemplaza a distribution/min/max.',
   })
-  distribution?: number[];
+  bins: AggregationBinDto[];
 }
 
 export class AggregationUnitGroupDto {
@@ -145,31 +195,41 @@ export class AggregationUnitGroupDto {
   optionId: string;
   @ApiProperty({ description: 'Texto de la unidad (p. ej. «hectáreas»).' })
   unit: string;
-  @ApiProperty() count: number;
-  @ApiProperty({
-    description: 'Porcentaje de este grupo sobre las respuestas con valor.',
-  })
-  percentage: number;
   @ApiProperty({
     nullable: true,
     type: Number,
     description:
-      'Estadísticas del grupo: null si el grupo no alcanza el umbral de privacidad.',
+      'null si suppressed=true (spec 66, D2): el grupo tiene menos de MIN_CELL_SIZE respuestas.',
+  })
+  count: number | null;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description:
+      'Porcentaje de este grupo sobre las respuestas con valor; null si suppressed=true.',
+  })
+  percentage: number | null;
+  @ApiProperty({
+    description:
+      'true si el grupo tiene menos de MIN_CELL_SIZE respuestas (spec 66, D2): conteo, ' +
+      'porcentaje y estadísticas vienen en null. El grupo no se omite del listado.',
+  })
+  suppressed: boolean;
+  @ApiProperty({
+    nullable: true,
+    type: Number,
+    description: 'Estadísticas del grupo: null si suppressed=true.',
   })
   average: number | null;
   @ApiProperty({ nullable: true, type: Number }) median: number | null;
   @ApiProperty({ nullable: true, type: Number }) q1: number | null;
   @ApiProperty({ nullable: true, type: Number }) q3: number | null;
-  @ApiProperty({ nullable: true, type: Number }) min: number | null;
-  @ApiProperty({ nullable: true, type: Number }) max: number | null;
   @ApiProperty({ nullable: true, type: Number }) stdDev: number | null;
   @ApiProperty({
-    required: false,
-    type: [Number],
-    description:
-      'Valores crudos del grupo. Solo presente si el grupo alcanza el umbral de privacidad.',
+    type: [AggregationBinDto],
+    description: 'Intervalos del grupo; vacío si el grupo está suprimido.',
   })
-  distribution?: number[];
+  bins: AggregationBinDto[];
 }
 
 /**
@@ -212,6 +272,16 @@ export class DashboardQuestionDto {
 
   @ApiProperty({ required: false, nullable: true })
   systemField: string | null;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
+    description:
+      'Gráfica curada explícitamente para esta pregunta (spec 66, D3), ' +
+      'p. ej. "harvest-calendar". Null si no se curó ninguna — el frontend ' +
+      'cae al comportamiento por tipo de pregunta.',
+  })
+  chartHint: string | null;
 
   @ApiProperty({
     description:

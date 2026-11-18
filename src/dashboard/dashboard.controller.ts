@@ -1,6 +1,9 @@
-import { Controller, Get, Header, Query } from '@nestjs/common';
+import { Controller, Get, Header, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Public } from '../auth/decorators/public.decorator';
+import { Public, PublicUnlessQuery } from '../auth/decorators/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ROLES } from '../auth/constants';
 import { DashboardService } from './dashboard.service';
 import { DashboardFiltersDto } from './dto/dashboard-filters.dto';
 import { DashboardResponseDto } from './dto/dashboard-response.dto';
@@ -17,16 +20,25 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('analytics')
-  @Header('Cache-Control', 'public, max-age=300')
+  @PublicUnlessQuery('instrumentId')
+  @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({
     summary: 'Datos agregados y anonimizados del dashboard público',
     description:
-      'Devuelve agregados por pregunta (nunca respuestas individuales). Requiere instrumentId o categoryId (mutuamente excluyentes, spec 43) para poblar questions[]; sin ninguno retorna solo metadata. Con categoryId, agrega las preguntas de todos los instrumentos activos de la categoría.',
+      'Spec 107 (P20): con `categoryId` es público (curaduría del spec 66); con `instrumentId` exige ADMIN o RESEARCHER (JWT, o API key con scope read) y responde `Cache-Control: private, no-store`. Devuelve agregados por pregunta (nunca respuestas individuales; los numéricos van en intervalos, sin valores crudos ni extremos). Requiere instrumentId o categoryId (mutuamente excluyentes, spec 43) para poblar questions[]; sin ninguno retorna solo metadata. Con categoryId, agrega las preguntas de todos los instrumentos activos de la categoría.',
   })
   @ApiResponse({ status: 200, type: DashboardResponseDto })
   @ApiResponse({
     status: 400,
     description: 'Se enviaron instrumentId y categoryId al mismo tiempo.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Con instrumentId, sin token ni API key.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Con instrumentId, usuario que no es ADMIN ni RESEARCHER.',
   })
   @ApiResponse({
     status: 404,
@@ -35,7 +47,12 @@ export class DashboardController {
   })
   getAnalytics(
     @Query() filters: DashboardFiltersDto,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<DashboardResponseDto> {
+    res.setHeader(
+      'Cache-Control',
+      filters.instrumentId ? 'private, no-store' : 'public, max-age=300',
+    );
     return this.dashboardService.getAnalytics(filters);
   }
 
