@@ -9,10 +9,10 @@ import {
  * operación — nunca un valor hardcodeado del mockup, que era ilustrativo.
  *
  * Solo existen dos vistas curadas en el diseño (`1a` Resumen general, `2a`
- * Categoría de demanda digital): `getKpis` devuelve `OVERVIEW_KPIS` salvo
- * que `filters.categoryId === 'C14'`, en cuyo caso devuelve
- * `DIGITAL_DEMAND_KPIS`. Ninguna otra categoría tiene tira de KPIs propia
- * todavía (fuera de alcance de esta fase; ver nota en el spec).
+ * Categoría de demanda digital). Desde el spec 109 (Fase 6) `getKpis`
+ * devuelve siempre `OVERVIEW_KPIS`: `categoryId` responde 410.
+ * DEBT: `DIGITAL_DEMAND_KPIS` quedó sin consumidor (la tira de KPIs del
+ * frontend se retiró); reconectarla o borrarla en el spec que retome los KPIs.
  *
  * Nota (spec 66, Fase 3, D7, 2026-08-10): la categoría de demanda digital
  * era `C15` antes de fusionar "Perfil del productor" + "La finca" en una
