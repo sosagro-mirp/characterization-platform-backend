@@ -824,6 +824,47 @@ export class DashboardService {
     }
   }
 
+  /**
+   * Spec 108 (P16) — lo que la curaduría del 66 sirve hoy para una categoría
+   * (elegibles, sin ocultas, con las fusiones aplicadas), sin agregar datos.
+   * Insumo de la semilla `seed:dashboard-charts`.
+   */
+  async listCuratedDestinations(categoryCode: string): Promise<
+    {
+      question: Question;
+      instrument: Instrument | undefined;
+      questionIds: string[];
+      chartHint: string | null;
+    }[]
+  > {
+    const category = DASHBOARD_CATEGORIES.find((c) => c.code === categoryCode);
+    if (!category) return [];
+    const instruments = await this.getCategoryInstruments(category);
+    const { questions, instrumentByQuestionId } =
+      await this.getEligibleQuestionsForCategory(category, instruments);
+    const visible = questions.filter(
+      (q) =>
+        !isQuestionHidden(
+          instrumentByQuestionId.get(q.questionId)?.code,
+          q.text,
+        ),
+    );
+    const merged = await this.applyQuestionMerges(
+      category.id,
+      visible,
+      instrumentByQuestionId,
+    );
+    return merged.map((question) => {
+      const instrument = instrumentByQuestionId.get(question.questionId);
+      return {
+        question,
+        instrument,
+        questionIds: this.idsOf(question as DestinationQuestion),
+        chartHint: resolveCuratedChartHint(instrument?.code, question.text),
+      };
+    });
+  }
+
   /** Valores y unidades de un destino `numeric_with_unit`, solo para normalizarlos en el servidor. */
   async fetchUnitValues(
     questionIds: string[],
