@@ -43,6 +43,10 @@ const TABLES_TO_CLEAR = [
   'options_question',
   'questions',
   'instruments_actor_types',
+  // Spec 98 — cultivos a los que aplica cada instrumento: dependen de
+  // `instruments`. El manifiesto no los lleva (ni `scope_level`): tras el
+  // snapshot se repuebla con `pnpm seed:instrument-scope -- --env development`.
+  'instruments_crops',
   'sections',
   'instruments',
 ] as const;
