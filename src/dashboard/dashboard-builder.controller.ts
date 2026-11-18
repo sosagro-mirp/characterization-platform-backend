@@ -241,6 +241,7 @@ export class DashboardBuilderController {
       search?: string;
       questionTypeId?: string;
       limit?: string;
+      ids?: string;
     },
   ) {
     return this.builder.questionCatalog(query);

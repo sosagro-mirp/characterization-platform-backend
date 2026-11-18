@@ -624,6 +624,8 @@ export class DashboardBuilderService {
     search?: string;
     questionTypeId?: string;
     limit?: string;
+    /** Spec 109 — ids separados por coma (cargar las fuentes de un gráfico guardado). */
+    ids?: string;
   }) {
     const qb = this.questionRepo
       .createQueryBuilder('question')
@@ -641,6 +643,14 @@ export class DashboardBuilderService {
     }
     if (query.search) {
       qb.andWhere('question.text ILIKE :s', { s: `%${query.search}%` });
+    }
+    if (query.ids) {
+      const ids = query.ids
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => UUID_RE.test(id));
+      if (ids.length === 0) return [];
+      qb.andWhere('question.questionId IN (:...ids)', { ids });
     }
     const limit = Math.min(Number(query.limit) || 500, 1000);
     const rows = await qb
@@ -680,6 +690,9 @@ export class DashboardBuilderService {
         selectable: blockedReason === null,
         blockedReason,
         compatibleCharts,
+        // Spec 109 — textos de opción, para avisar diferencias al fusionar y
+        // aplicar en la UI las condiciones de dona, mapa y calendario.
+        options: optionTexts,
       };
     });
   }
