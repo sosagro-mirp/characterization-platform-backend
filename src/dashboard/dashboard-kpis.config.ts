@@ -1,4 +1,7 @@
-import { QuestionLocator } from './dashboard-response-filters.config';
+import {
+  CONNECTIVITY_SOURCE,
+  QuestionLocator,
+} from './dashboard-response-filters.config';
 
 /**
  * Spec 43 (Fase 4, D5): catálogo de KPIs curados. Cada entrada declara su
@@ -6,10 +9,16 @@ import { QuestionLocator } from './dashboard-response-filters.config';
  * operación — nunca un valor hardcodeado del mockup, que era ilustrativo.
  *
  * Solo existen dos vistas curadas en el diseño (`1a` Resumen general, `2a`
- * Categoría C15): `getKpis` devuelve `OVERVIEW_KPIS` salvo que
- * `filters.categoryId === 'C15'`, en cuyo caso devuelve `C15_KPIS`. Ninguna
- * otra categoría tiene tira de KPIs propia todavía (fuera de alcance de esta
- * fase; ver nota en el spec).
+ * Categoría de demanda digital): `getKpis` devuelve `OVERVIEW_KPIS` salvo
+ * que `filters.categoryId === 'C14'`, en cuyo caso devuelve
+ * `DIGITAL_DEMAND_KPIS`. Ninguna otra categoría tiene tira de KPIs propia
+ * todavía (fuera de alcance de esta fase; ver nota en el spec).
+ *
+ * Nota (spec 66, Fase 3, D7, 2026-08-10): la categoría de demanda digital
+ * era `C15` antes de fusionar "Perfil del productor" + "La finca" en una
+ * sola categoría (C1) — la renumeración en cascada la dejó en `C14`. La
+ * constante se renombró de `C15_KPIS` a `DIGITAL_DEMAND_KPIS` para no
+ * mentir sobre a qué categoría corresponde.
  *
  * "Avance campaña" (KPI del mockup de `1a`) se **excluye**: `Campaign` no
  * tiene un campo de meta/objetivo en el esquema actual y este spec no agrega
@@ -75,8 +84,11 @@ export const OVERVIEW_KPIS: KpiDefinition[] = [
   ACCEPTANCE_INDEX,
 ];
 
-export const C15_KPIS: KpiDefinition[] = [
+export const DIGITAL_DEMAND_KPIS: KpiDefinition[] = [
   ACCEPTANCE_INDEX,
+  // DEBT: spec 66 (D12) — «¿Tiene y usa un smartphone…?» no existe en ningún
+  // instrumento de producción: el KPI sale vacío. Decidir en la Fase 18 si se
+  // reemplaza (p. ej. por «¿Qué dispositivos utiliza actualmente?») o se quita.
   {
     key: 'hasSmartphone',
     label: 'Con smartphone',
@@ -140,7 +152,7 @@ export const C15_KPIS: KpiDefinition[] = [
   },
 ];
 
-/** Fase 4: preguntas fuente de la vista "Demanda digital" (C15), fuera del
+/** Fase 4: preguntas fuente de la vista "Demanda digital" (C14), fuera del
  * catálogo de filtros de Fase 3 porque no son filtros sino agregados. */
 export const DIGITAL_DEMAND_SOURCES = {
   sDcuInstrumentCode: 'S_DCU',
@@ -156,17 +168,54 @@ export const DIGITAL_DEMAND_SOURCES = {
     questionText:
       '¿Cuáles son las principales barreras para adoptar tecnologías digitales?',
   } satisfies QuestionLocator,
+  // Spec 66 (D13): vigente en `S_AGRI` (y talleres), histórica en `S11-DB`.
   digitalSkills: {
-    locate: 'instrumentAndText',
-    instrumentCode: 'S11-DB',
-    questionText:
-      '¿Cuáles de las siguientes habilidades digitales puede realizar?',
+    locate: 'anyOf',
+    sources: [
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S_AGRI',
+        questionText:
+          '¿Cuáles de las siguientes habilidades digitales puede realizar?',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S11-DB',
+        questionText:
+          '¿Cuáles de las siguientes habilidades digitales puede realizar?',
+      },
+    ],
   } satisfies QuestionLocator,
   platforms: {
-    locate: 'instrumentAndText',
-    instrumentCode: 'S11-DB',
-    questionText: '¿Cuáles plataformas o aplicaciones usa actualmente?',
+    locate: 'anyOf',
+    sources: [
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S_AGRI',
+        questionText: '¿Cuáles plataformas o aplicaciones usa actualmente?',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'TALLER',
+        questionText:
+          '¿Cuáles plataformas o aplicaciones usa actualmente? (puede marcar más de una opción)',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'TALLER-TAB',
+        questionText:
+          '¿Cuáles plataformas o aplicaciones usa actualmente? (puede marcar más de una opción)',
+      },
+      {
+        locate: 'instrumentAndText',
+        instrumentCode: 'S11-DB',
+        questionText: '¿Cuáles plataformas o aplicaciones usa actualmente?',
+      },
+    ],
   } satisfies QuestionLocator,
+  // DEBT: spec 66 (D12) — esta pregunta no existe en ningún instrumento de
+  // producción (`S11-RES` ya no existe): el corte sale vacío. Decidir en la
+  // Fase 18 si se reemplaza o se quita.
   preferredChannel: {
     locate: 'instrumentAndText',
     instrumentCode: 'S11-RES',
@@ -182,11 +231,6 @@ export const DIGITAL_DEMAND_SOURCES = {
       locate: 'systemField',
       systemField: 'farmer.educationLevel',
     } satisfies QuestionLocator,
-    connectivity: {
-      locate: 'instrumentAndText',
-      instrumentCode: 'S8E',
-      questionText:
-        '¿Cómo describiría la calidad de la señal móvil en la finca?',
-    } satisfies QuestionLocator,
+    connectivity: CONNECTIVITY_SOURCE,
   },
 };
