@@ -24,6 +24,7 @@ import {
 } from './dashboard-charts.service';
 import { DashboardService } from './dashboard.service';
 import {
+  privateOnlyMetricReason,
   privateOnlyReason,
   questionTypeLabel,
 } from './dashboard-privacy.config';
@@ -658,6 +659,8 @@ export class DashboardBuilderService {
         entity: m.entity,
         charts: m.charts,
         filters: ENTITY_METRIC_FILTERS,
+        // Spec 109 (Fase 6): usable solo en gráficos de audiencia privada.
+        privateOnlyReason: privateOnlyMetricReason(m.metricKey),
       }),
     );
   }

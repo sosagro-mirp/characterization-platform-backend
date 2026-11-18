@@ -1,5 +1,6 @@
 import {
   explainIneligibility,
+  privateOnlyMetricReason,
   privateOnlyReason,
   questionTypeLabel,
 } from './dashboard-privacy.config';
@@ -62,6 +63,8 @@ describe('privateOnlyReason (spec 109, Fase 6)', () => {
     'Hectáreas totales del predio',
     'Hectáreas actualmente cultivadas con las cadenas del proyecto (ha)',
     '¿Cuál es el área del predio que está actualmente cultivada?',
+    '¿Cuál es el tamaño total aproximado del predio?',
+    'Hectárea cultivada del predio',
   ])('«%s» solo admite audiencia privada', (text) => {
     expect(privateOnlyReason({ text })).toMatch(/^Dato sensible/);
   });
@@ -80,5 +83,18 @@ describe('privateOnlyReason (spec 109, Fase 6)', () => {
     'Género del productor(a)',
   ])('«%s» se puede publicar', (text) => {
     expect(privateOnlyReason({ text })).toBeNull();
+  });
+});
+
+describe('privateOnlyMetricReason (spec 109, Fase 6)', () => {
+  it('la distribución del área de las fincas solo admite audiencia privada', () => {
+    expect(privateOnlyMetricReason('farm_area_distribution')).toMatch(
+      /^Dato sensible/,
+    );
+  });
+
+  it('las demás métricas se pueden publicar', () => {
+    expect(privateOnlyMetricReason('farms_by_department')).toBeNull();
+    expect(privateOnlyMetricReason(null)).toBeNull();
   });
 });

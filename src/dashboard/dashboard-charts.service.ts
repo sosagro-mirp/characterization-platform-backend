@@ -13,7 +13,10 @@ import { DashboardService, ServingFilterContext } from './dashboard.service';
 import { DashboardChart } from './entities/dashboard-chart.entity';
 import { DashboardChartSource } from './entities/dashboard-chart-source.entity';
 import { findEntityMetric } from './dashboard-entity-metrics.config';
-import { privateOnlyReason } from './dashboard-privacy.config';
+import {
+  privateOnlyMetricReason,
+  privateOnlyReason,
+} from './dashboard-privacy.config';
 
 export const SOURCE_BLOCKED = 'DASHBOARD_SOURCE_BLOCKED';
 /** Spec 109 (Fase 6): fuente sensible en un gráfico de audiencia pública. */
@@ -146,6 +149,17 @@ export class DashboardChartsService {
         throw new BadRequestException({
           code: CHART_INCOMPATIBLE,
           message: `La métrica «${metric.metricKey}» no admite el gráfico «${config.chartKind}» (permitidos: ${metric.charts.join(', ')}).`,
+        });
+      }
+      const metricReason =
+        audience === 'public'
+          ? privateOnlyMetricReason(metric.metricKey)
+          : null;
+      if (metricReason) {
+        throw new BadRequestException({
+          code: SOURCE_PRIVATE_ONLY,
+          message: `${metricReason} (métrica «${metric.metricKey}»).`,
+          blocked: [],
         });
       }
       return null;
@@ -377,7 +391,11 @@ export class DashboardChartsService {
     expectedType: string | null,
     audience?: string,
   ): Promise<Health> {
-    if (config.sourceKind === 'entity_metric') return 'ok';
+    if (config.sourceKind === 'entity_metric') {
+      return audience === 'public' && privateOnlyMetricReason(config.metricKey)
+        ? 'needs_review'
+        : 'ok';
+    }
     const ids = config.series.flatMap((s) => s.questionIds);
     if (ids.length === 0) return 'needs_review';
     const questions = await this.loadQuestions(ids);
@@ -398,6 +416,24 @@ export class DashboardChartsService {
   ): Promise<PreviewResult> {
     if (config.sourceKind === 'entity_metric') {
       const metric = findEntityMetric(config.metricKey!)!;
+      if (audience === 'public' && privateOnlyMetricReason(metric.metricKey)) {
+        // Spec 109 (Fase 6): dato sensible; en público no se calcula.
+        return {
+          health: 'needs_review',
+          metricKey: metric.metricKey,
+          ignoredFilters: [],
+          excludedSources: [],
+          series: [
+            {
+              seriesKey: 'metric',
+              label: metric.label,
+              answeredCount: 0,
+              suppressed: true,
+              aggregation: null,
+            },
+          ],
+        };
+      }
       const result = await this.aggregation.runEntityMetric(
         metric.metricKey,
         query,

@@ -365,8 +365,12 @@ const PRIVATE_ONLY_TEXT_PATTERNS: RegExp[] = [
   // «Área total del predio», «Área cultivada con las cadenas…», «Hectáreas
   // totales del predio», «Hectáreas actualmente cultivadas…», «¿Cuál es el
   // área del predio que está actualmente cultivada?».
-  /\b(area|hectareas)\b.*\b(predio|cultivad[ao]s?)\b/,
+  // «¿Cuál es el tamaño total aproximado del predio?».
+  /\b(area|hectareas?|tamano)\b.*\b(predio|cultivad[ao]s?)\b/,
 ];
+
+/** Métricas de entidad sobre el mismo dato (área de las fincas, `farms.area`). */
+const PRIVATE_ONLY_ENTITY_METRICS = ['farm_area_distribution'];
 
 export const PRIVATE_ONLY_REASON =
   'Dato sensible: solo se puede usar en gráficos de audiencia privada.';
@@ -384,8 +388,17 @@ export function privateOnlyReason(question: {
   }
   const text = normalizeText(question.text)
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+    .replace(/[\u0300-\u036f]/g, '');
   return PRIVATE_ONLY_TEXT_PATTERNS.some((re) => re.test(text))
+    ? PRIVATE_ONLY_REASON
+    : null;
+}
+
+/** Motivo por el que una métrica de entidad no puede ir en un gráfico público, o `null`. */
+export function privateOnlyMetricReason(
+  metricKey: string | null | undefined,
+): string | null {
+  return metricKey && PRIVATE_ONLY_ENTITY_METRICS.includes(metricKey)
     ? PRIVATE_ONLY_REASON
     : null;
 }
