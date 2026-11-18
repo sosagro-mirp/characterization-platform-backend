@@ -1527,7 +1527,7 @@ export class DashboardService {
         ? 'COUNT(DISTINCT response.survey)'
         : 'COUNT(response.responseId)';
 
-    const rows = await this.buildResponseBaseQuery(
+    const rowsQuery = this.buildResponseBaseQuery(
       this.idsOf(question),
       filters,
       responseFilters,
@@ -1537,30 +1537,45 @@ export class DashboardService {
         multi ? 'MIN("option"."option_id"::text)' : 'option.optionId',
         'optionId',
       )
-      .addSelect('option.text', 'text')
+      .addSelect(multi ? 'MIN(option.text)' : 'option.text', 'text')
+      .addSelect(
+        multi ? 'MIN(option.metadata_id)' : 'option.metadata_id',
+        'metadataId',
+      )
       // Con varias preguntas por destino (incluida la fusión D15) las opciones
-      // se agrupan SOLO por texto: si el `value` entrara en el agrupamiento,
-      // una opción con el mismo texto y distinto `value` saldría como dos
-      // barras y la supresión de celda se aplicaría a cada parte.
+      // se agrupan por la entidad de catálogo que representan (`metadata_id`,
+      // p. ej. el municipio) y, si no tienen, por texto. Si el `value` entrara
+      // en el agrupamiento, una opción con el mismo texto y distinto `value`
+      // saldría como dos barras y la supresión de celda se aplicaría a cada
+      // parte. Spec 109 (auditoría 95 del 66): agrupar solo por texto juntaba
+      // municipios homónimos de distintos departamentos (Granada, Albania…).
       .addSelect(multi ? 'MIN(option.value)' : 'option.value', 'value')
       .addSelect(countExpression, 'count')
-      .groupBy(multi ? 'option.text' : 'option.optionId')
-      .addGroupBy('option.text')
-      .addGroupBy(multi ? 'option.text' : 'option.value')
-      .getRawMany<{
-        optionId: string;
-        text: string;
-        value: string | null;
-        count: string;
-      }>();
+      .groupBy(
+        multi ? 'COALESCE(option.metadata_id, option.text)' : 'option.optionId',
+      );
+    if (!multi) {
+      rowsQuery
+        .addGroupBy('option.text')
+        .addGroupBy('option.metadata_id')
+        .addGroupBy('option.value');
+    }
+    const rows = await rowsQuery.getRawMany<{
+      optionId: string;
+      text: string;
+      metadataId: string | null;
+      value: string | null;
+      count: string;
+    }>();
+    const labels = await this.disambiguateHomonyms(rows);
 
     const options = rows
-      .map((row) => {
+      .map((row, index) => {
         const rawCount = Number(row.count);
         const rawPercentage = round2((rawCount / answeredCount) * 100);
         return {
           optionId: row.optionId,
-          text: row.text,
+          text: labels[index],
           value: row.value !== null ? Number(row.value) : null,
           // D2 (spec 66): orden y "top" se deciden sobre el conteo real, no
           // sobre el valor ya suprimido — una celda suprimida no deja de
@@ -1594,6 +1609,46 @@ export class DashboardService {
       type: typeName as 'single_choice' | 'multiple_choice' | 'compliance',
       options: publicOptions,
     };
+  }
+
+  /**
+   * Spec 109 (auditoría 95 del 66) — cuando dos opciones distintas comparten
+   * texto y apuntan a municipios del catálogo (`metadata_id` → `towns`), se
+   * les agrega el departamento: «Granada (Meta)», «Granada (Antioquia)».
+   * Las demás etiquetas no cambian.
+   */
+  private async disambiguateHomonyms(
+    rows: { text: string; metadataId: string | null }[],
+  ): Promise<string[]> {
+    const byText = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const keys = byText.get(row.text) ?? new Set<string>();
+      keys.add(row.metadataId ?? row.text);
+      byText.set(row.text, keys);
+    }
+    const ambiguous = rows.filter(
+      (row) => row.metadataId && (byText.get(row.text)?.size ?? 0) > 1,
+    );
+    if (ambiguous.length === 0) return rows.map((row) => row.text);
+    const ids = [...new Set(ambiguous.map((row) => row.metadataId!))].filter(
+      (id) => /^[0-9a-f-]{36}$/i.test(id),
+    );
+    const towns = ids.length
+      ? await this.townRepo.find({
+          where: { townId: In(ids) },
+          relations: { department: true },
+        })
+      : [];
+    const deptByTown = new Map(
+      towns.map((t) => [t.townId, t.department?.name ?? null]),
+    );
+    return rows.map((row) => {
+      if (!row.metadataId || (byText.get(row.text)?.size ?? 0) < 2) {
+        return row.text;
+      }
+      const dept = deptByTown.get(row.metadataId);
+      return dept ? `${row.text} (${dept})` : row.text;
+    });
   }
 
   /** D8: media de acuerdo (1-5) usando OptionQuestion.value; castea text si no hay value;
