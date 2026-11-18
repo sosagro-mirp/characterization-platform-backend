@@ -23,6 +23,7 @@ import {
   SeriesConfig,
 } from './dashboard-charts.service';
 import { DashboardService } from './dashboard.service';
+import { questionTypeLabel } from './dashboard-privacy.config';
 import {
   getAllowedCharts,
   getMatrix,
@@ -664,7 +665,7 @@ export class DashboardBuilderService {
       const typeName = q.type?.name;
       let blockedReason = this.dashboard.blockedReasonFor(q);
       if (!blockedReason && !isSelectableQuestionType(typeName)) {
-        blockedReason = `El tipo «${typeName}» no tiene gráfico compatible.`;
+        blockedReason = `Tipo no graficable: las preguntas de ${typeName ? questionTypeLabel(typeName) : 'este tipo'} no tienen gráfico compatible.`;
       }
       const optionTexts = (q.options ?? []).map((o) => o.text);
       const compatibleCharts = blockedReason

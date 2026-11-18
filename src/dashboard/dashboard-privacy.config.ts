@@ -300,19 +300,36 @@ export function suppressCell(
  * pregunta, o `null` si es elegible. Misma lógica que `isQuestionEligible`
  * (que sigue siendo la fuente única de la decisión): el motivo solo explica.
  */
+/** Nombre en español de los tipos de pregunta, para los motivos de bloqueo. */
+const QUESTION_TYPE_LABELS: Record<string, string> = {
+  open_text: 'texto abierto',
+  yes_no: 'Sí/No',
+  single_choice: 'selección única',
+  multiple_choice: 'selección múltiple',
+  compliance: 'cumplimiento',
+  likert: 'Likert',
+  numeric: 'numérico',
+  numeric_with_unit: 'numérico con unidad',
+};
+
+export function questionTypeLabel(typeName: string): string {
+  return QUESTION_TYPE_LABELS[typeName] ?? typeName;
+}
+
 export function explainIneligibility(
   question: EligibilityCandidate,
 ): string | null {
   if (isQuestionEligible(question)) return null;
   if (!question.typeName) return 'La pregunta no tiene tipo cargado.';
-  if (EXCLUDED_QUESTION_TYPES.includes(question.typeName)) {
-    return `Los datos de tipo «${question.typeName}» no se pueden graficar.`;
-  }
+  // La privacidad pesa más que el tipo: es el motivo que el usuario debe ver.
   if (
     question.systemField &&
     DENIED_SYSTEM_FIELDS.includes(question.systemField)
   ) {
-    return 'La pregunta alimenta un dato que identifica a una persona.';
+    return 'Identifica al productor: la pregunta alimenta un dato que identifica a una persona.';
   }
-  return 'La pregunta pide datos que identifican a una persona.';
+  if (EXCLUDED_QUESTION_TYPES.includes(question.typeName)) {
+    return `Tipo no graficable: las preguntas de ${questionTypeLabel(question.typeName)} no se pueden graficar.`;
+  }
+  return 'Identifica al productor: la pregunta pide datos que identifican a una persona.';
 }
