@@ -24,13 +24,13 @@ export class DashboardFiltersDto {
       // Spec 66 (Fase 3, D7, 2026-08-10): C1–C14, no C1–C15 — fusión de
       // "Perfil del productor" + "La finca" en una sola categoría (C1) y
       // renumeración en cascada de las siguientes.
-      'Filtra por categoría temática (C1–C14, spec 43/66). Agrega las preguntas de todos los instrumentos activos de la categoría. Mutuamente excluyente con instrumentId.',
+      'Código de una categoría del constructor (spec 109, P2: C1…, OVERVIEW). Un código inexistente o inactivo responde 404. En /dashboard/charts elige la categoría; en /analytics se retiró (410).',
     example: 'C1',
   })
   @IsOptional()
   @IsString()
-  @Matches(/^C([1-9]|1[0-4])$/, {
-    message: 'categoryId debe tener el formato C1..C14.',
+  @Matches(/^[A-Za-z0-9_-]{1,50}$/, {
+    message: 'categoryId debe ser el código de una categoría.',
   })
   categoryId?: string;
 

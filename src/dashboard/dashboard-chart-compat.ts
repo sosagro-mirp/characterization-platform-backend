@@ -95,6 +95,9 @@ const DEPARTMENTS = [
   'vichada',
 ];
 
+/** Opciones de escape que no cuentan contra las condiciones de calendario. */
+const ESCAPE_OPTION = /^(no aplica|no sabe|ns\/nr|otros?)$/i;
+
 const normalize = (t: string): string =>
   t.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
@@ -179,9 +182,11 @@ export function validateChartKind(input: {
     }
   }
   if (chartKind === 'harvest-calendar') {
-    const set = new Set(optionTexts.map(normalize));
-    const isMonths =
-      optionTexts.length === 12 && MONTHS.every((m) => set.has(m));
+    // Spec 109: «No aplica» y similares son opciones de escape de las preguntas
+    // de cosecha (S2.4·23, S2.5); el calendario las ignora, como en el 66.
+    const months = optionTexts.filter((t) => !ESCAPE_OPTION.test(t.trim()));
+    const set = new Set(months.map(normalize));
+    const isMonths = months.length === 12 && MONTHS.every((m) => set.has(m));
     if (!isMonths) {
       return {
         ok: false,

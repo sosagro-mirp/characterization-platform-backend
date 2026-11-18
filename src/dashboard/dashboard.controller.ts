@@ -1,6 +1,11 @@
 import { Controller, Get, Header, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Public, PublicUnlessQuery } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { ROLES } from '../auth/constants';
@@ -9,7 +14,15 @@ import { DashboardFiltersDto } from './dto/dashboard-filters.dto';
 import { DashboardResponseDto } from './dto/dashboard-response.dto';
 import { DashboardDepartmentCountDto } from './dto/dashboard-department-count.dto';
 import { DashboardOverviewDto } from './dto/dashboard-overview.dto';
-import { DashboardCategoryDto } from './dto/dashboard-category.dto';
+import {
+  ServedCategoryDto,
+  ServedChartsResponseDto,
+} from './dto/dashboard-served-chart.dto';
+import {
+  DashboardServingService,
+  PRIVATE_AUDIENCES,
+  PUBLIC_AUDIENCES,
+} from './dashboard-serving.service';
 import { DashboardKpiDto } from './dto/dashboard-kpis.dto';
 import { DashboardDigitalDemandDto } from './dto/dashboard-digital-demand.dto';
 
@@ -17,20 +30,23 @@ import { DashboardDigitalDemandDto } from './dto/dashboard-digital-demand.dto';
 @Public()
 @Controller('dashboard')
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(
+    private readonly dashboardService: DashboardService,
+    private readonly serving: DashboardServingService,
+  ) {}
 
   @Get('analytics')
   @PublicUnlessQuery('instrumentId')
   @Roles(ROLES.ADMIN, ROLES.RESEARCHER)
   @ApiOperation({
-    summary: 'Datos agregados y anonimizados del dashboard público',
+    summary: 'Datos agregados por instrumento (ADMIN/RESEARCHER)',
     description:
-      'Spec 107 (P20): con `categoryId` es público (curaduría del spec 66); con `instrumentId` exige ADMIN o RESEARCHER (JWT, o API key con scope read) y responde `Cache-Control: private, no-store`. Devuelve agregados por pregunta (nunca respuestas individuales; los numéricos van en intervalos, sin valores crudos ni extremos). Requiere instrumentId o categoryId (mutuamente excluyentes, spec 43) para poblar questions[]; sin ninguno retorna solo metadata. Con categoryId, agrega las preguntas de todos los instrumentos activos de la categoría.',
+      'Spec 109 (P20): la consulta pública por `categoryId` se retiró y responde 410; el dashboard usa `GET /dashboard/charts`. Spec 107: con `instrumentId` exige ADMIN o RESEARCHER (JWT, o API key con scope read) y responde `Cache-Control: private, no-store`. Devuelve agregados por pregunta (nunca respuestas individuales; los numéricos van en intervalos, sin valores crudos ni extremos). Requiere instrumentId o categoryId (mutuamente excluyentes, spec 43) para poblar questions[]; sin ninguno retorna solo metadata. Con categoryId, agrega las preguntas de todos los instrumentos activos de la categoría.',
   })
   @ApiResponse({ status: 200, type: DashboardResponseDto })
   @ApiResponse({
-    status: 400,
-    description: 'Se enviaron instrumentId y categoryId al mismo tiempo.',
+    status: 410,
+    description: 'Con categoryId: ruta retirada (spec 109).',
   })
   @ApiResponse({
     status: 401,
@@ -88,15 +104,38 @@ export class DashboardController {
   }
 
   @Get('categories')
-  @Header('Cache-Control', 'public, max-age=3600')
+  @Header('Cache-Control', 'public, max-age=300')
   @ApiOperation({
-    summary: 'Catálogo de categorías temáticas del dashboard (C1–C15)',
+    summary: 'Categorías del dashboard público',
     description:
-      'Categorías estáticas (spec 43, dashboard.md §2) con sus instrumentos activos y el conteo de preguntas visualizables. Catálogo estático, cache de una hora.',
+      'Spec 109 (P2, P20): categorías activas del constructor con al menos un gráfico público publicado, en su orden. Incluye `OVERVIEW` si tiene gráficos; la navegación la omite.',
   })
-  @ApiResponse({ status: 200, type: [DashboardCategoryDto] })
-  getCategories(): Promise<DashboardCategoryDto[]> {
-    return this.dashboardService.getCategories();
+  @ApiResponse({ status: 200, type: [ServedCategoryDto] })
+  getCategories(): Promise<ServedCategoryDto[]> {
+    return this.serving.listCategories(PUBLIC_AUDIENCES);
+  }
+
+  @Get('charts')
+  @Header('Cache-Control', 'public, max-age=300')
+  @ApiOperation({
+    summary: 'Gráficos públicos publicados de una categoría',
+    description:
+      'Spec 109 (P20, P22): solo gráficos `published`, no archivados, de audiencia pública, en el orden configurado, con los filtros globales. `categoryId` es el código de la categoría (C1…, OVERVIEW). Las fuentes bloqueadas se excluyen; un gráfico sin fuentes válidas no se sirve. Celdas y gráficos por debajo de los umbrales del 107 se sirven suprimidos.',
+  })
+  @ApiResponse({ status: 200, type: ServedChartsResponseDto })
+  @ApiResponse({
+    status: 404,
+    description:
+      'Código de categoría inexistente o inactivo, o un filtro UUID que no existe.',
+  })
+  getCharts(
+    @Query() filters: DashboardFiltersDto,
+  ): Promise<ServedChartsResponseDto> {
+    return this.serving.serveCharts(
+      filters.categoryId,
+      PUBLIC_AUDIENCES,
+      filters,
+    );
   }
 
   @Get('overview')
@@ -137,5 +176,50 @@ export class DashboardController {
     @Query() filters: DashboardFiltersDto,
   ): Promise<DashboardDigitalDemandDto> {
     return this.dashboardService.getDigitalDemand(filters);
+  }
+}
+
+/**
+ * Spec 109 (P8, P19, P22) — dashboard privado: gráficos públicos y privados
+ * publicados, para ADMIN y RESEARCHER, con las mismas barreras y umbrales que
+ * el público y sin caché compartida.
+ */
+@ApiTags('Dashboard')
+@ApiBearerAuth()
+@Roles(ROLES.ADMIN, ROLES.RESEARCHER)
+@Controller('dashboard/private')
+export class DashboardPrivateController {
+  constructor(private readonly serving: DashboardServingService) {}
+
+  @Get('categories')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Categorías del dashboard privado',
+    description:
+      'Categorías activas con al menos un gráfico publicado (público o privado).',
+  })
+  @ApiResponse({ status: 200, type: [ServedCategoryDto] })
+  getCategories(): Promise<ServedCategoryDto[]> {
+    return this.serving.listCategories(PRIVATE_AUDIENCES);
+  }
+
+  @Get('charts')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Gráficos publicados (públicos y privados) de una categoría',
+  })
+  @ApiResponse({ status: 200, type: ServedChartsResponseDto })
+  @ApiResponse({
+    status: 404,
+    description: 'Categoría inexistente o inactiva.',
+  })
+  getCharts(
+    @Query() filters: DashboardFiltersDto,
+  ): Promise<ServedChartsResponseDto> {
+    return this.serving.serveCharts(
+      filters.categoryId,
+      PRIVATE_AUDIENCES,
+      filters,
+    );
   }
 }

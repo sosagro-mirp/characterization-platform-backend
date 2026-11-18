@@ -18,10 +18,12 @@ import {
 import {
   ChartConfig,
   DashboardChartsService,
+  chartConfigFrom,
   PreviewResult,
   SeriesConfig,
 } from './dashboard-charts.service';
 import { DashboardService } from './dashboard.service';
+import { questionTypeLabel } from './dashboard-privacy.config';
 import {
   getAllowedCharts,
   getMatrix,
@@ -184,24 +186,7 @@ export class DashboardBuilderService {
     chart: DashboardChart,
     sources: DashboardChartSource[],
   ): ChartConfig {
-    const bySeries = new Map<string, SeriesConfig>();
-    for (const s of sources) {
-      const entry = bySeries.get(s.seriesKey) ?? {
-        seriesKey: s.seriesKey,
-        label: s.seriesLabel,
-        questionIds: [],
-      };
-      entry.questionIds.push(s.questionId);
-      bySeries.set(s.seriesKey, entry);
-    }
-    return {
-      sourceKind: chart.sourceKind,
-      chartKind: chart.chartKind,
-      combineMode: chart.combineMode,
-      settings: chart.settings ?? {},
-      metricKey: chart.entityMetricKey,
-      series: [...bySeries.values()],
-    };
+    return chartConfigFrom(chart, sources);
   }
 
   private async toBody(
@@ -575,10 +560,30 @@ export class DashboardBuilderService {
 
   async events(id: string) {
     await this.getChartEntity(id);
-    return this.eventRepo.find({
+    const events = await this.eventRepo.find({
       where: { chartId: id },
       order: { createdAt: 'ASC' },
     });
+    // Spec 109 — quién hizo cada cambio: el historial del constructor muestra
+    // el nombre además de la fecha (userId queda null si fue la API).
+    const userIds = [
+      ...new Set(events.map((e) => e.userId).filter((u): u is string => !!u)),
+    ];
+    const names = new Map<string, string>();
+    if (userIds.length > 0) {
+      const rows: { user_id: string; name: string; last_name: string }[] =
+        await this.ds.query(
+          'SELECT user_id, name, last_name FROM users WHERE user_id = ANY($1)',
+          [userIds],
+        );
+      for (const r of rows) {
+        names.set(r.user_id, `${r.name} ${r.last_name ?? ''}`.trim());
+      }
+    }
+    return events.map((e) => ({
+      ...e,
+      userName: e.userId ? (names.get(e.userId) ?? null) : null,
+    }));
   }
 
   // ───────────────────────────── vista previa ─────────────────────────────
@@ -640,6 +645,8 @@ export class DashboardBuilderService {
     search?: string;
     questionTypeId?: string;
     limit?: string;
+    /** Spec 109 — ids separados por coma (cargar las fuentes de un gráfico guardado). */
+    ids?: string;
   }) {
     const qb = this.questionRepo
       .createQueryBuilder('question')
@@ -658,6 +665,14 @@ export class DashboardBuilderService {
     if (query.search) {
       qb.andWhere('question.text ILIKE :s', { s: `%${query.search}%` });
     }
+    if (query.ids) {
+      const ids = query.ids
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => UUID_RE.test(id));
+      if (ids.length === 0) return [];
+      qb.andWhere('question.questionId IN (:...ids)', { ids });
+    }
     const limit = Math.min(Number(query.limit) || 500, 1000);
     const rows = await qb
       .orderBy('instrument.name', 'ASC')
@@ -670,7 +685,7 @@ export class DashboardBuilderService {
       const typeName = q.type?.name;
       let blockedReason = this.dashboard.blockedReasonFor(q);
       if (!blockedReason && !isSelectableQuestionType(typeName)) {
-        blockedReason = `El tipo «${typeName}» no tiene gráfico compatible.`;
+        blockedReason = `Tipo no graficable: las preguntas de ${typeName ? questionTypeLabel(typeName) : 'este tipo'} no tienen gráfico compatible.`;
       }
       const optionTexts = (q.options ?? []).map((o) => o.text);
       const compatibleCharts = blockedReason
@@ -696,6 +711,9 @@ export class DashboardBuilderService {
         selectable: blockedReason === null,
         blockedReason,
         compatibleCharts,
+        // Spec 109 — textos de opción, para avisar diferencias al fusionar y
+        // aplicar en la UI las condiciones de dona, mapa y calendario.
+        options: optionTexts,
       };
     });
   }
