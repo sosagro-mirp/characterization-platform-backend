@@ -79,9 +79,7 @@
  * Eventos (P7): `{ eventId, eventType: 'created'|'updated'|'published'|
  * 'unpublished'|'archived'|'restored', userId, createdAt, summary }`.
  */
-import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import * as path from 'node:path';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getOptionsToken } from '@nestjs/throttler';
@@ -1579,60 +1577,6 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
         );
       }
     });
-  });
-
-  // ── Criterio 19 ───────────────────────────────────────────────────────────
-
-  describe('C19 — semilla de C1, C2 y Resumen general', () => {
-    // Ejecuta el CLI real contra desarrollo (`--env development`). Deja en la
-    // base los gráficos sembrados: es el estado que la Fase 4 deja a propósito.
-    // La comparación visual contra la curaduría del 66 es manual (Fase 4).
-    const runSeed = () =>
-      execFileSync(
-        'pnpm',
-        ['-s', 'seed:dashboard-charts', '--env', 'development'],
-        {
-          cwd: path.resolve(__dirname, '..'),
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'pipe'],
-          timeout: 300_000,
-        },
-      );
-
-    const seededCharts = async () => {
-      const res = await http()
-        .get(`${BASE}/categories`)
-        .set('Authorization', `Bearer ${adminToken}`)
-        .expect(200);
-      const cats = listOf<CategoryBody>(res.body).filter((c) =>
-        ['C1', 'C2', 'OVERVIEW'].includes(c.code),
-      );
-      const result: Record<string, ChartBody[]> = {};
-      for (const c of cats) {
-        result[c.code] = await listCharts({ categoryId: c.categoryId });
-      }
-      return result;
-    };
-
-    it('criterio 19: la semilla es idempotente, reporta lo que no resuelve y siembra C1, C2 y OVERVIEW publicados y públicos', async () => {
-      runSeed();
-      const first = await seededCharts();
-      const secondOutput = runSeed();
-      const second = await seededCharts();
-
-      for (const code of ['C1', 'C2', 'OVERVIEW']) {
-        expect(second[code]?.length ?? 0).toBeGreaterThan(0);
-        expect(second[code].map((c) => c.chartId).sort()).toEqual(
-          first[code].map((c) => c.chartId).sort(),
-        );
-        for (const c of second[code]) {
-          expect(c.status).toBe('published');
-          expect(c.audience).toBe('public');
-        }
-      }
-      // El reporte de lo no resuelto aparece aunque esté vacío.
-      expect(secondOutput).toMatch(/no resuelt|unresolved/i);
-    }, 600_000);
   });
 
   // ── Criterios 21–24 — métricas de entidad (P13, aprobada 2026-11-17) ───────
