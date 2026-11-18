@@ -65,6 +65,14 @@ const HINT_TO_CHART: Record<string, string> = {
   'horizontal-bars': 'horizontal-bars',
 };
 
+/**
+ * Decisiones del 66 declaradas sobre un miembro histórico de una fusión (no
+ * sobre el representante): D6 pidió mapa para «Departamento» en C2.
+ */
+const HINT_OVERRIDES: Record<string, string> = {
+  'C2|Departamento': 'map',
+};
+
 export async function planDashboardCharts(
   dashboard: DashboardService,
 ): Promise<{ planned: PlannedChart[]; unresolved: SeedReport['unresolved'] }> {
@@ -82,7 +90,8 @@ export async function planDashboardCharts(
         continue;
       }
       const optionTexts = (d.question.options ?? []).map((o) => o.text);
-      const hinted = d.chartHint ? HINT_TO_CHART[d.chartHint] : undefined;
+      const hint = HINT_OVERRIDES[`${code}|${d.question.text}`] ?? d.chartHint;
+      const hinted = hint ? (HINT_TO_CHART[hint] ?? hint) : undefined;
       const candidates = [hinted, ...allowed].filter(Boolean) as string[];
       const chartKind = candidates.find(
         (k) =>

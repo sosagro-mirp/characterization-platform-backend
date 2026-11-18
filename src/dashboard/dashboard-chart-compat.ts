@@ -165,9 +165,12 @@ export function validateChartKind(input: {
     }
   }
   if (chartKind === 'map') {
+    // «Otros» es la opción de escape de las preguntas de departamento: no
+    // cuenta contra la condición (el 66 ya mostraba el mapa con ella).
+    const named = optionTexts.filter((t) => !/^otros?$/i.test(t.trim()));
     const allDepartments =
-      optionTexts.length > 0 &&
-      optionTexts.every((t) => DEPARTMENTS.includes(normalize(t)));
+      named.length > 0 &&
+      named.every((t) => DEPARTMENTS.includes(normalize(t)));
     if (!allDepartments) {
       return {
         ok: false,
