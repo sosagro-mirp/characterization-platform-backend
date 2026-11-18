@@ -1720,11 +1720,12 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
     const createMetricChart = async (
       metricKey: string,
       chartKind: string,
+      overrides: Record<string, unknown> = {},
     ): Promise<MetricChart> => {
       const res = await http()
         .post(`${BASE}/charts`)
         .set('Authorization', `Bearer ${adminToken}`)
-        .send(metricBody(metricKey, chartKind));
+        .send(metricBody(metricKey, chartKind, overrides));
       expect(res.status).toBe(201);
       return res.body as MetricChart;
     };
@@ -2156,8 +2157,11 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
       const chart = await createMetricChart(
         'farm_area_distribution',
         'histogram',
+        { audience: 'private' },
       );
-      for (const audience of ['public', 'private'] as const) {
+      // Spec 109 (Fase 6): el área de las fincas solo admite audiencia
+      // privada; la vista previa pública ya no la calcula (cubierto en e2e-109).
+      for (const audience of ['private'] as const) {
         const body = await metricPreview(chart.chartId, audience, {
           departmentId: geo.depBig,
         });
@@ -2207,8 +2211,9 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
       const chart = await createMetricChart(
         'farm_area_distribution',
         'histogram',
+        { audience: 'private' },
       );
-      const body = await metricPreview(chart.chartId, 'public', {
+      const body = await metricPreview(chart.chartId, 'private', {
         departmentId: geo.depSmall,
       });
       expect(body.series[0].suppressed).toBe(true);

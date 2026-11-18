@@ -18,7 +18,10 @@ import {
   ServedChartDto,
   ServedChartsResponseDto,
 } from './dto/dashboard-served-chart.dto';
-import { MIN_SAMPLE_THRESHOLD } from './dashboard-privacy.config';
+import {
+  MIN_SAMPLE_THRESHOLD,
+  privateOnlyMetricReason,
+} from './dashboard-privacy.config';
 
 interface YesNoAggregation {
   type: 'yes_no';
@@ -164,6 +167,14 @@ export class DashboardServingService {
 
     const served: ServedChartDto[] = [];
     for (const chart of rows) {
+      // Spec 109 (Fase 6): una métrica sensible no se sirve en público.
+      if (
+        chart.audience === 'public' &&
+        chart.sourceKind === 'entity_metric' &&
+        privateOnlyMetricReason(chart.entityMetricKey)
+      ) {
+        continue;
+      }
       const config = chartConfigFrom(
         chart,
         sources.filter((s) => s.chartId === chart.chartId),
@@ -173,6 +184,7 @@ export class DashboardServingService {
         chart.questionType,
         query,
         ctx,
+        chart.audience,
       );
 
       const base = {

@@ -1,5 +1,7 @@
 import {
   explainIneligibility,
+  privateOnlyMetricReason,
+  privateOnlyReason,
   questionTypeLabel,
 } from './dashboard-privacy.config';
 
@@ -50,5 +52,49 @@ describe('explainIneligibility (spec 109)', () => {
     expect(explainIneligibility({ text: 'x', typeName: null })).toBe(
       'La pregunta no tiene tipo cargado.',
     );
+  });
+});
+
+describe('privateOnlyReason (spec 109, Fase 6)', () => {
+  it.each([
+    '¿Pertenece el productor a alguno de los siguientes grupos o territorios? (Puede marcar más de una opción)',
+    'Área total del predio',
+    'Área cultivada con las cadenas del proyecto',
+    'Hectáreas totales del predio',
+    'Hectáreas actualmente cultivadas con las cadenas del proyecto (ha)',
+    '¿Cuál es el área del predio que está actualmente cultivada?',
+    '¿Cuál es el tamaño total aproximado del predio?',
+    'Hectárea cultivada del predio',
+  ])('«%s» solo admite audiencia privada', (text) => {
+    expect(privateOnlyReason({ text })).toMatch(/^Dato sensible/);
+  });
+
+  it('la clave farm.area también, aunque cambie el texto', () => {
+    expect(
+      privateOnlyReason({ text: 'Tamaño', systemField: 'farm.area' }),
+    ).toMatch(/^Dato sensible/);
+  });
+
+  it.each([
+    'Hectáreas sembradas en café (ha)',
+    '¿Cuántos kilos de café pergamino seco cosecha por hectárea al año?',
+    '¿Qué áreas requieren mayor fortalecimiento?',
+    '¿Pertenece a alguna federación, asociación, cooperativa o gremio?',
+    'Género del productor(a)',
+  ])('«%s» se puede publicar', (text) => {
+    expect(privateOnlyReason({ text })).toBeNull();
+  });
+});
+
+describe('privateOnlyMetricReason (spec 109, Fase 6)', () => {
+  it('la distribución del área de las fincas solo admite audiencia privada', () => {
+    expect(privateOnlyMetricReason('farm_area_distribution')).toMatch(
+      /^Dato sensible/,
+    );
+  });
+
+  it('las demás métricas se pueden publicar', () => {
+    expect(privateOnlyMetricReason('farms_by_department')).toBeNull();
+    expect(privateOnlyMetricReason(null)).toBeNull();
   });
 });

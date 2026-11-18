@@ -23,7 +23,11 @@ import {
   SeriesConfig,
 } from './dashboard-charts.service';
 import { DashboardService } from './dashboard.service';
-import { questionTypeLabel } from './dashboard-privacy.config';
+import {
+  privateOnlyMetricReason,
+  privateOnlyReason,
+  questionTypeLabel,
+} from './dashboard-privacy.config';
 import {
   getAllowedCharts,
   getMatrix,
@@ -195,7 +199,11 @@ export class DashboardBuilderService {
   ) {
     const rows = sources ?? (await this.sourcesOf(chart.chartId));
     const config = this.toConfig(chart, rows);
-    const health = await this.charts.healthOf(config, chart.questionType);
+    const health = await this.charts.healthOf(
+      config,
+      chart.questionType,
+      chart.audience,
+    );
     const series = config.series.map((s) => ({
       seriesKey: s.seriesKey,
       label: s.label,
@@ -358,7 +366,7 @@ export class DashboardBuilderService {
   async createChart(dto: CreateChartDto, userId: string) {
     await this.assertCategory(dto.categoryId);
     const config = this.configFromDto(dto);
-    const questionType = await this.charts.validate(config);
+    const questionType = await this.charts.validate(config, dto.audience);
 
     const id = await this.ds.transaction(async (m) => {
       const chart = await m.save(
@@ -412,7 +420,10 @@ export class DashboardBuilderService {
       series: dto.series ? this.normalizeSeries(dto.series) : current.series,
     };
     if (dto.categoryId) await this.assertCategory(dto.categoryId);
-    const questionType = await this.charts.validate(config);
+    const questionType = await this.charts.validate(
+      config,
+      dto.audience ?? chart.audience,
+    );
 
     await this.ds.transaction(async (m) => {
       const changed = Object.keys(dto);
@@ -512,7 +523,7 @@ export class DashboardBuilderService {
     const chart = await this.getChartEntity(id);
     // Revalida privacidad y compatibilidad contra el estado actual.
     const config = this.toConfig(chart, await this.sourcesOf(id));
-    await this.charts.validate(config);
+    await this.charts.validate(config, chart.audience);
     await this.ds.transaction(async (m) => {
       chart.status = 'published';
       chart.publishedBy = userId;
@@ -602,14 +613,26 @@ export class DashboardBuilderService {
     }
     const chart = await this.getChartEntity(id);
     const config = this.toConfig(chart, await this.sourcesOf(id));
-    return this.charts.preview(config, chart.questionType, query);
+    return this.charts.preview(
+      config,
+      chart.questionType,
+      query,
+      undefined,
+      audience ?? chart.audience,
+    );
   }
 
   async previewDraft(dto: CreateChartDto): Promise<PreviewResult> {
     this.assertAudience(dto.audience);
     const config = this.configFromDto(dto);
-    const questionType = await this.charts.validate(config);
-    return this.charts.preview(config, questionType);
+    const questionType = await this.charts.validate(config, dto.audience);
+    return this.charts.preview(
+      config,
+      questionType,
+      {},
+      undefined,
+      dto.audience,
+    );
   }
 
   private assertAudience(audience: string | undefined): void {
@@ -636,6 +659,8 @@ export class DashboardBuilderService {
         entity: m.entity,
         charts: m.charts,
         filters: ENTITY_METRIC_FILTERS,
+        // Spec 109 (Fase 6): usable solo en gráficos de audiencia privada.
+        privateOnlyReason: privateOnlyMetricReason(m.metricKey),
       }),
     );
   }
@@ -710,6 +735,8 @@ export class DashboardBuilderService {
         archivedAt: q.archivedAt ?? null,
         selectable: blockedReason === null,
         blockedReason,
+        // Spec 109 (Fase 6): usable solo en gráficos de audiencia privada.
+        privateOnlyReason: blockedReason ? null : privateOnlyReason(q),
         compatibleCharts,
         // Spec 109 — textos de opción, para avisar diferencias al fusionar y
         // aplicar en la UI las condiciones de dona, mapa y calendario.
