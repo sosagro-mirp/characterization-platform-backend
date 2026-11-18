@@ -295,14 +295,13 @@ export function suppressCell(
   return { count, percentage, suppressed: false };
 }
 
-/**
- * Spec 108 — motivo legible por el que `isQuestionEligible` rechaza una
- * pregunta, o `null` si es elegible. Misma lógica que `isQuestionEligible`
- * (que sigue siendo la fuente única de la decisión): el motivo solo explica.
- */
 /** Nombre en español de los tipos de pregunta, para los motivos de bloqueo. */
 const QUESTION_TYPE_LABELS: Record<string, string> = {
   open_text: 'texto abierto',
+  image: 'imagen',
+  voice_recording: 'grabación de voz',
+  document: 'documento',
+  video: 'video',
   yes_no: 'Sí/No',
   single_choice: 'selección única',
   multiple_choice: 'selección múltiple',
@@ -316,17 +315,35 @@ export function questionTypeLabel(typeName: string): string {
   return QUESTION_TYPE_LABELS[typeName] ?? typeName;
 }
 
+/**
+ * Spec 108 — motivo legible por el que `isQuestionEligible` rechaza una
+ * pregunta, o `null` si es elegible. Misma lógica que `isQuestionEligible`
+ * (que sigue siendo la fuente única de la decisión): el motivo solo explica.
+ * La privacidad pesa más que el tipo: si la pregunta identifica a una persona
+ * (campo denegado, lista de preguntas o texto identificante) ese es el motivo
+ * que se muestra, aunque además su tipo no sea graficable.
+ */
 export function explainIneligibility(
   question: EligibilityCandidate,
 ): string | null {
   if (isQuestionEligible(question)) return null;
   if (!question.typeName) return 'La pregunta no tiene tipo cargado.';
-  // La privacidad pesa más que el tipo: es el motivo que el usuario debe ver.
   if (
     question.systemField &&
     DENIED_SYSTEM_FIELDS.includes(question.systemField)
   ) {
     return 'Identifica al productor: la pregunta alimenta un dato que identifica a una persona.';
+  }
+  const identifying =
+    isIdentifyingQuestionText(question.text) ||
+    (!!question.instrumentCode &&
+      PII_QUESTION_DENYLIST.some(
+        (entry) =>
+          entry.instrumentCode === question.instrumentCode &&
+          normalizeText(entry.questionText) === normalizeText(question.text),
+      ));
+  if (identifying) {
+    return 'Identifica al productor: la pregunta pide datos que identifican a una persona.';
   }
   if (EXCLUDED_QUESTION_TYPES.includes(question.typeName)) {
     return `Tipo no graficable: las preguntas de ${questionTypeLabel(question.typeName)} no se pueden graficar.`;

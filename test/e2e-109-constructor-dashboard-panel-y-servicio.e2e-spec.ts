@@ -973,8 +973,9 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
       userId: string | null;
       userName?: string | null;
     }[];
-    expect(events.length).toBeGreaterThan(0);
-    for (const e of events.filter((ev) => ev.userId)) {
+    const authored = events.filter((ev) => ev.userId);
+    expect(authored.length).toBeGreaterThan(0);
+    for (const e of authored) {
       expect(typeof e.userName).toBe('string');
       expect((e.userName ?? '').length).toBeGreaterThan(0);
     }
