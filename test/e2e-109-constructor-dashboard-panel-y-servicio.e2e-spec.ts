@@ -138,6 +138,11 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
   // Gráficos.
   const ch: Record<string, string> = {};
 
+  // Municipios homónimos en dos departamentos (auditoría 95 del 66).
+  const HOMONYM = `Spec109 Pueblo ${RUN}`;
+  const townIds: string[] = [];
+  const homonymDepartments: string[] = [];
+
   const http = () => request(app.getHttpServer());
   const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
@@ -498,6 +503,89 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
       throw builderUnavailable('PATCH charts/reorder', reorder);
     }
 
+    // Homónimos: dos preguntas «Municipio» fusionadas cuyas opciones con el
+    // mismo texto apuntan (metadata_id) a municipios de departamentos distintos.
+    const departments = await ds.query<
+      { department_id: string; name: string }[]
+    >(`SELECT department_id, name FROM departments ORDER BY name LIMIT 2`);
+    for (const dept of departments) {
+      const [town] = await ds.query<{ town_id: string }[]>(
+        `INSERT INTO towns (town_id, name, department_id)
+         VALUES (gen_random_uuid(), $1, $2) RETURNING town_id`,
+        [HOMONYM, dept.department_id],
+      );
+      townIds.push(town.town_id);
+      homonymDepartments.push(dept.name);
+    }
+    const [singleType] = await ds.query<{ type_id: string }[]>(
+      `SELECT type_id FROM types_of_questions WHERE name = 'single_choice'`,
+    );
+    const townOptionIds: string[][] = [];
+    for (const [qi, name] of ['townA', 'townB'].entries()) {
+      const [row] = await ds.query<{ question_id: string }[]>(
+        `INSERT INTO questions (question_id, section_id, text, type_id, is_required, "order")
+         VALUES (gen_random_uuid(), $1, $2, $3, false, $4) RETURNING question_id`,
+        [
+          section.section_id,
+          `Spec109 ${name} ${RUN}`,
+          singleType.type_id,
+          100 + qi,
+        ],
+      );
+      q[name] = row.question_id;
+      const ids: string[] = [];
+      for (const townId of townIds) {
+        const [opt] = await ds.query<{ option_id: string }[]>(
+          `INSERT INTO options_question (option_id, question_id, text, metadata_id)
+           VALUES (gen_random_uuid(), $1, $2, $3) RETURNING option_id`,
+          [row.question_id, HOMONYM, townId],
+        );
+        ids.push(opt.option_id);
+      }
+      townOptionIds.push(ids);
+    }
+    // townA: 6 encuestas en el municipio del primer departamento;
+    // townB: 2 encuestas en el del segundo.
+    for (const i of range(0, 5)) {
+      await ds.query(
+        `INSERT INTO responses (response_id, survey_id, question_id, option_id)
+         VALUES (gen_random_uuid(), $1, $2, $3)`,
+        [surveyIds[i], q.townA, townOptionIds[0][0]],
+      );
+    }
+    for (const i of range(6, 7)) {
+      await ds.query(
+        `INSERT INTO responses (response_id, survey_id, question_id, option_id)
+         VALUES (gen_random_uuid(), $1, $2, $3)`,
+        [surveyIds[i], q.townB, townOptionIds[1][1]],
+      );
+    }
+    {
+      const res = await http()
+        .post(`${BUILDER}/charts`)
+        .set(auth(adminToken))
+        .send({
+          categoryId: cat.a.id,
+          title: 'Spec109 municipio',
+          sourceKind: 'questions',
+          combineMode: 'merge',
+          chartKind: 'bars',
+          audience: 'public',
+          layout: 'normal',
+          series: [
+            {
+              seriesKey: 's1',
+              label: 'Municipio',
+              questionIds: [q.townA, q.townB],
+            },
+          ],
+        });
+      if (res.status !== 201)
+        throw builderUnavailable('POST charts (municipio)', res);
+      ch.homonym = (res.body as { chartId: string }).chartId;
+      await chartAction(ch.homonym, 'publish');
+    }
+
     // Criterio 4: tras publicar, dos fuentes pasan a estar bloqueadas.
     await ds.query(
       `UPDATE questions SET system_field = $1 WHERE question_id = ANY($2::uuid[])`,
@@ -537,6 +625,7 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
       questionIds,
     ]);
     await safe(`DELETE FROM sections WHERE instrument_id = $1`, [instrumentId]);
+    await safe(`DELETE FROM towns WHERE town_id = ANY($1::uuid[])`, [townIds]);
     await safe(`DELETE FROM instruments WHERE instrument_id = $1`, [
       instrumentId,
     ]);
@@ -834,6 +923,39 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
       );
       expect(mine).toEqual([ch.d3, ch.d1, ch.d2]);
     });
+  });
+
+  // ── Auditoría 95 del 66 — municipios homónimos ──────────────────────────
+
+  it('una fusión no junta municipios homónimos de distintos departamentos', async () => {
+    const body = await servedCharts('public', cat.a.code);
+    const chart = find(body, ch.homonym) as
+      | (ServedChart & {
+          series: { aggregation: { options: { text: string }[] } | null }[];
+        })
+      | undefined;
+    expect(chart).toBeDefined();
+    const texts = (chart?.series[0]?.aggregation?.options ?? []).map(
+      (o) => o.text,
+    );
+    expect(texts).toHaveLength(2);
+    expect(texts).toEqual(
+      expect.arrayContaining(
+        homonymDepartments.map((dept) => `${HOMONYM} (${dept})`),
+      ),
+    );
+  });
+
+  // ── C14 con bloque fijo ─────────────────────────────────────────────────
+
+  it('«Demanda digital» (C14) se lista mientras esté activa, aunque no tenga gráficos', async () => {
+    const [c14] = await ds.query<{ is_active: boolean }[]>(
+      `SELECT is_active FROM dashboard_categories WHERE code = 'C14'`,
+    );
+    const res = await http().get(PUBLIC_CATEGORIES).expect(200);
+    const codes = (res.body as ServedCategory[]).map(codeOf);
+    if (c14?.is_active) expect(codes).toContain('C14');
+    else expect(codes).not.toContain('C14');
   });
 
   // ── Caché pública (P22) ─────────────────────────────────────────────────

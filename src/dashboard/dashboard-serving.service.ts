@@ -59,6 +59,13 @@ export function withYesNoCells(aggregation: unknown): unknown {
   };
 }
 
+/**
+ * «Demanda digital» tiene un bloque consolidado fijo en código
+ * (`/dashboard/digital-demand`): se lista mientras esté activa, aunque no
+ * tenga gráficos en el constructor (decisión del usuario, 2026-11-18).
+ */
+export const DIGITAL_DEMAND_CATEGORY_CODE = 'C14';
+
 /** Audiencias que ve cada dashboard (P8, P19, P20). */
 export const PUBLIC_AUDIENCES: DashboardAudience[] = ['public'];
 export const PRIVATE_AUDIENCES: DashboardAudience[] = ['public', 'private'];
@@ -84,7 +91,7 @@ export class DashboardServingService {
 
   /**
    * Categorías activas con al menos un gráfico publicado de las audiencias
-   * pedidas, en su orden. Incluye `OVERVIEW` si cumple; el frontend la quita
+   * pedidas (más C14, por su bloque fijo), en su orden. Incluye `OVERVIEW` si cumple; el frontend la quita
    * de la navegación.
    */
   async listCategories(
@@ -94,12 +101,12 @@ export class DashboardServingService {
       .createQueryBuilder('cat')
       .where('cat.is_active = true')
       .andWhere(
-        `EXISTS (SELECT 1 FROM dashboard_charts ch
+        `(cat.code = :fixedBlock OR EXISTS (SELECT 1 FROM dashboard_charts ch
                   WHERE ch.category_id = cat.category_id
                     AND ch.status = 'published'
                     AND ch.archived_at IS NULL
-                    AND ch.audience IN (:...audiences))`,
-        { audiences },
+                    AND ch.audience IN (:...audiences)))`,
+        { audiences, fixedBlock: DIGITAL_DEMAND_CATEGORY_CODE },
       )
       .orderBy('cat.position', 'ASC')
       .addOrderBy('cat.code', 'ASC')
