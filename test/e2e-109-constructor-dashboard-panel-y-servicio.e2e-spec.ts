@@ -961,6 +961,25 @@ describe('Spec 109 — dashboards sobre gráficos (e2e)', () => {
     else expect(codes).not.toContain('C14');
   });
 
+  // ── Historial con nombre de usuario ─────────────────────────────────────
+
+  it('el historial de un gráfico trae el nombre de quien hizo cada cambio', async () => {
+    const res = await http()
+      .get(`${BUILDER}/charts/${ch.d1}/events`)
+      .set(auth(adminToken))
+      .expect(200);
+    const events = res.body as {
+      eventType: string;
+      userId: string | null;
+      userName?: string | null;
+    }[];
+    expect(events.length).toBeGreaterThan(0);
+    for (const e of events.filter((ev) => ev.userId)) {
+      expect(typeof e.userName).toBe('string');
+      expect((e.userName ?? '').length).toBeGreaterThan(0);
+    }
+  });
+
   // ── Caché pública (P22) ─────────────────────────────────────────────────
 
   it('P22 — la ruta pública de gráficos conserva public, max-age=300', async () => {

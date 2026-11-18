@@ -560,10 +560,30 @@ export class DashboardBuilderService {
 
   async events(id: string) {
     await this.getChartEntity(id);
-    return this.eventRepo.find({
+    const events = await this.eventRepo.find({
       where: { chartId: id },
       order: { createdAt: 'ASC' },
     });
+    // Spec 109 — quién hizo cada cambio: el historial del constructor muestra
+    // el nombre además de la fecha (userId queda null si fue la API).
+    const userIds = [
+      ...new Set(events.map((e) => e.userId).filter((u): u is string => !!u)),
+    ];
+    const names = new Map<string, string>();
+    if (userIds.length > 0) {
+      const rows: { user_id: string; name: string; last_name: string }[] =
+        await this.ds.query(
+          'SELECT user_id, name, last_name FROM users WHERE user_id = ANY($1)',
+          [userIds],
+        );
+      for (const r of rows) {
+        names.set(r.user_id, `${r.name} ${r.last_name ?? ''}`.trim());
+      }
+    }
+    return events.map((e) => ({
+      ...e,
+      userName: e.userId ? (names.get(e.userId) ?? null) : null,
+    }));
   }
 
   // ───────────────────────────── vista previa ─────────────────────────────
