@@ -4,6 +4,10 @@ import { buildPlan } from './plan';
 import { applyPlan } from './apply';
 import { exportManifest } from './export';
 import { CampaignSnapshotCampaign, insertCampaigns } from './campaigns';
+import {
+  restoreDashboardSources,
+  saveDashboardSources,
+} from './dashboard-sources';
 
 /**
  * Spec 84, Fase 3 — reemplaza TODO el contenido de instrumentos de un
@@ -39,6 +43,10 @@ const TABLES_TO_CLEAR = [
   'options_question',
   'questions',
   'instruments_actor_types',
+  // Spec 98 — cultivos a los que aplica cada instrumento: dependen de
+  // `instruments`. El manifiesto no los lleva (ni `scope_level`): tras el
+  // snapshot se repuebla con `pnpm seed:instrument-scope -- --env development`.
+  'instruments_crops',
   'sections',
   'instruments',
 ] as const;
@@ -52,6 +60,9 @@ const PRESERVED_TABLES = [
   // Spec 94 — vínculos productor ↔ finca: dependen de farmers/farms, no de
   // las tablas que se vacían, y se conservan junto con ellos.
   'farmer_farms',
+  // Spec 108 — fuentes de los gráficos del constructor: dependen de `questions`
+  // (CASCADE), se guardan antes del borrado y se restauran al final.
+  'dashboard_chart_sources',
 ];
 
 export interface SnapshotGuard {
@@ -78,6 +89,8 @@ export async function snapshot(
 
   await assertNoUnknownDependents(ds);
 
+  const savedChartSources = await saveDashboardSources(ds);
+
   await ds.transaction(async (manager) => {
     for (const table of TABLES_TO_CLEAR) {
       await manager.query(`DELETE FROM ${table}`);
@@ -102,6 +115,21 @@ export async function snapshot(
     await ds.transaction(async (manager) => {
       await insertCampaigns(manager, campaigns);
     });
+  }
+
+  // Spec 108 — restaurar las fuentes de gráficos (por UUID o por huella).
+  if (savedChartSources.length > 0) {
+    const report = await ds.transaction((manager) =>
+      restoreDashboardSources(manager, savedChartSources),
+    );
+    console.log(
+      `Fuentes de gráficos: ${report.kept} conservadas, ${report.rebuilt} reconstruidas por huella, ${report.unresolved.length} sin resolver.`,
+    );
+    for (const u of report.unresolved) {
+      console.warn(
+        `  Sin resolver: gráfico ${u.chart_id} · ${u.instrument_code_snapshot ?? '-'} · "${u.question_text_snapshot}"`,
+      );
+    }
   }
 
   // Verificación final: el destino debe coincidir con el manifiesto pedido.

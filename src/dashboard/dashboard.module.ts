@@ -11,6 +11,14 @@ import { Department } from 'src/departments/entities/department.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { DashboardCategory } from './entities/dashboard-category.entity';
+import { DashboardChart } from './entities/dashboard-chart.entity';
+import { DashboardChartSource } from './entities/dashboard-chart-source.entity';
+import { DashboardChartEvent } from './entities/dashboard-chart-event.entity';
+import { DashboardAggregationService } from './dashboard-aggregation.service';
+import { DashboardBuilderController } from './dashboard-builder.controller';
+import { DashboardBuilderService } from './dashboard-builder.service';
+import { DashboardChartsService } from './dashboard-charts.service';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
@@ -28,9 +36,18 @@ import { DashboardService } from './dashboard.service';
       Town,
       TypeOfCrop,
       ActorType,
+      DashboardCategory,
+      DashboardChart,
+      DashboardChartSource,
+      DashboardChartEvent,
     ]),
   ],
-  controllers: [DashboardController],
-  providers: [DashboardService],
+  controllers: [DashboardController, DashboardBuilderController],
+  providers: [
+    DashboardService,
+    DashboardAggregationService,
+    DashboardChartsService,
+    DashboardBuilderService,
+  ],
 })
 export class DashboardModule {}

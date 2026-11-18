@@ -40,6 +40,23 @@ usa después de que el usuario lo haya confirmado explícitamente en la sesión.
 que lo salve: existe para reemplazar contenido a ciegas en desarrollo, nunca
 para tocar datos reales.
 
+### Alcance por instrumento (spec 98)
+
+El manifiesto no incluye `scope_level` ni la tabla `instruments_crops`. `snapshot`
+vacía `instruments_crops` (depende de `instruments`) y los instrumentos
+reinsertados quedan sin alcance: después del snapshot hay que correr
+`pnpm seed:instrument-scope -- --env development` para repoblarlo.
+
+### Gráficos del constructor de dashboard (spec 108)
+
+`dashboard_chart_sources.question_id` apunta a `questions` con `ON DELETE
+CASCADE`, y `snapshot` vacía las preguntas del destino. Por eso `snapshot`
+guarda las fuentes antes de borrar y las restaura al final: las que conservan
+su UUID de pregunta se reinsertan tal cual; las demás se reconstruyen por
+huella (código de instrumento + texto exacto, solo si es inequívoca) y las que
+no resuelve se listan en consola. Las tablas `dashboard_categories`,
+`dashboard_charts` y `dashboard_chart_events` no se tocan.
+
 ## Los comandos
 
 ### 1. `pnpm instruments:export`

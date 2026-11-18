@@ -68,6 +68,7 @@ import { mergeGroupsForCategory } from './dashboard-question-merge.config';
 import {
   DENIED_SYSTEM_FIELDS,
   EXCLUDED_QUESTION_TYPES,
+  explainIneligibility,
   isQuestionEligible,
   MIN_SAMPLE_THRESHOLD,
   suppressCell,
@@ -787,6 +788,100 @@ export class DashboardService {
   /** Ids de las preguntas a leer para una pregunta resuelta por destino. */
   private idsOf(question: DestinationQuestion): string[] {
     return question.destinationQuestionIds ?? [question.questionId];
+  }
+
+  // ───────────── Spec 108 — puntos de entrada del constructor ─────────────
+
+  /** Motivo por el que la barrera del 107 bloquea una pregunta, o `null` si es elegible. */
+  blockedReasonFor(question: Question): string | null {
+    return explainIneligibility({
+      text: question.text,
+      systemField: question.systemField,
+      typeName: question.type?.name,
+      instrumentCode: question.section?.instrument?.code,
+    });
+  }
+
+  /**
+   * Agrega una pregunta (o las que alimentan un mismo destino, contadas por
+   * encuesta distinta) con la misma lógica, supresión y barreras del 107.
+   * Si el tipo no se puede agregar devuelve `null`.
+   */
+  async aggregateDestination(
+    question: Question,
+    destinationIds: string[],
+    filters: DashboardFiltersDto,
+    instrument?: Instrument,
+  ): Promise<DashboardQuestionDto | null> {
+    const destination = question as DestinationQuestion;
+    destination.destinationQuestionIds =
+      destinationIds.length > 1 ? destinationIds : undefined;
+    try {
+      return await this.aggregateQuestion(destination, filters, [], instrument);
+    } catch (error) {
+      if (error instanceof UnsupportedQuestionTypeError) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * Spec 108 (P16) — lo que la curaduría del 66 sirve hoy para una categoría
+   * (elegibles, sin ocultas, con las fusiones aplicadas), sin agregar datos.
+   * Insumo de la semilla `seed:dashboard-charts`.
+   */
+  async listCuratedDestinations(categoryCode: string): Promise<
+    {
+      question: Question;
+      instrument: Instrument | undefined;
+      questionIds: string[];
+      chartHint: string | null;
+    }[]
+  > {
+    const category = DASHBOARD_CATEGORIES.find((c) => c.code === categoryCode);
+    if (!category) return [];
+    const instruments = await this.getCategoryInstruments(category);
+    const { questions, instrumentByQuestionId } =
+      await this.getEligibleQuestionsForCategory(category, instruments);
+    const visible = questions.filter(
+      (q) =>
+        !isQuestionHidden(
+          instrumentByQuestionId.get(q.questionId)?.code,
+          q.text,
+        ),
+    );
+    const merged = await this.applyQuestionMerges(
+      category.id,
+      visible,
+      instrumentByQuestionId,
+    );
+    return merged.map((question) => {
+      const instrument = instrumentByQuestionId.get(question.questionId);
+      return {
+        question,
+        instrument,
+        questionIds: this.idsOf(question as DestinationQuestion),
+        chartHint: resolveCuratedChartHint(instrument?.code, question.text),
+      };
+    });
+  }
+
+  /** Valores y unidades de un destino `numeric_with_unit`, solo para normalizarlos en el servidor. */
+  async fetchUnitValues(
+    questionIds: string[],
+    filters: DashboardFiltersDto,
+  ): Promise<{ value: number; unit: string; surveyId: string }[]> {
+    const rows = await this.buildResponseBaseQuery(questionIds, filters, [])
+      .innerJoin('response.option', 'option')
+      .andWhere('response.numericValue IS NOT NULL')
+      .select('response.numericValue', 'value')
+      .addSelect('option.text', 'unit')
+      .addSelect('response.survey', 'surveyId')
+      .getRawMany<{ value: string; unit: string; surveyId: string }>();
+    return rows.map((r) => ({
+      value: Number(r.value),
+      unit: r.unit,
+      surveyId: r.surveyId,
+    }));
   }
 
   /** Cuenta filas, o encuestas distintas si el destino viene de varias preguntas. */
