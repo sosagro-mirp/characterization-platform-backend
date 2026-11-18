@@ -10,11 +10,7 @@ import {
   complementaryHidden,
   positionStatsAllowed,
 } from './dashboard-binning';
-import {
-  MIN_CELL_SIZE,
-  MIN_SAMPLE_THRESHOLD,
-  suppressCell,
-} from './dashboard-privacy.config';
+import { MIN_SAMPLE_THRESHOLD, suppressCell } from './dashboard-privacy.config';
 import {
   RESPONSE_DERIVED_FILTERS,
   findEntityMetric,
