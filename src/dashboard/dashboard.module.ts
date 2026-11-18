@@ -11,6 +11,10 @@ import { Department } from 'src/departments/entities/department.entity';
 import { Town } from 'src/towns/entities/town.entity';
 import { TypeOfCrop } from 'src/types-of-crops/entities/type-of-crop.entity';
 import { ActorType } from 'src/actor-types/entities/actor-type.entity';
+import { DashboardCategory } from './entities/dashboard-category.entity';
+import { DashboardChart } from './entities/dashboard-chart.entity';
+import { DashboardChartSource } from './entities/dashboard-chart-source.entity';
+import { DashboardChartEvent } from './entities/dashboard-chart-event.entity';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
@@ -28,6 +32,10 @@ import { DashboardService } from './dashboard.service';
       Town,
       TypeOfCrop,
       ActorType,
+      DashboardCategory,
+      DashboardChart,
+      DashboardChartSource,
+      DashboardChartEvent,
     ]),
   ],
   controllers: [DashboardController],
