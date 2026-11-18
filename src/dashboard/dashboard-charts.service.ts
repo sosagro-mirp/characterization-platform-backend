@@ -9,7 +9,9 @@ import {
   validateChartKind,
 } from './dashboard-chart-compat';
 import { DashboardAggregationService } from './dashboard-aggregation.service';
-import { DashboardService } from './dashboard.service';
+import { DashboardService, ServingFilterContext } from './dashboard.service';
+import { DashboardChart } from './entities/dashboard-chart.entity';
+import { DashboardChartSource } from './entities/dashboard-chart-source.entity';
 import { findEntityMetric } from './dashboard-entity-metrics.config';
 
 export const SOURCE_BLOCKED = 'DASHBOARD_SOURCE_BLOCKED';
@@ -33,6 +35,31 @@ export interface ChartConfig {
 
 export type Health = 'ok' | 'needs_review';
 
+/** Configuración de un gráfico guardado a partir de su fila y sus fuentes. */
+export function chartConfigFrom(
+  chart: DashboardChart,
+  sources: DashboardChartSource[],
+): ChartConfig {
+  const bySeries = new Map<string, SeriesConfig>();
+  for (const s of sources) {
+    const entry = bySeries.get(s.seriesKey) ?? {
+      seriesKey: s.seriesKey,
+      label: s.seriesLabel,
+      questionIds: [],
+    };
+    entry.questionIds.push(s.questionId);
+    bySeries.set(s.seriesKey, entry);
+  }
+  return {
+    sourceKind: chart.sourceKind,
+    chartKind: chart.chartKind,
+    combineMode: chart.combineMode,
+    settings: chart.settings ?? {},
+    metricKey: chart.entityMetricKey,
+    series: [...bySeries.values()],
+  };
+}
+
 export interface ExcludedSource {
   questionId: string;
   reason: string;
@@ -48,6 +75,10 @@ export interface PreviewResult {
     answeredCount: number;
     suppressed: boolean;
     aggregation: unknown;
+    /** Spec 109 — false si la serie se quedó sin fuentes válidas. */
+    hasValidSources?: boolean;
+    /** Spec 109 — instrumentos de las fuentes válidas (procedencia). */
+    instrumentNames?: string[];
   }[];
   excludedSources: ExcludedSource[];
   normalization?: { targetUnit: string; excludedCount: number };
@@ -335,6 +366,7 @@ export class DashboardChartsService {
     config: ChartConfig,
     expectedType: string | null,
     query: Record<string, string | undefined> = {},
+    ctx?: ServingFilterContext,
   ): Promise<PreviewResult> {
     if (config.sourceKind === 'entity_metric') {
       const metric = findEntityMetric(config.metricKey!)!;
@@ -386,14 +418,24 @@ export class DashboardChartsService {
           answeredCount: 0,
           suppressed: true,
           aggregation: null,
+          hasValidSources: false,
+          instrumentNames: [],
         });
         continue;
       }
+      const instrumentNames = [
+        ...new Set(
+          validIds
+            .map((id) => questions.get(id)!.section?.instrument?.name)
+            .filter((n): n is string => !!n),
+        ),
+      ];
       if (normalize && nwu?.targetUnit) {
         const res = await this.aggregation.aggregateNormalized(
           validIds,
           nwu.targetUnit,
           nwu.factors ?? {},
+          ctx,
         );
         normalization = {
           targetUnit: nwu.targetUnit,
@@ -406,6 +448,8 @@ export class DashboardChartsService {
           answeredCount: res.answeredCount,
           suppressed: res.suppressed,
           aggregation: res.aggregation,
+          hasValidSources: true,
+          instrumentNames,
         });
         continue;
       }
@@ -414,6 +458,7 @@ export class DashboardChartsService {
         representative,
         validIds,
         representative.section?.instrument,
+        ctx,
       );
       series.push({
         seriesKey: s.seriesKey,
@@ -421,6 +466,8 @@ export class DashboardChartsService {
         answeredCount: res.answeredCount,
         suppressed: res.suppressed,
         aggregation: res.aggregation,
+        hasValidSources: true,
+        instrumentNames,
       });
     }
     return {

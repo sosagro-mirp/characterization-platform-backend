@@ -21,6 +21,7 @@ export interface PlannedChart {
   questionIds?: string[];
   metricKey?: string;
   questionType?: string;
+  layout?: 'normal' | 'wide';
   note?: string;
 }
 
@@ -33,28 +34,40 @@ export interface SeedReport {
 
 const SEED_CODES = ['C1', 'C2'];
 
-/** Resumen general: equivalentes de las tarjetas de `getOverview` en métricas de entidad. */
-const OVERVIEW_METRICS: PlannedChart[] = [
+/**
+ * Spec 109 (P3, criterio 14) — Resumen general: las tarjetas que el 66 armaba
+ * buscando preguntas por texto en `OverviewView`. La dona de cultivos, el mapa
+ * y la edad siguen como bloques fijos del frontend (decisión del usuario del
+ * 2026-11-18), así que no se siembran como métricas.
+ */
+const OVERVIEW_FROM_CURATION: {
+  sourceCode: string;
+  title: string;
+  chartKind: string;
+  layout: 'normal' | 'wide';
+  match: (q: { text: string; systemField?: string | null }) => boolean;
+}[] = [
   {
-    categoryCode: 'OVERVIEW',
-    title: 'Productores por departamento',
-    kind: 'metric',
-    metricKey: 'farmers_by_department',
-    chartKind: 'map',
+    sourceCode: 'C1',
+    title: 'Género del productor',
+    chartKind: 'bars',
+    layout: 'normal',
+    match: (q) => q.systemField === 'farmer.gender',
   },
   {
-    categoryCode: 'OVERVIEW',
-    title: 'Fincas por cultivo',
-    kind: 'metric',
-    metricKey: 'farms_by_crop',
-    chartKind: 'donut',
+    sourceCode: 'C1',
+    title: 'Etapas de la cadena',
+    chartKind: 'horizontal-bars',
+    layout: 'normal',
+    match: (q) => q.text.startsWith('¿En qué etapas de la cadena productiva'),
   },
   {
-    categoryCode: 'OVERVIEW',
-    title: 'Distribución del área de las fincas',
-    kind: 'metric',
-    metricKey: 'farm_area_distribution',
-    chartKind: 'histogram',
+    sourceCode: 'C3',
+    title: 'Meses de cosecha principal',
+    chartKind: 'harvest-calendar',
+    layout: 'wide',
+    match: (q) =>
+      q.text.startsWith('¿En qué meses se presenta la cosecha principal'),
   },
 ];
 
@@ -123,7 +136,45 @@ export async function planDashboardCharts(
       });
     }
   }
-  planned.push(...OVERVIEW_METRICS);
+  for (const card of OVERVIEW_FROM_CURATION) {
+    const d = (await dashboard.listCuratedDestinations(card.sourceCode)).find(
+      (dest) => card.match(dest.question),
+    );
+    if (!d) {
+      unresolved.push({
+        title: `[OVERVIEW] ${card.title}`,
+        reason: `No se encontró su pregunta en ${card.sourceCode}.`,
+      });
+      continue;
+    }
+    const type = d.question.type?.name;
+    const check = validateChartKind({
+      questionType: type,
+      chartKind: card.chartKind,
+      combineMode: 'merge',
+      optionTexts: (d.question.options ?? []).map((o) => o.text),
+    });
+    if (!check.ok) {
+      unresolved.push({
+        title: `[OVERVIEW] ${card.title}`,
+        reason: check.reason ?? 'Gráfico no permitido.',
+      });
+      continue;
+    }
+    planned.push({
+      categoryCode: 'OVERVIEW',
+      title: card.title,
+      kind: 'question',
+      chartKind: card.chartKind,
+      questionIds: d.questionIds,
+      questionType: type,
+      layout: card.layout,
+      note:
+        d.questionIds.length > 1
+          ? `fusión de ${d.questionIds.length}`
+          : undefined,
+    });
+  }
   return { planned, unresolved };
 }
 
@@ -179,6 +230,7 @@ export async function applyDashboardCharts(
               chartKind: p.chartKind,
               combineMode: 'merge' as const,
               audience: 'public' as const,
+              layout: p.layout ?? ('normal' as const),
               series: [
                 {
                   seriesKey: 's1',

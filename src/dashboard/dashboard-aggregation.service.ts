@@ -3,7 +3,7 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { Instrument } from 'src/instruments/entities/instrument.entity';
 import { Question } from 'src/questions/entities/question.entity';
-import { DashboardService } from './dashboard.service';
+import { DashboardService, ServingFilterContext } from './dashboard.service';
 import { DashboardFiltersDto } from './dto/dashboard-filters.dto';
 import {
   buildBins,
@@ -57,12 +57,14 @@ export class DashboardAggregationService {
     representative: Question,
     questionIds: string[],
     instrument?: Instrument,
+    ctx?: ServingFilterContext,
   ): Promise<SeriesAggregation> {
     const dto = await this.dashboard.aggregateDestination(
       representative,
       questionIds,
-      {} as DashboardFiltersDto,
+      ctx?.filters ?? ({} as DashboardFiltersDto),
       instrument,
+      ctx?.responseFilters ?? [],
     );
     if (!dto) return { answeredCount: 0, suppressed: true, aggregation: null };
     return {
@@ -77,10 +79,12 @@ export class DashboardAggregationService {
     questionIds: string[],
     targetUnit: string,
     factors: Record<string, number>,
+    ctx?: ServingFilterContext,
   ): Promise<NormalizedAggregation> {
     const rows = await this.dashboard.fetchUnitValues(
       questionIds,
-      {} as DashboardFiltersDto,
+      ctx?.filters ?? ({} as DashboardFiltersDto),
+      ctx?.responseFilters ?? [],
     );
     // Una encuesta cuenta una sola vez aunque responda a varias fuentes de la
     // fusión (criterio 15): se toma su primer valor con factor.
