@@ -24,7 +24,7 @@ export class DashboardFiltersDto {
       // Spec 66 (Fase 3, D7, 2026-08-10): C1–C14, no C1–C15 — fusión de
       // "Perfil del productor" + "La finca" en una sola categoría (C1) y
       // renumeración en cascada de las siguientes.
-      'Código de una categoría del constructor (spec 109, P2: C1…, OVERVIEW). Un código inexistente o inactivo responde 404. En /dashboard/charts elige la categoría; en /analytics se retiró (410).',
+      'Código de una categoría del constructor (spec 109, P2: C1…, OVERVIEW). Un código inexistente o inactivo responde 404. En /dashboard/charts elige la categoría; en /analytics, /summary, /department-counts, /overview, /kpis y /digital-demand se retiró (410).',
     example: 'C1',
   })
   @IsOptional()

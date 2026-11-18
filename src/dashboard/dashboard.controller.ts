@@ -41,7 +41,7 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Datos agregados por instrumento (ADMIN/RESEARCHER)',
     description:
-      'Spec 109 (P20): la consulta pública por `categoryId` se retiró y responde 410; el dashboard usa `GET /dashboard/charts`. Spec 107: con `instrumentId` exige ADMIN o RESEARCHER (JWT, o API key con scope read) y responde `Cache-Control: private, no-store`. Devuelve agregados por pregunta (nunca respuestas individuales; los numéricos van en intervalos, sin valores crudos ni extremos). Requiere instrumentId o categoryId (mutuamente excluyentes, spec 43) para poblar questions[]; sin ninguno retorna solo metadata. Con categoryId, agrega las preguntas de todos los instrumentos activos de la categoría.',
+      'Spec 109 (P20): la consulta pública por `categoryId` se retiró y responde 410; el dashboard usa `GET /dashboard/charts`. Spec 107: con `instrumentId` exige ADMIN o RESEARCHER (JWT, o API key con scope read) y responde `Cache-Control: private, no-store`. Devuelve agregados por pregunta (nunca respuestas individuales; los numéricos van en intervalos, sin valores crudos ni extremos). Requiere instrumentId para poblar questions[]; sin él retorna solo metadata. Desde el spec 109 (Fase 6) muestra toda pregunta elegible por privacidad y tipo, sin curaduría editorial, y `chartHint` es null.',
   })
   @ApiResponse({ status: 200, type: DashboardResponseDto })
   @ApiResponse({
@@ -58,8 +58,7 @@ export class DashboardController {
   })
   @ApiResponse({
     status: 404,
-    description:
-      'Alguno de los filtros UUID no existe, o categoryId no es una categoría válida.',
+    description: 'Alguno de los filtros UUID no existe.',
   })
   getAnalytics(
     @Query() filters: DashboardFiltersDto,
@@ -77,7 +76,11 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Tamaño de la muestra para los filtros dados',
     description:
-      'Útil para el frontend antes de renderizar gráficos (indicador de tamaño de muestra en el panel de filtros). Acepta instrumentId o categoryId (spec 43).',
+      'Útil para el frontend antes de renderizar gráficos (indicador de tamaño de muestra en el panel de filtros). Acepta instrumentId; categoryId responde 410 (spec 109).',
+  })
+  @ApiResponse({
+    status: 410,
+    description: 'Con categoryId: ruta retirada (spec 109, Fase 6).',
   })
   @ApiResponse({
     status: 200,
@@ -94,7 +97,11 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Distribución de encuestas por departamento (mapa coroplético)',
     description:
-      'Ignora departmentId/townId si se envían. Acepta instrumentId o categoryId (spec 43) para acotar la muestra. Aplica el umbral de privacidad por departamento (buckets con < 5 encuestas se omiten).',
+      'Ignora departmentId/townId si se envían. Acepta instrumentId para acotar la muestra; categoryId responde 410 (spec 109). Aplica el umbral de privacidad por departamento (buckets con < 5 encuestas se omiten).',
+  })
+  @ApiResponse({
+    status: 410,
+    description: 'Con categoryId: ruta retirada (spec 109, Fase 6).',
   })
   @ApiResponse({ status: 200, type: [DashboardDepartmentCountDto] })
   getDepartmentCounts(
@@ -143,9 +150,13 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Perfil demográfico de la muestra (independiente del instrumento)',
     description:
-      'Ignora instrumentId/categoryId/departmentId/townId. Distribución por tipo de actor, cultivo y departamento, más estadísticas de farmer.age y farmer.experienceYears (respetando el umbral de privacidad).',
+      'Ignora instrumentId/departmentId/townId; categoryId responde 410 (spec 109). Distribución por tipo de actor, cultivo y departamento, más estadísticas de farmer.age y farmer.experienceYears (respetando el umbral de privacidad).',
   })
   @ApiResponse({ status: 200, type: DashboardOverviewDto })
+  @ApiResponse({
+    status: 410,
+    description: 'Con categoryId: ruta retirada (spec 109, Fase 6).',
+  })
   getOverview(
     @Query() filters: DashboardFiltersDto,
   ): Promise<DashboardOverviewDto> {
@@ -155,11 +166,15 @@ export class DashboardController {
   @Get('kpis')
   @Header('Cache-Control', 'public, max-age=300')
   @ApiOperation({
-    summary: 'Tira de KPIs curados (spec 43, D5)',
+    summary: 'Tira de KPIs del resumen general (spec 43, D5)',
     description:
-      'Con categoryId=C15 devuelve la tira de "Demanda digital"; en cualquier otro caso (incluida la vista de resumen general), la tira general. Cada KPI declara su unidad y se marca suppressed cuando su pregunta fuente no alcanza el umbral de privacidad — nunca un número inventado.',
+      'Devuelve siempre la tira general; categoryId responde 410 (spec 109). Cada KPI declara su unidad y se marca suppressed cuando su pregunta fuente no alcanza el umbral de privacidad — nunca un número inventado.',
   })
   @ApiResponse({ status: 200, type: [DashboardKpiDto] })
+  @ApiResponse({
+    status: 410,
+    description: 'Con categoryId: ruta retirada (spec 109, Fase 6).',
+  })
   getKpis(@Query() filters: DashboardFiltersDto): Promise<DashboardKpiDto[]> {
     return this.dashboardService.getKpis(filters);
   }
@@ -167,11 +182,15 @@ export class DashboardController {
   @Get('digital-demand')
   @Header('Cache-Control', 'public, max-age=300')
   @ApiOperation({
-    summary: 'Vista consolidada "Demanda digital" (C15, spec 43, D4)',
+    summary: 'Vista consolidada "Demanda digital" (C14, spec 43, D4)',
     description:
-      'Consolida todos los ítems Likert ★ (interés en app) de la muestra filtrada: ranking con bandas y media, índice global de aceptación, cortes por edad/nivel educativo/conectividad, radar de barreras S_DCU (B1/B2/B3), confianza en instituciones, habilidades digitales, plataformas y canal preferido. Ignora instrumentId/categoryId (consolidación fija, cruza siempre los mismos instrumentos).',
+      'Consolida todos los ítems Likert ★ (interés en app) de la muestra filtrada: ranking con bandas y media, índice global de aceptación, cortes por edad/nivel educativo/conectividad, radar de barreras S_DCU (B1/B2/B3), confianza en instituciones, habilidades digitales, plataformas y canal preferido. Ignora instrumentId (consolidación fija, cruza siempre los mismos instrumentos); categoryId responde 410 (spec 109).',
   })
   @ApiResponse({ status: 200, type: DashboardDigitalDemandDto })
+  @ApiResponse({
+    status: 410,
+    description: 'Con categoryId: ruta retirada (spec 109, Fase 6).',
+  })
   getDigitalDemand(
     @Query() filters: DashboardFiltersDto,
   ): Promise<DashboardDigitalDemandDto> {

@@ -15,12 +15,6 @@ export class DashboardMetadataDto {
 
   @ApiProperty({
     required: false,
-    description: 'Nombre de la categoría seleccionada, si aplica (spec 43).',
-  })
-  categoryName?: string;
-
-  @ApiProperty({
-    required: false,
     description: 'Nombre del departamento filtrado, si aplica.',
   })
   departmentName?: string;
@@ -277,9 +271,9 @@ export class DashboardQuestionDto {
     required: false,
     nullable: true,
     description:
-      'Gráfica curada explícitamente para esta pregunta (spec 66, D3), ' +
-      'p. ej. "harvest-calendar". Null si no se curó ninguna — el frontend ' +
-      'cae al comportamiento por tipo de pregunta.',
+      'Siempre null desde el spec 109 (Fase 6), que retiró la curaduría del ' +
+      '66: el frontend elige la gráfica por tipo de pregunta. Se conserva ' +
+      'por compatibilidad del contrato.',
   })
   chartHint: string | null;
 

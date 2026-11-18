@@ -22,7 +22,6 @@
     "seed:seed": "ts-node -r tsconfig-paths/register src/database/seeds/run-seed.ts",
     "seed:inject-strategic": "ts-node -r tsconfig-paths/register src/database/seeds/run-inject-strategic-questions.seed.ts",
     "seed:dev-toy": "ts-node -r tsconfig-paths/register src/database/seeds/run-dev-toy-surveys.seed.ts",
-    "seed:dashboard-charts": "ts-node -r tsconfig-paths/register src/database/seeds/dashboard-charts.cli.ts",
     "seed:instrument-scope": "ts-node -r tsconfig-paths/register src/database/seeds/instrument-scope-matrix.cli.ts",
     "seed:migrate-other-options": "ts-node -r tsconfig-paths/register src/database/seeds/run-migrate-other-options.seed.ts",
     "swagger:generate": "ts-node -r tsconfig-paths/register src/generate-swagger.ts",

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   GoneException,
   Injectable,
   Logger,
@@ -35,10 +34,6 @@ import {
 } from './dto/dashboard-response.dto';
 import { keysFor } from '../questions/system-fields/system-field-registry';
 import {
-  DASHBOARD_CATEGORIES,
-  DashboardCategoryConfig,
-} from './dashboard-categories.config';
-import {
   AGE_RANGE_BOUNDS,
   AGE_RANGE_BUCKETS,
   AgeRangeBucket,
@@ -47,7 +42,6 @@ import {
   ResponseFilterSource,
 } from './dashboard-response-filters.config';
 import {
-  DIGITAL_DEMAND_KPIS,
   DIGITAL_DEMAND_SOURCES,
   KpiDefinition,
   OVERVIEW_KPIS,
@@ -61,11 +55,6 @@ import {
   LikertRankingItemDto,
 } from './dto/dashboard-digital-demand.dto';
 import {
-  attachExternalIds,
-  collapseMergeGroups,
-} from './dashboard-question-merge';
-import { mergeGroupsForCategory } from './dashboard-question-merge.config';
-import {
   DENIED_SYSTEM_FIELDS,
   EXCLUDED_QUESTION_TYPES,
   explainIneligibility,
@@ -78,10 +67,14 @@ import {
   complementaryHidden,
   positionStatsAllowed,
 } from './dashboard-binning';
-import {
-  isQuestionHidden,
-  resolveCuratedChartHint,
-} from './dashboard-question-curation.config';
+
+/**
+ * Spec 109 (Fase 6) — `categoryId` en las rutas de agregación se retiró junto
+ * con el mapa de categorías del 66: las categorías viven en el constructor y
+ * se consultan en `GET /dashboard/charts?categoryId=<código>`.
+ */
+const LEGACY_CATEGORY_GONE =
+  'La consulta por categoría se retiró: use GET /api/dashboard/charts?categoryId=<código>.';
 
 /**
  * Spec 43 (Fase 3): filtros globales derivados de respuestas, ya resueltos a
@@ -160,15 +153,11 @@ export class DashboardService {
   async getSummary(
     filters: DashboardFiltersDto,
   ): Promise<{ count: number; suppressed: boolean }> {
-    const { categoryInstruments } = await this.validateFilters(filters);
-    const categoryInstrumentIds = this.resolveCategoryInstrumentIds(
-      filters,
-      categoryInstruments,
-    );
+    await this.validateFilters(filters);
     const responseFilters = await this.resolveResponseFilters(filters);
     const count = await this.buildFilteredSurveyQuery(
       filters,
-      categoryInstrumentIds,
+      undefined,
       responseFilters,
     ).getCount();
     return { count, suppressed: count < MIN_SAMPLE_THRESHOLD };
@@ -190,17 +179,13 @@ export class DashboardService {
     responseFilters?: ResolvedResponseFilters,
   ): Promise<DashboardDepartmentCountDto[]> {
     const { departmentId: _departmentId, townId: _townId, ...rest } = filters;
-    const { categoryInstruments } = await this.validateFilters(rest);
-    const categoryInstrumentIds = this.resolveCategoryInstrumentIds(
-      rest,
-      categoryInstruments,
-    );
+    await this.validateFilters(rest);
     const resolvedResponseFilters =
       responseFilters ?? (await this.resolveResponseFilters(rest));
 
     const rows = await this.buildFilteredSurveyQuery(
       rest,
-      categoryInstrumentIds,
+      undefined,
       resolvedResponseFilters,
     )
       .innerJoin('survey.department', 'department')
@@ -238,6 +223,7 @@ export class DashboardService {
   async getOverview(
     filters: DashboardFiltersDto,
   ): Promise<DashboardOverviewDto> {
+    this.rejectLegacyCategory(filters);
     const {
       instrumentId: _instrumentId,
       categoryId: _categoryId,
@@ -358,45 +344,28 @@ export class DashboardService {
   ): Promise<DashboardResponseDto> {
     // Spec 109 (P20): la ruta pública por categoría «todas las elegibles»
     // (opt-out) se retira; el dashboard sirve gráficos configurados en
-    // `GET /dashboard/charts?categoryId=`.
-    if (filters.categoryId) {
-      throw new GoneException(
-        'La consulta por categoría se retiró: use GET /api/dashboard/charts?categoryId=<código>.',
-      );
-    }
-    const {
-      instrument,
-      category,
-      categoryInstruments,
-      departmentName,
-      townName,
-      cropName,
-      actorTypeName,
-    } = await this.validateFilters(filters);
-    const categoryInstrumentIds = this.resolveCategoryInstrumentIds(
-      filters,
-      categoryInstruments,
-    );
+    // `GET /dashboard/charts?categoryId=`. Queda la vista privada por
+    // instrumento (panel y MCP), sin la curaduría editorial del 66: muestra
+    // toda pregunta elegible por privacidad y tipo (Fase 6, decisión del
+    // usuario del 2026-11-18).
+    this.rejectLegacyCategory(filters);
+    const { instrument, departmentName, townName, cropName, actorTypeName } =
+      await this.validateFilters(filters);
     const responseFilters = await this.resolveResponseFilters(filters);
 
     const totalCount = await this.buildFilteredSurveyQuery(
       filters,
-      categoryInstrumentIds,
+      undefined,
       responseFilters,
     ).getCount();
     const dateRange =
       totalCount > 0
-        ? await this.getDateRange(
-            filters,
-            categoryInstrumentIds,
-            responseFilters,
-          )
+        ? await this.getDateRange(filters, undefined, responseFilters)
         : null;
 
     const metadata = {
       totalCount,
       instrumentName: instrument?.name,
-      categoryName: category?.name,
       departmentName,
       townName,
       cropName,
@@ -414,54 +383,16 @@ export class DashboardService {
       };
     }
 
-    if (!instrument && !category) {
+    if (!instrument) {
       return { metadata, suppressed: false, questions: [] };
     }
 
-    // D2 (spec 43): instrumentId y categoryId son mutuamente excluyentes
-    // (validado en validateFilters), así que a lo sumo uno de los dos ramales
-    // siguientes se ejecuta.
-    let questions: Question[];
-    let instrumentByQuestionId: Map<string, Instrument>;
-    if (instrument) {
-      questions = await this.getEligibleQuestions(instrument.instrumentId);
-      instrumentByQuestionId = new Map(
-        questions.map((q) => [q.questionId, instrument]),
-      );
-    } else {
-      ({ questions, instrumentByQuestionId } =
-        await this.getEligibleQuestionsForCategory(
-          category!,
-          categoryInstruments,
-        ));
-    }
-
-    // D4 (spec 66): curaduría editorial — una pregunta oculta sigue siendo
-    // elegible por privacidad/tipo, pero se decidió con el usuario que no
-    // aporta valor analítico al dashboard público (ver
-    // dashboard-question-curation.config.ts).
-    questions = questions.filter(
-      (question) =>
-        !isQuestionHidden(
-          instrumentByQuestionId.get(question.questionId)?.code,
-          question.text,
-        ),
-    );
-
-    // D15 (spec 66): preguntas equivalentes de varios instrumentos se juntan
-    // en una sola gráfica (ver dashboard-question-merge.config.ts).
-    if (category) {
-      questions = await this.applyQuestionMerges(
-        category.id,
-        questions,
-        instrumentByQuestionId,
-      );
-    }
+    const questions = await this.getEligibleQuestions(instrument.instrumentId);
 
     const dashboardQuestions: DashboardQuestionDto[] = [];
     for (const question of questions) {
       // Una pregunta de un tipo sin agregación se omite y se registra: no
-      // tumba la categoría entera con un 500 (bug `numeric_with_unit`).
+      // tumba el instrumento entero con un 500 (bug `numeric_with_unit`).
       // Cualquier otro error (base de datos, SQL) se propaga.
       try {
         dashboardQuestions.push(
@@ -469,7 +400,7 @@ export class DashboardService {
             question,
             filters,
             responseFilters,
-            instrumentByQuestionId.get(question.questionId),
+            instrument,
           ),
         );
       } catch (error) {
@@ -484,60 +415,21 @@ export class DashboardService {
     return { metadata, suppressed: false, questions: dashboardQuestions };
   }
 
-  /**
-   * D2 (spec 43): agrega las preguntas elegibles de todos los instrumentos
-   * activos de la categoría, respetando el filtro por sección (D1) por
-   * instrumento, y deduplicando por questionId (defensivo — no debería haber
-   * solapamiento si las secciones por categoría son disjuntas).
-   */
-  private async getEligibleQuestionsForCategory(
-    category: DashboardCategoryConfig,
-    activeInstruments: Instrument[],
-  ): Promise<{
-    questions: Question[];
-    instrumentByQuestionId: Map<string, Instrument>;
-  }> {
-    const mappingByCode = new Map(
-      category.instruments.map((mapping) => [mapping.instrumentCode, mapping]),
-    );
-
-    const seen = new Set<string>();
-    const questions: Question[] = [];
-    const instrumentByQuestionId = new Map<string, Instrument>();
-
-    for (const instrument of activeInstruments) {
-      const mapping = instrument.code
-        ? mappingByCode.get(instrument.code)
-        : undefined;
-      const instrumentQuestions = await this.getEligibleQuestions(
-        instrument.instrumentId,
-        mapping?.sectionNames,
-      );
-      for (const question of instrumentQuestions) {
-        if (seen.has(question.questionId)) continue;
-        seen.add(question.questionId);
-        questions.push(question);
-        instrumentByQuestionId.set(question.questionId, instrument);
-      }
+  /** Spec 109 (Fase 6): `categoryId` en una ruta de agregación responde 410. */
+  private rejectLegacyCategory(filters: DashboardFiltersDto): void {
+    if (filters.categoryId) {
+      throw new GoneException(LEGACY_CATEGORY_GONE);
     }
-
-    return { questions, instrumentByQuestionId };
   }
 
   private async validateFilters(filters: DashboardFiltersDto): Promise<{
     instrument: Instrument | null;
-    category: DashboardCategoryConfig | null;
-    categoryInstruments: Instrument[];
     departmentName?: string;
     townName?: string;
     cropName?: string;
     actorTypeName?: string;
   }> {
-    if (filters.instrumentId && filters.categoryId) {
-      throw new BadRequestException(
-        'No se puede filtrar por instrumentId y categoryId al mismo tiempo.',
-      );
-    }
+    this.rejectLegacyCategory(filters);
 
     let instrument: Instrument | null = null;
 
@@ -548,18 +440,6 @@ export class DashboardService {
       if (!instrument) {
         throw new NotFoundException('Instrumento no encontrado.');
       }
-    }
-
-    let category: DashboardCategoryConfig | null = null;
-    let categoryInstruments: Instrument[] = [];
-
-    if (filters.categoryId) {
-      category =
-        DASHBOARD_CATEGORIES.find((c) => c.id === filters.categoryId) ?? null;
-      if (!category) {
-        throw new NotFoundException('Categoría no encontrada.');
-      }
-      categoryInstruments = await this.getCategoryInstruments(category);
     }
 
     let departmentName: string | undefined;
@@ -602,8 +482,6 @@ export class DashboardService {
 
     return {
       instrument,
-      category,
-      categoryInstruments,
       departmentName,
       townName,
       cropName,
@@ -708,103 +586,6 @@ export class DashboardService {
       .then((questions) => questions.filter((q) => this.passesBarrier(q)));
   }
 
-  /**
-   * D15 (spec 66, Fase 3): colapsa los grupos de preguntas equivalentes de la
-   * categoría y suma los miembros `external` (de otra categoría) al
-   * representante. Un grupo sin representante en la categoría no se muestra.
-   */
-  private async applyQuestionMerges(
-    categoryId: string,
-    questions: Question[],
-    instrumentByQuestionId: Map<string, Instrument>,
-  ): Promise<Question[]> {
-    const groups = mergeGroupsForCategory(categoryId);
-    if (groups.length === 0) return questions;
-    const { questions: merged, externalToFetch } = collapseMergeGroups(
-      groups,
-      questions,
-      (q) => instrumentByQuestionId.get(q.questionId)?.code,
-    );
-    for (const { member, representative } of externalToFetch) {
-      const external = await this.findEligibleQuestionByInstrumentAndText(
-        member.instrumentCode,
-        member.questionText,
-      );
-      if (!external) continue;
-      this.warnIfOptionsDiffer(representative, external);
-      attachExternalIds(representative, external.questionId);
-    }
-    for (const question of merged) {
-      const ids = (question as DestinationQuestion).destinationQuestionIds;
-      if (!ids || ids.length < 2) continue;
-      for (const other of questions) {
-        if (other === question || !ids.includes(other.questionId)) continue;
-        this.warnIfOptionsDiffer(question, other);
-      }
-    }
-    return merged;
-  }
-
-  /**
-   * Como `findQuestionByInstrumentAndText`, pero con las mismas barreras de
-   * privacidad que `getEligibleQuestions` (tipos y `systemField` bloqueados) y
-   * prefiriendo la versión no archivada. Para miembros `external` de una
-   * fusión (D15), que no pasan por la lista de su categoría.
-   */
-  private async findEligibleQuestionByInstrumentAndText(
-    instrumentCode: string,
-    text: string,
-  ): Promise<Question | null> {
-    return this.questionRepo
-      .createQueryBuilder('question')
-      .innerJoin('question.section', 'section')
-      .innerJoin(
-        'section.instrument',
-        'instrument',
-        'instrument.code = :instrumentCode',
-        { instrumentCode },
-      )
-      .innerJoinAndSelect('question.type', 'type')
-      .leftJoinAndSelect('question.options', 'options')
-      .where('question.text = :text', { text })
-      .andWhere('type.name NOT IN (:...excludedTypes)', {
-        excludedTypes: EXCLUDED_QUESTION_TYPES,
-      })
-      .andWhere(
-        '(question.systemField IS NULL OR question.systemField NOT IN (:...deniedFields))',
-        { deniedFields: DENIED_SYSTEM_FIELDS },
-      )
-      .orderBy('question.archivedAt', 'ASC', 'NULLS FIRST')
-      .getOne()
-      .then((question) =>
-        question &&
-        isQuestionEligible({
-          text: question.text,
-          systemField: question.systemField,
-          typeName: question.type?.name,
-          instrumentCode,
-        })
-          ? question
-          : null,
-      );
-  }
-
-  /** D15 exige las mismas opciones en todos los miembros; si difieren, se avisa. */
-  private warnIfOptionsDiffer(a: Question, b: Question): void {
-    const texts = (q: Question) =>
-      new Set((q.options ?? []).map((option) => option.text));
-    const ta = texts(a);
-    const tb = texts(b);
-    const diff = [...ta]
-      .filter((t) => !tb.has(t))
-      .concat([...tb].filter((t) => !ta.has(t)));
-    if (diff.length > 0) {
-      this.logger.warn(
-        `Fusión de preguntas con opciones distintas ("${a.text}" / "${b.text}"): ${diff.join(', ')}`,
-      );
-    }
-  }
-
   /** Ids de las preguntas a leer para una pregunta resuelta por destino. */
   private idsOf(question: DestinationQuestion): string[] {
     return question.destinationQuestionIds ?? [question.questionId];
@@ -872,47 +653,6 @@ export class DashboardService {
       if (error instanceof UnsupportedQuestionTypeError) return null;
       throw error;
     }
-  }
-
-  /**
-   * Spec 108 (P16) — lo que la curaduría del 66 sirve hoy para una categoría
-   * (elegibles, sin ocultas, con las fusiones aplicadas), sin agregar datos.
-   * Insumo de la semilla `seed:dashboard-charts`.
-   */
-  async listCuratedDestinations(categoryCode: string): Promise<
-    {
-      question: Question;
-      instrument: Instrument | undefined;
-      questionIds: string[];
-      chartHint: string | null;
-    }[]
-  > {
-    const category = DASHBOARD_CATEGORIES.find((c) => c.code === categoryCode);
-    if (!category) return [];
-    const instruments = await this.getCategoryInstruments(category);
-    const { questions, instrumentByQuestionId } =
-      await this.getEligibleQuestionsForCategory(category, instruments);
-    const visible = questions.filter(
-      (q) =>
-        !isQuestionHidden(
-          instrumentByQuestionId.get(q.questionId)?.code,
-          q.text,
-        ),
-    );
-    const merged = await this.applyQuestionMerges(
-      category.id,
-      visible,
-      instrumentByQuestionId,
-    );
-    return merged.map((question) => {
-      const instrument = instrumentByQuestionId.get(question.questionId);
-      return {
-        question,
-        instrument,
-        questionIds: this.idsOf(question as DestinationQuestion),
-        chartHint: resolveCuratedChartHint(instrument?.code, question.text),
-      };
-    });
   }
 
   /** Valores y unidades de un destino `numeric_with_unit`, solo para normalizarlos en el servidor. */
@@ -1051,20 +791,6 @@ export class DashboardService {
       typeName: question.type?.name,
       instrumentCode: question.section?.instrument?.code,
     });
-  }
-
-  /**
-   * `undefined` cuando `filters.categoryId` no se pidió (sin filtro de
-   * instrumento); un array — posiblemente vacío — cuando sí se pidió, para
-   * que `applySurveyFilters` distinga "sin categoría" de "categoría sin
-   * instrumentos activos hoy" (ver nota en `applySurveyFilters`).
-   */
-  private resolveCategoryInstrumentIds(
-    filters: DashboardFiltersDto,
-    categoryInstruments: Instrument[],
-  ): string[] | undefined {
-    if (!filters.categoryId) return undefined;
-    return categoryInstruments.map((i) => i.instrumentId);
   }
 
   /**
@@ -1264,43 +990,13 @@ export class DashboardService {
   }
 
   /**
-   * Spec 84 — instrumentos que alimentan una categoría, respetando la marca
-   * `historic` de `dashboard-categories.config.ts`: las fuentes históricas
-   * (S1a/S1b una vez desactivadas) cuentan aunque `isActive: false`; el
-   * resto (incluido `S_REG`) solo mientras esté activo. Reemplaza el
-   * `find({ code: In(...), isActive: true })` que usaban por separado
-   * `validateFilters` y `getCategories`.
-   */
-  private async getCategoryInstruments(
-    category: DashboardCategoryConfig,
-  ): Promise<Instrument[]> {
-    const historicCodes = category.instruments
-      .filter((m) => m.historic)
-      .map((m) => m.instrumentCode);
-    const activeOnlyCodes = category.instruments
-      .filter((m) => !m.historic)
-      .map((m) => m.instrumentCode);
-
-    const [historic, activeOnly] = await Promise.all([
-      historicCodes.length
-        ? this.instrumentRepo.find({ where: { code: In(historicCodes) } })
-        : Promise.resolve([]),
-      activeOnlyCodes.length
-        ? this.instrumentRepo.find({
-            where: { code: In(activeOnlyCodes), isActive: true },
-          })
-        : Promise.resolve([]),
-    ]);
-
-    return [...historic, ...activeOnly];
-  }
-
-  /**
    * D6: exclusión por tipo no visualizable + denylist explícita de
    * systemField (no un blanket "farm.*"). `sectionNames` (spec 43, D1)
-   * restringe la agregación a ciertas secciones del instrumento — necesario
-   * para instrumentos que aportan a más de una categoría (ver S1a → C1/C2 en
-   * `dashboard-categories.config.ts`).
+   * restringía la agregación a ciertas secciones del instrumento para el mapa
+   * de categorías del 66.
+   * DEBT: desde el spec 109 (Fase 6) ningún llamador pasa `sectionNames`, y
+   * `categoryInstrumentIds` de `buildFilteredSurveyQuery`/`applySurveyFilters`
+   * siempre llega `undefined`; se pueden retirar en una limpieza aparte.
    */
   private async getEligibleQuestions(
     instrumentId: string,
@@ -1362,9 +1058,10 @@ export class DashboardService {
       systemField: question.systemField ?? null,
       isInverted,
       answeredCount,
-      // D3 (spec 66): gráfica curada explícitamente para esta pregunta, si
-      // la hay — el frontend cae al comportamiento por tipo cuando es null.
-      chartHint: resolveCuratedChartHint(instrument?.code, question.text),
+      // Spec 109 (Fase 6): la curaduría del 66 se retiró; el tipo de gráfico
+      // lo decide el constructor y, en la vista por instrumento, el frontend
+      // por tipo de pregunta.
+      chartHint: null,
       // D9 (spec 43, Fase 7): procedencia por pregunta — necesaria para que
       // una vista de categoría (que agrega varios instrumentos) pueda
       // etiquetar de dónde viene cada tarjeta.
@@ -1918,26 +1615,19 @@ export class DashboardService {
   // ─────────────────────────── Fase 4 (spec 43) ───────────────────────────
 
   /**
-   * D5: tira de KPIs curados. Solo existen dos vistas curadas en el diseño
-   * (`categoryId=C14` → `DIGITAL_DEMAND_KPIS`; cualquier otro caso,
-   * incluida la vista de resumen general, → `OVERVIEW_KPIS`).
-   * `instrumentId`/`categoryId` se descartan de los filtros reales de cada
-   * KPI (cada uno ya declara su propia pregunta fuente — igual que
-   * `getOverview`, D2) y solo se usa `categoryId` para elegir qué catálogo
-   * de KPIs devolver.
-   *
-   * Nota (spec 66, Fase 3, D7, 2026-08-10): era `categoryId=C15` antes de la
-   * renumeración en cascada al fusionar C1+C3.
+   * D5: tira de KPIs del resumen general (`OVERVIEW_KPIS`). Desde el spec
+   * 109 (Fase 6) `categoryId` responde 410 y ya no elige la tira de demanda
+   * digital. `instrumentId` se descarta de los filtros reales de cada KPI
+   * (cada uno declara su propia pregunta fuente, igual que `getOverview`).
    */
   async getKpis(filters: DashboardFiltersDto): Promise<DashboardKpiDto[]> {
-    const { categoryId, instrumentId: _instrumentId, ...rest } = filters;
+    this.rejectLegacyCategory(filters);
+    const { instrumentId: _instrumentId, ...rest } = filters;
     await this.validateFilters(rest);
     const responseFilters = await this.resolveResponseFilters(rest);
-    const definitions =
-      categoryId === 'C14' ? DIGITAL_DEMAND_KPIS : OVERVIEW_KPIS;
 
     const kpis: DashboardKpiDto[] = [];
-    for (const definition of definitions) {
+    for (const definition of OVERVIEW_KPIS) {
       kpis.push(await this.computeKpi(definition, rest, responseFilters));
     }
     return kpis;
@@ -2570,11 +2260,8 @@ export class DashboardService {
   async getDigitalDemand(
     filters: DashboardFiltersDto,
   ): Promise<DashboardDigitalDemandDto> {
-    const {
-      categoryId: _categoryId,
-      instrumentId: _instrumentId,
-      ...rest
-    } = filters;
+    this.rejectLegacyCategory(filters);
+    const { instrumentId: _instrumentId, ...rest } = filters;
     await this.validateFilters(rest);
     const responseFilters = await this.resolveResponseFilters(rest);
 
