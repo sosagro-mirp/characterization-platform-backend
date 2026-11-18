@@ -15,6 +15,10 @@ import { DashboardCategory } from './entities/dashboard-category.entity';
 import { DashboardChart } from './entities/dashboard-chart.entity';
 import { DashboardChartSource } from './entities/dashboard-chart-source.entity';
 import { DashboardChartEvent } from './entities/dashboard-chart-event.entity';
+import { DashboardAggregationService } from './dashboard-aggregation.service';
+import { DashboardBuilderController } from './dashboard-builder.controller';
+import { DashboardBuilderService } from './dashboard-builder.service';
+import { DashboardChartsService } from './dashboard-charts.service';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
@@ -38,7 +42,12 @@ import { DashboardService } from './dashboard.service';
       DashboardChartEvent,
     ]),
   ],
-  controllers: [DashboardController],
-  providers: [DashboardService],
+  controllers: [DashboardController, DashboardBuilderController],
+  providers: [
+    DashboardService,
+    DashboardAggregationService,
+    DashboardChartsService,
+    DashboardBuilderService,
+  ],
 })
 export class DashboardModule {}
