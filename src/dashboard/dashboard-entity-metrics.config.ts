@@ -58,6 +58,13 @@ export const ENTITY_METRICS: EntityMetricDefinition[] = [
     charts: ['bars', 'horizontal-bars', 'donut'],
   },
   {
+    // Spec 111: mapa del Resumen general.
+    metricKey: 'production_units_by_department',
+    label: 'Unidades productivas por departamento',
+    entity: 'production_unit',
+    charts: ['map', 'bars', 'horizontal-bars'],
+  },
+  {
     metricKey: 'farm_area_distribution',
     label: 'Distribución del área de las fincas',
     entity: 'farm',
