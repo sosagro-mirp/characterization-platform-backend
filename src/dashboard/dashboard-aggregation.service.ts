@@ -169,8 +169,14 @@ export class DashboardAggregationService {
     }
     if (query.cropId) {
       params.push(query.cropId);
+      // Spec 111 (A5): en unidades por departamento el cultivo restringe la
+      // propia unidad (`fc`); en las demás, la finca que tenga ese cultivo.
+      // DEBT: `production_units_by_crop` sigue con el criterio de finca
+      // (cuenta las otras unidades de esas fincas); ver spec/backlog.md.
       where.push(
-        `EXISTS (SELECT 1 FROM farms_crops fx WHERE fx.farm_id = f.farm_id AND fx.crop_id = $${params.length} AND fx.archived_at IS NULL)`,
+        metricKey === 'production_units_by_department'
+          ? `fc.crop_id = $${params.length}`
+          : `EXISTS (SELECT 1 FROM farms_crops fx WHERE fx.farm_id = f.farm_id AND fx.crop_id = $${params.length} AND fx.archived_at IS NULL)`,
       );
     }
     const extra = where.length ? ` AND ${where.join(' AND ')}` : '';
@@ -229,6 +235,20 @@ export class DashboardAggregationService {
                 WHERE TRUE${extra}
                 GROUP BY c.crop_id, c.name`;
         break;
+      case 'production_units_by_department':
+        // Spec 111: unidades productivas activas (finca × cultivo) ubicadas
+        // por el municipio de la finca. `JOIN` (no `LEFT`) a towns y
+        // departments, igual que su totalSql: los buckets particionan el
+        // total, como exige la supresión complementaria (P18-e).
+        sql = `SELECT d.department_id AS id, d.name AS name,
+                      COUNT(fc.farm_crop_id) AS count
+                 FROM farms f
+                 JOIN towns t ON t.town_id = f.town_id
+                 JOIN departments d ON d.department_id = t.department_id
+                 JOIN farms_crops fc ON fc.farm_id = f.farm_id AND fc.archived_at IS NULL
+                WHERE TRUE${extra}
+                GROUP BY d.department_id, d.name`;
+        break;
       case 'production_units_by_crop':
         sql = `SELECT c.crop_id AS id, c.name AS name,
                       COUNT(fc.farm_crop_id) AS count
@@ -252,6 +272,12 @@ export class DashboardAggregationService {
     } else if (metricKey === 'farms_by_department') {
       totalSql = `SELECT COUNT(DISTINCT f.farm_id) AS n FROM farms f
                    JOIN towns t ON t.town_id = f.town_id WHERE TRUE${extra}`;
+    } else if (metricKey === 'production_units_by_department') {
+      totalSql = `SELECT COUNT(fc.farm_crop_id) AS n FROM farms f
+                   JOIN towns t ON t.town_id = f.town_id
+                   JOIN departments d ON d.department_id = t.department_id
+                   JOIN farms_crops fc ON fc.farm_id = f.farm_id AND fc.archived_at IS NULL
+                  WHERE TRUE${extra}`;
     } else if (metricKey === 'farms_by_crop') {
       totalSql = `SELECT COUNT(DISTINCT f.farm_id) AS n FROM farms f
                    LEFT JOIN towns t ON t.town_id = f.town_id

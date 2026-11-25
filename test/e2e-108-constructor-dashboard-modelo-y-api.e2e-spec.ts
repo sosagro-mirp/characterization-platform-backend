@@ -40,7 +40,7 @@
  *                                            y `compatibleCharts` ([] si no es seleccionable)
  *   GET    /compat-matrix                    matriz P10: [{ questionType, charts, combineModes }]
  *   GET    /entity-metrics?entity=           catálogo P13: [{ metricKey, label, entity,
- *                                            charts, filters }] (cinco métricas)
+ *                                            charts, filters }] (seis métricas)
  *   POST   /charts (métrica)                 { categoryId, title, sourceKind: 'entity_metric',
  *                                            metricKey, chartKind, audience, layout? } sin series
  *   GET    /charts/:id/preview?audience=&<filtros globales>
@@ -1624,6 +1624,11 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
         entity: 'production_unit',
         charts: ['bars', 'horizontal-bars', 'donut'],
       },
+      // Spec 111: unidades productivas por departamento (mapa del Resumen general).
+      production_units_by_department: {
+        entity: 'production_unit',
+        charts: ['map', 'bars', 'horizontal-bars'],
+      },
       farm_area_distribution: { entity: 'farm', charts: ['histogram'] },
     };
 
@@ -1935,7 +1940,7 @@ describe('Spec 108 — constructor de dashboard: modelo y API (e2e)', () => {
 
     // ── Criterio 21 ─────────────────────────────────────────────────────────
 
-    it('criterio 21: GET /entity-metrics lista exactamente las cinco métricas con sus gráficos y filtros', async () => {
+    it('criterio 21: GET /entity-metrics lista exactamente las seis métricas con sus gráficos y filtros', async () => {
       const res = await http()
         .get(`${BASE}/entity-metrics`)
         .set('Authorization', `Bearer ${adminToken}`)
