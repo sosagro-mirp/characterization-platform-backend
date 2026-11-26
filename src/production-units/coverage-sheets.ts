@@ -16,6 +16,12 @@ export const STATUS_LABEL: Record<string, string> = {
   no_aplica: 'No aplica',
 };
 
+const LEVEL_LABEL: Record<string, string> = {
+  farmer: 'Por productor',
+  farm: 'Por finca',
+  farm_crop: 'Por cultivo',
+};
+
 export interface CoverageSheetsInput {
   columns: { instrumentId: string; label: string; scopeLevel: string }[];
   rows: {
@@ -106,7 +112,7 @@ export function addCoverageSheets(
     const p = summary.byColumn[c.instrumentId];
     const r = avance.addRow([
       c.label,
-      c.scopeLevel,
+      LEVEL_LABEL[c.scopeLevel] ?? c.scopeLevel,
       p.done,
       p.possible,
       p.percent,

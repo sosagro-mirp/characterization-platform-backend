@@ -126,14 +126,18 @@ export class ProductionUnitsExportService {
       throw new BadRequestException('Una o más fincas no existen');
     }
 
+    let cropNames: string[] = [];
     if (progressCropIds?.length) {
-      const found = await this.dataSource.query<{ crop_id: string }[]>(
-        `SELECT crop_id FROM types_of_crops WHERE crop_id = ANY($1::uuid[])`,
+      const found = await this.dataSource.query<
+        { crop_id: string; name: string }[]
+      >(
+        `SELECT crop_id, name FROM types_of_crops WHERE crop_id = ANY($1::uuid[])`,
         [progressCropIds],
       );
       if (found.length !== new Set(progressCropIds).size) {
         throw new BadRequestException('Uno o más cultivos no existen');
       }
+      cropNames = found.map((c) => c.name);
     }
 
     const buffer = await this.buildWorkbook(
@@ -142,6 +146,7 @@ export class ProductionUnitsExportService {
       filters,
       actor,
       progressCropIds,
+      cropNames,
     );
     const hash = createHash('sha256').update(buffer).digest('hex');
     await this.logs.save(
@@ -170,6 +175,7 @@ export class ProductionUnitsExportService {
     filters: Record<string, unknown>,
     actor: ExportActor,
     progressCropIds?: string[],
+    cropNames: string[] = [],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
@@ -317,11 +323,11 @@ export class ProductionUnitsExportService {
         'Avance global (%)',
         progress.global.percent === null
           ? '—'
-          : `${(progress.global.percent * 100).toFixed(1)} %`,
+          : `${Math.round(progress.global.percent * 100)} %`,
       ],
       [
         'Cultivos usados para el conteo',
-        progressCropIds?.length ? progressCropIds.join('; ') : 'Todos',
+        progressCropIds?.length ? cropNames.join('; ') : 'Todos',
       ],
       [],
       ['Reglas'],
