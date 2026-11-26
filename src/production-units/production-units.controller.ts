@@ -53,10 +53,12 @@ export class ProductionUnitsController {
     @Body() dto: ExportProductionUnitsDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    const { buffer } = await this.exporter.export(dto.farmIds, dto.filters, {
-      userId: user.userId,
-      email: user.email,
-    });
+    const { buffer } = await this.exporter.export(
+      dto.farmIds,
+      dto.filters,
+      { userId: user.userId, email: user.email },
+      dto.progressCropIds,
+    );
     return new StreamableFile(buffer);
   }
 

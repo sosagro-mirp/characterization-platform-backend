@@ -89,3 +89,37 @@ export function uniqueHeaders(headers: string[]): string[] {
     return n === 1 ? h : `${h} (${n})`;
   });
 }
+
+/** Spec 112 — colores de la hoja `Cobertura` (ARGB, relleno sólido). */
+export const COVERAGE_COLORS = {
+  aplicado: 'FFC6EFCE',
+  falta: 'FFFFC7CE',
+  parcial: 'FFFFEB9C',
+  no_aplica: 'FFEDEDED',
+} as const;
+
+/**
+ * Relleno de una celda de cobertura. Una encuesta fuera de alcance que no
+ * cubre todos los posibles sigue "Aplicado*" pero se pinta amarilla (D112-3).
+ */
+export function coverageFill(cell: {
+  status: 'aplicado' | 'parcial' | 'falta' | 'no_aplica';
+  outOfScope?: boolean;
+  possible?: number;
+  done?: number;
+}): string {
+  if (
+    cell.status === 'aplicado' &&
+    cell.outOfScope &&
+    (cell.done ?? 0) < (cell.possible ?? 0)
+  ) {
+    return COVERAGE_COLORS.parcial;
+  }
+  return COVERAGE_COLORS[cell.status];
+}
+
+/**
+ * Hojas cuyo autofiltro ya es definitivo (p. ej. `Avance`, con una fila Total
+ * que debe quedar fuera): `extendAutoFilters` no las estira.
+ */
+export const fixedAutoFilterSheets = new WeakSet<object>();

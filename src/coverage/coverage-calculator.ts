@@ -36,8 +36,21 @@ export interface SurveyInput {
   createdAt: string;
 }
 
+/** Spec 112 — un cultivo aplicable de la finca y si quedó cubierto. */
+export interface CropUnit {
+  farmCropId: string;
+  cropId: string;
+  covered: boolean;
+}
+
 export interface CoverageCell {
   status: CoverageStatus;
+  /** Spec 112 — encuestas posibles (0 si no aplica). Opcional: snapshots viejos no lo traen. */
+  possible?: number;
+  /** Spec 112 — encuestas realizadas, `0 ≤ done ≤ possible`. */
+  done?: number;
+  /** Spec 112 — solo en `farm_crop`: cultivos aplicables con su estado. */
+  cropUnits?: CropUnit[];
   surveyId?: string | null;
   surveyCount?: number;
   coveredFarmers?: number;
@@ -87,6 +100,8 @@ export function computeFarmCoverage(
       surveyCount: matches.length,
       coveredFarmers: covered.size,
       totalFarmers: farm.farmerIds.length,
+      possible: Math.max(1, farm.farmerIds.length),
+      done: covered.size,
     };
   }
 
@@ -111,6 +126,8 @@ export function computeFarmCoverage(
       status: farmSurveys.length ? 'aplicado' : 'falta',
       surveyId: farmSurveys[0]?.surveyId ?? null,
       surveyCount: farmSurveys.length,
+      possible: 1,
+      done: farmSurveys.length ? 1 : 0,
       ...(inferredFarm && farmSurveys.length ? { inferredFarm: true } : {}),
     };
   }
@@ -141,7 +158,15 @@ export function computeFarmCoverage(
     }
   }
 
+  const cropUnits: CropUnit[] = applicable.map((fc) => ({
+    farmCropId: fc.farmCropId,
+    cropId: fc.cropId,
+    covered: coveredCrops.has(fc.farmCropId),
+  }));
   const base = {
+    possible: applicable.length,
+    done: coveredCrops.size,
+    cropUnits,
     ...(inferredFarm && farmSurveys.length ? { inferredFarm: true } : {}),
   };
 

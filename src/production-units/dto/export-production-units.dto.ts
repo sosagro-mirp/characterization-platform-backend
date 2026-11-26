@@ -1,5 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { ArrayMaxSize, IsArray, IsObject, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsObject,
+  IsOptional,
+  IsUUID,
+} from 'class-validator';
 
 export class ExportProductionUnitsDto {
   /** Fincas a exportar: las que el usuario tiene filtradas en la vista. */
@@ -13,4 +19,12 @@ export class ExportProductionUnitsDto {
   @ApiProperty({ type: 'object', additionalProperties: true })
   @IsObject()
   filters: Record<string, unknown>;
+
+  /** Spec 112 — cultivos filtrados en la vista: recortan el conteo de avance. */
+  @ApiPropertyOptional({ type: [String], format: 'uuid' })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID(undefined, { each: true })
+  progressCropIds?: string[];
 }

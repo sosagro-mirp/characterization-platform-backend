@@ -4,8 +4,10 @@ import { createHash } from 'crypto';
 import * as ExcelJS from 'exceljs';
 import { DataSource, Repository } from 'typeorm';
 import { isCountableSurvey } from '../coverage/coverage-calculator';
+import { addCoverageSheets } from './coverage-sheets';
 import {
   cellValue,
+  fixedAutoFilterSheets,
   NUMERIC_WITH_UNIT,
   questionHeaders,
   ResponseRow,
@@ -23,13 +25,6 @@ import {
 
 // Spec 98, Fase 5 — libro de Excel con lo filtrado en la vista. Reglas en
 // `spec/98_exploracion_unidades_productivas.md`, sección "Excel".
-
-const STATUS_LABEL: Record<string, string> = {
-  aplicado: 'Aplicado',
-  parcial: 'Parcial',
-  falta: 'Falta',
-  no_aplica: 'No aplica',
-};
 
 const SELECTION_LABEL: Record<string, string> = {
   included: 'Incluida',
@@ -76,6 +71,7 @@ interface FilterRange {
  */
 export function extendAutoFilters(wb: ExcelJS.Workbook): void {
   for (const ws of wb.worksheets) {
+    if (fixedAutoFilterSheets.has(ws)) continue;
     const range = ws.autoFilter as FilterRange | string | undefined;
     if (!range || typeof range === 'string') continue;
     if (ws.rowCount <= range.to.row) continue;
@@ -121,6 +117,7 @@ export class ProductionUnitsExportService {
     farmIds: string[],
     filters: Record<string, unknown>,
     actor: ExportActor,
+    progressCropIds?: string[],
   ): Promise<ExportResult> {
     const data = await this.units.load();
     const wanted = new Set(farmIds);
@@ -129,14 +126,32 @@ export class ProductionUnitsExportService {
       throw new BadRequestException('Una o más fincas no existen');
     }
 
-    const buffer = await this.buildWorkbook(data, farms, filters, actor);
+    if (progressCropIds?.length) {
+      const found = await this.dataSource.query<{ crop_id: string }[]>(
+        `SELECT crop_id FROM types_of_crops WHERE crop_id = ANY($1::uuid[])`,
+        [progressCropIds],
+      );
+      if (found.length !== new Set(progressCropIds).size) {
+        throw new BadRequestException('Uno o más cultivos no existen');
+      }
+    }
+
+    const buffer = await this.buildWorkbook(
+      data,
+      farms,
+      filters,
+      actor,
+      progressCropIds,
+    );
     const hash = createHash('sha256').update(buffer).digest('hex');
     await this.logs.save(
       this.logs.create({
         userId: actor.userId,
         userEmail: actor.email,
         exportType: 'production_units',
-        filters,
+        filters: progressCropIds?.length
+          ? { ...filters, progressCropIds }
+          : filters,
         farmIds: farms.map((f) => f.farmId),
         rowCount: farms.length,
         fileSha256: hash,
@@ -154,6 +169,7 @@ export class ProductionUnitsExportService {
     farms: LoadedFarm[],
     filters: Record<string, unknown>,
     actor: ExportActor,
+    progressCropIds?: string[],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
     wb.created = new Date();
@@ -216,37 +232,26 @@ export class ProductionUnitsExportService {
       ]);
     });
 
-    // Cobertura
-    const cobertura = this.sheet(wb, 'Cobertura', [
-      'Finca',
-      ...data.columns.map((c) => c.coverageGroup ?? c.code ?? c.name),
-    ]);
-    rows.forEach((row) => {
-      cobertura.addRow([
-        row.name,
-        ...data.columns.map((c) => {
-          const cell = row.coverage[c.instrumentId];
-          const extra =
-            cell.totalFarmers && cell.totalFarmers > 1
-              ? ` (${cell.coveredFarmers} de ${cell.totalFarmers})`
-              : '';
-          const marks =
-            cell.outOfScope || cell.inferredCrop || cell.inferredFarm
-              ? '*'
-              : '';
-          const repeated =
-            cell.surveyCount && cell.surveyCount > 1
-              ? ` [${cell.surveyCount} encuestas]`
-              : '';
-          return `${STATUS_LABEL[cell.status]}${extra}${marks}${repeated}`;
-        }),
-      ]);
+    // Cobertura y Avance (spec 112)
+    const progress = addCoverageSheets(wb, {
+      columns: data.columns.map((c) => ({
+        instrumentId: c.instrumentId,
+        label: c.coverageGroup ?? c.code ?? c.name,
+        scopeLevel: c.scopeLevel,
+      })),
+      rows: rows.map((r) => ({
+        farmId: r.farmId,
+        name: r.name,
+        coverage: r.coverage,
+      })),
+      cropIds: progressCropIds,
     });
 
     // Respuestas por instrumento
     const usedNames = new Set<string>([
       'Unidades',
       'Cobertura',
+      'Avance',
       'Sin ubicar',
       'Diccionario',
       'Metadatos',
@@ -304,6 +309,20 @@ export class ProductionUnitsExportService {
       ['Fincas exportadas', farms.length],
       ['Fincas con consentimiento pendiente', pendingConsentRows],
       ['Encuestas sin ubicar', unlocated.length],
+      [
+        'Avance global (realizadas / posibles)',
+        `${progress.global.done} / ${progress.global.possible}`,
+      ],
+      [
+        'Avance global (%)',
+        progress.global.percent === null
+          ? '—'
+          : `${(progress.global.percent * 100).toFixed(1)} %`,
+      ],
+      [
+        'Cultivos usados para el conteo',
+        progressCropIds?.length ? progressCropIds.join('; ') : 'Todos',
+      ],
       [],
       ['Reglas'],
       [
@@ -315,6 +334,12 @@ export class ProductionUnitsExportService {
         'Solo salen hojas de respuestas de instrumentos con al menos una encuesta incluida.',
       ],
       ['Multimedia: solo el conteo de adjuntos, sin URL.'],
+      [
+        'Avance: cada encuesta aplicable cuenta una vez (por cultivo en cultivo, por productor en productor, por finca en finca). No aplica se omite; fuera de alcance no suma.',
+      ],
+      [
+        'Colores de Cobertura: verde aplicado, rojo claro falta, amarillo parcial (o fuera de alcance sin cubrir), gris no aplica.',
+      ],
       [
         'En Cobertura, * marca una encuesta fuera de alcance o con cultivo/finca inferidos.',
       ],

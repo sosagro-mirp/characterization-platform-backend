@@ -184,13 +184,10 @@ describe('Spec 112 — libro generado', () => {
     // REGISTRO 2/2 + S_FINCA 1/2 + S_CULT 2/3 + S2.4 0/1 = 5 de 8.
     expect(total.getCell(h.get('Realizadas')!).value).toBe(5);
     expect(total.getCell(h.get('Posibles')!).value).toBe(8);
-    const filter = ws.autoFilter as
-      | { to: { row: number } }
-      | string
-      | undefined;
-    if (filter && typeof filter !== 'string') {
-      expect(filter.to.row).toBeLessThan(ws.rowCount);
-    }
+    const ref = ws.autoFilter as unknown as string | undefined;
+    const end = /:([A-Z]+)(\d+)$/.exec(ref ?? '');
+    expect(end).not.toBeNull();
+    expect(Number(end![2])).toBeLessThan(ws.rowCount);
     // S2.4: solo cuenta la finca A (la B no aplica), 0 de 1.
     const s24 = ws.getRow(5);
     expect(s24.getCell(h.get('Posibles')!).value).toBe(1);
@@ -220,8 +217,10 @@ describe('Spec 112 — libro generado', () => {
 
   it('C15 — el autofiltro de Cobertura llega hasta su última fila', async () => {
     const ws = (await roundTrip(INPUT)).getWorksheet('Cobertura')!;
-    const filter = ws.autoFilter as { to: { row: number; column: number } };
-    expect(filter.to.row).toBe(ws.rowCount);
-    expect(filter.to.column).toBe(ws.getRow(1).cellCount);
+    // Al releer, ExcelJS devuelve el rango como cadena A1 ("A1:H3").
+    const ref = ws.autoFilter as unknown as string;
+    const end = /:([A-Z]+)(\d+)$/.exec(ref)!;
+    expect(Number(end[2])).toBe(ws.rowCount);
+    expect(ws.getColumn(end[1]).number).toBe(ws.getRow(1).cellCount);
   });
 });
